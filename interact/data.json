@@ -1,0 +1,8 @@
+{
+  "code": "file:gateway/output/gateway.wasm",
+  "address": {
+    "devnet": "",
+    "testnet": "",
+    "mainnet": ""
+  }
+}
