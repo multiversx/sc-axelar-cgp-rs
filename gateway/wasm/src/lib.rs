@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                            0
+// Endpoints:                            9
 // Async Callback (empty):               1
-// Total number of exported functions:   2
+// Total number of exported functions:  11
 
 #![no_std]
 #![feature(lang_items)]
@@ -19,6 +19,15 @@ multiversx_sc_wasm_adapter::endpoints! {
     gateway
     (
         init => init
+        sendToken => send_token
+        callContract => call_contract
+        callContractWithToken => call_contract_with_token
+        validateContractCall => validate_contract_call
+        validateContractCallAndMint => validate_contract_call_and_mint
+        isContractCallApproved => is_contract_call_approved
+        isContractCallAndMintApproved => is_contract_call_and_mint_approved
+        token_mint_limit => token_mint_limit
+        token_mint_amount => token_mint_amount
     )
 }
 
