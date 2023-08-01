@@ -44,4 +44,21 @@ pub trait Events {
         #[indexed] destination_contract_address: ManagedBuffer,
         data: ContractCallWithTokenData<Self::Api>,
     );
+
+    #[event("governance_transferred_event")]
+    fn governance_transferred_event(
+        &self,
+        #[indexed] previous_governance: ManagedAddress,
+        #[indexed] new_governance: ManagedAddress,
+    );
+
+    #[event("mint_limiter_transferred_event")]
+    fn mint_limiter_transferred_event(
+        &self,
+        #[indexed] previous_mint_limiter: ManagedAddress,
+        #[indexed] new_mint_limiter: ManagedAddress,
+    );
+
+    #[event("token_mint_limit_updated_event")]
+    fn token_mint_limit_updated_event(&self, #[indexed] symbol: EgldOrEsdtTokenIdentifier, limit: &BigUint);
 }

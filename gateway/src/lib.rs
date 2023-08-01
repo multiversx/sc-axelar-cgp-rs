@@ -4,13 +4,14 @@ multiversx_sc::imports!();
 
 mod constants;
 mod events;
+mod governance;
 mod tokens;
 
 use crate::constants::*;
 use crate::events::{ContractCallData, ContractCallWithTokenData};
 
 #[multiversx_sc::contract]
-pub trait Gateway: tokens::Tokens + events::Events {
+pub trait Gateway: tokens::Tokens + governance::Governance + events::Events {
     #[init]
     fn init(&self, auth_module: &ManagedAddress, token_deployer_implementation: &ManagedAddress) {
         require!(
@@ -109,7 +110,13 @@ pub trait Gateway: tokens::Tokens + events::Events {
     ) -> bool {
         let contract_address = &self.blockchain().get_caller();
 
-        let hash = self.get_is_contract_call_approved_key(command_id, source_chain, source_address, contract_address, payload_hash);
+        let hash = self.get_is_contract_call_approved_key(
+            command_id,
+            source_chain,
+            source_address,
+            contract_address,
+            payload_hash,
+        );
 
         let valid = self.approved_key_bool().contains(&hash);
 
@@ -133,7 +140,15 @@ pub trait Gateway: tokens::Tokens + events::Events {
     ) -> bool {
         let contract_address = &self.blockchain().get_caller();
 
-        let hash = self.get_is_contract_call_approved_with_mint_key(command_id, source_chain, source_address, contract_address, payload_hash, symbol.clone(), amount);
+        let hash = self.get_is_contract_call_approved_with_mint_key(
+            command_id,
+            source_chain,
+            source_address,
+            contract_address,
+            payload_hash,
+            symbol.clone(),
+            amount,
+        );
 
         let valid = self.approved_key_bool().contains(&hash);
 
@@ -154,7 +169,13 @@ pub trait Gateway: tokens::Tokens + events::Events {
         contract_address: &ManagedAddress,
         payload_hash: &ManagedBuffer,
     ) -> bool {
-        let hash = self.get_is_contract_call_approved_key(command_id, source_chain, source_address, contract_address, payload_hash);
+        let hash = self.get_is_contract_call_approved_key(
+            command_id,
+            source_chain,
+            source_address,
+            contract_address,
+            payload_hash,
+        );
 
         self.approved_key_bool().contains(&hash)
     }
@@ -170,9 +191,44 @@ pub trait Gateway: tokens::Tokens + events::Events {
         symbol: EgldOrEsdtTokenIdentifier,
         amount: &BigUint,
     ) -> bool {
-        let hash = self.get_is_contract_call_approved_with_mint_key(command_id, source_chain, source_address, contract_address, payload_hash, symbol, amount);
+        let hash = self.get_is_contract_call_approved_with_mint_key(
+            command_id,
+            source_chain,
+            source_address,
+            contract_address,
+            payload_hash,
+            symbol,
+            amount,
+        );
 
         self.approved_key_bool().contains(&hash)
+    }
+
+    #[view(isCommandExecuted)]
+    fn is_command_executed(&self, command_id: &ManagedBuffer) -> bool {
+        let hash = self.get_is_command_executed_key(command_id);
+
+        self.approved_key_bool().contains(&hash)
+    }
+
+    // TODO: Is this really needed?
+    #[view(contractId)]
+    fn contract_id(&self) -> ManagedByteArray<32> {
+        self.crypto()
+            .keccak256(ManagedBuffer::new_from_bytes(AXELAR_GATEWAY))
+    }
+
+    fn get_is_command_executed_key(&self, command_id: &ManagedBuffer) -> ManagedByteArray<32> {
+        let prefix: ManagedByteArray<32> = self
+            .crypto()
+            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_COMMAND_EXECUTED));
+
+        let mut encoded = ManagedBuffer::new();
+
+        encoded.append(prefix.as_managed_buffer());
+        encoded.append(command_id);
+
+        self.crypto().keccak256(encoded)
     }
 
     fn get_is_contract_call_approved_key(
@@ -183,7 +239,9 @@ pub trait Gateway: tokens::Tokens + events::Events {
         contract_address: &ManagedAddress,
         payload_hash: &ManagedBuffer,
     ) -> ManagedByteArray<32> {
-        let prefix: ManagedByteArray<32> = self.crypto().keccak256(ManagedBuffer::new_from_bytes(PREFIX_CONTRACT_CALL_APPROVED));
+        let prefix: ManagedByteArray<32> = self
+            .crypto()
+            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_CONTRACT_CALL_APPROVED));
 
         let mut encoded = ManagedBuffer::new();
 
@@ -207,7 +265,9 @@ pub trait Gateway: tokens::Tokens + events::Events {
         symbol: EgldOrEsdtTokenIdentifier,
         amount: &BigUint,
     ) -> ManagedByteArray<32> {
-        let prefix: ManagedByteArray<32> = self.crypto().keccak256(ManagedBuffer::new_from_bytes(PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT));
+        let prefix: ManagedByteArray<32> = self.crypto().keccak256(ManagedBuffer::new_from_bytes(
+            PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT,
+        ));
 
         let mut encoded = ManagedBuffer::new();
 
@@ -223,41 +283,17 @@ pub trait Gateway: tokens::Tokens + events::Events {
         self.crypto().keccak256(encoded)
     }
 
-    fn only_governance(&self, caller: ManagedAddress) {
-        require!(
-            caller
-                == self
-                    .get_address(ManagedBuffer::new_from_bytes(KEY_GOVERNANCE))
-                    .get(),
-            "Not governance"
-        );
-    }
-
-    // @dev Reverts with an error if the sender is not the mint limiter or governance.
-    fn only_mint_limiter(&self, caller: ManagedAddress) {
-        let mint_limiter = self
-            .get_address(ManagedBuffer::new_from_bytes(KEY_MINT_LIMITER))
-            .get();
-
-        let governance = self
-            .get_address(ManagedBuffer::new_from_bytes(KEY_GOVERNANCE))
-            .get();
-
-        require!(
-            caller == mint_limiter || caller == governance,
-            "Not mint limiter"
-        );
-    }
-
+    #[view(authModule)]
     #[storage_mapper("auth_module")]
     fn auth_module(&self) -> SingleValueMapper<ManagedAddress>;
 
+    #[view(tokenDeployer)]
     #[storage_mapper("token_deployer_implementation")]
     fn token_deployer_implementation(&self) -> SingleValueMapper<ManagedAddress>;
 
-    // TODO: Modify these to independent storages?
-    #[storage_mapper("get_address")]
-    fn get_address(&self, key: ManagedBuffer) -> SingleValueMapper<ManagedAddress>;
+    #[view(implementation)]
+    #[storage_mapper("implementation")]
+    fn implementation(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[storage_mapper("approved_key_bool")]
     fn approved_key_bool(&self) -> WhitelistMapper<ManagedByteArray<32>>;

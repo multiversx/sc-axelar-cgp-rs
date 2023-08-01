@@ -1,21 +1,10 @@
 multiversx_sc::imports!();
 
 use crate::constants::*;
+use crate::events;
 
 #[multiversx_sc::module]
-pub trait Tokens {
-    #[view]
-    fn token_mint_limit(&self, symbol: &EgldOrEsdtTokenIdentifier) -> BigUint {
-        self.get_biguint(self.get_token_mint_limit_key(symbol)).get()
-    }
-
-    #[view]
-    fn token_mint_amount(&self, symbol: &EgldOrEsdtTokenIdentifier) -> BigUint {
-        let timestamp = self.blockchain().get_block_timestamp();
-
-        self.get_biguint(self.get_token_mint_amount_key(symbol, timestamp / HOURS_TO_SECONDS_6)).get()
-    }
-
+pub trait Tokens: events::Events {
     fn burn_token_from(
         &self,
         _caller: &ManagedAddress,
@@ -24,7 +13,7 @@ pub trait Tokens {
     ) {
         require!(amount > &BigUint::zero(), "Invalid amount");
 
-        let token_type_mapper = self.get_token_type(symbol);
+        let token_type_mapper = self.token_type(symbol);
 
         require!(!token_type_mapper.is_empty(), "Token does not exist");
 
@@ -44,14 +33,19 @@ pub trait Tokens {
         }
     }
 
-    fn mint_token(&self, symbol: &EgldOrEsdtTokenIdentifier, account: &ManagedAddress, amount: &BigUint) {
-        let token_type_mapper = self.get_token_type(symbol);
+    fn mint_token(
+        &self,
+        symbol: &EgldOrEsdtTokenIdentifier,
+        account: &ManagedAddress,
+        amount: &BigUint,
+    ) {
+        let token_type_mapper = self.token_type(symbol);
 
         require!(!token_type_mapper.is_empty(), "Token does not exist");
 
         let token_type: TokenType = token_type_mapper.get();
 
-        self.set_token_mint_amount(symbol, &self.token_mint_amount(symbol) + amount);
+        self.set_token_mint_amount(symbol, &self.get_token_mint_amount(symbol) + amount);
 
         match token_type {
             TokenType::External => {
@@ -65,39 +59,51 @@ pub trait Tokens {
         }
     }
 
-    fn get_token_mint_limit_key(&self, symbol: &EgldOrEsdtTokenIdentifier) -> ManagedByteArray<32> {
-        let mut encoded = ManagedBuffer::new();
+    fn set_token_mint_limit(&self, symbol: EgldOrEsdtTokenIdentifier, limit: &BigUint) {
+        self.token_mint_limit(&symbol).set(limit);
 
-        encoded.append(&ManagedBuffer::new_from_bytes(PREFIX_TOKEN_MINT_LIMIT));
-        encoded.append(&symbol.clone().into_name());
-
-        self.crypto().keccak256(encoded)
-    }
-
-    fn get_token_mint_amount_key(&self, symbol: &EgldOrEsdtTokenIdentifier, day: u64) -> ManagedByteArray<32> {
-        let mut encoded = ManagedBuffer::new();
-
-        encoded.append(&ManagedBuffer::new_from_bytes(PREFIX_TOKEN_MINT_AMOUNT));
-        encoded.append(&symbol.clone().into_name());
-        encoded.append(&BigUint::from(day).to_bytes_be_buffer());
-
-        self.crypto().keccak256(encoded)
+        self.token_mint_limit_updated_event(symbol, limit);
     }
 
     fn set_token_mint_amount(&self, symbol: &EgldOrEsdtTokenIdentifier, amount: BigUint) {
-        let limit = self.token_mint_limit(symbol);
+        let token_mint_limit_storage = self.token_mint_limit(symbol);
 
-        require!(limit == 0 || limit >= amount, "Exceed mint limit");
+        require!(
+            token_mint_limit_storage.is_empty() || token_mint_limit_storage.get() >= amount,
+            "Exceed mint limit"
+        );
 
         let timestamp = self.blockchain().get_block_timestamp();
 
-        self.get_biguint(self.get_token_mint_amount_key(symbol, timestamp / HOURS_TO_SECONDS_6)).set(amount);
+        self.token_mint_amount(symbol, timestamp / HOURS_6_TO_SECONDS)
+            .set(amount);
     }
 
-    // TODO: Modify this to independent storages?
-    #[storage_mapper("get_biguint")]
-    fn get_biguint(&self, key: ManagedByteArray<32>) -> SingleValueMapper<BigUint>;
+    #[view(tokenMintAmount)]
+    fn get_token_mint_amount(&self, symbol: &EgldOrEsdtTokenIdentifier) -> BigUint {
+        let timestamp = self.blockchain().get_block_timestamp();
 
+        self.token_mint_amount(symbol, timestamp / HOURS_6_TO_SECONDS)
+            .get()
+    }
+
+    #[view(tokenMintLimit)]
+    #[storage_mapper("token_mint_limit")]
+    fn token_mint_limit(&self, symbol: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<BigUint>;
+
+    #[storage_mapper("token_mint_amount")]
+    fn token_mint_amount(
+        &self,
+        symbol: &EgldOrEsdtTokenIdentifier,
+        day: u64,
+    ) -> SingleValueMapper<BigUint>;
+
+    #[view(getTokenType)]
     #[storage_mapper("token_type")]
-    fn get_token_type(&self, token: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<TokenType>;
+    fn token_type(&self, token: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<TokenType>;
+
+    // TODO: Do we need this?
+    // #[view(tokenAddresses)]
+    // #[storage_mapper("token_addresses")]
+    // fn token_addresses(&self, token: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<ManagedAddress>;
 }
