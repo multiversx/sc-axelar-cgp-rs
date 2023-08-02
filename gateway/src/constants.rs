@@ -3,8 +3,7 @@ multiversx_sc::derive_imports!();
 
 /// Will be used for generating keccak256 hash
 pub const PREFIX_COMMAND_EXECUTED: &[u8; 16] = b"command-executed";
-pub const PREFIX_TOKEN_ADDRESS: &[u8; 13] = b"token-address";
-pub const PREFIX_TOKEN_TYPE: &[u8; 10] = b"token-type";
+// pub const PREFIX_TOKEN_ADDRESS: &[u8; 13] = b"token-address"; // TODO: Should we add storage for 'token address' which on MultiversX it might be the ESDT identifier of the token?
 pub const PREFIX_CONTRACT_CALL_APPROVED: &[u8; 22] = b"contract-call-approved";
 pub const PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT: &[u8; 32] = b"contract-call-approved-with-mint";
 
@@ -56,4 +55,27 @@ pub struct MintTokenParams<M: ManagedTypeApi> {
 pub struct BurnTokenParams<M: ManagedTypeApi> {
     pub symbol: EgldOrEsdtTokenIdentifier<M>,
     pub salt: ManagedBuffer<M>, // TODO: What is this used for exactly?
+}
+
+#[derive(TypeAbi, TopDecode, Debug)]
+pub struct ApproveContractCallParams<M: ManagedTypeApi> {
+    pub source_chain: ManagedBuffer<M>,
+    pub source_address: ManagedBuffer<M>,
+    pub contract_address: ManagedAddress<M>,
+    pub payload_hash: ManagedBuffer<M>,
+    pub source_tx_hash: ManagedBuffer<M>,
+    pub source_event_index: BigUint<M>,
+}
+
+
+#[derive(TypeAbi, TopDecode, Debug)]
+pub struct ApproveContractCallWithMintParams<M: ManagedTypeApi> {
+    pub source_chain: ManagedBuffer<M>,
+    pub source_address: ManagedBuffer<M>,
+    pub contract_address: ManagedAddress<M>,
+    pub payload_hash: ManagedBuffer<M>,
+    pub symbol: EgldOrEsdtTokenIdentifier<M>,
+    pub amount: BigUint<M>,
+    pub source_tx_hash: ManagedBuffer<M>,
+    pub source_event_index: BigUint<M>,
 }

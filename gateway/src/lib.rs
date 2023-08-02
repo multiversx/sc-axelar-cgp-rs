@@ -122,10 +122,10 @@ pub trait Gateway:
             payload_hash,
         );
 
-        let valid = self.approved_key_bool().contains(&hash);
+        let valid = self.contract_call_approved().contains(&hash);
 
         if valid {
-            self.approved_key_bool().remove(&hash);
+            self.contract_call_approved().remove(&hash);
         }
 
         valid
@@ -150,14 +150,14 @@ pub trait Gateway:
             source_address,
             contract_address,
             payload_hash,
-            symbol.clone(),
+            symbol,
             amount,
         );
 
-        let valid = self.approved_key_bool().contains(&hash);
+        let valid = self.contract_call_approved().contains(&hash);
 
         if valid {
-            self.approved_key_bool().remove(&hash);
+            self.contract_call_approved().remove(&hash);
             let result = self.mint_token_raw(symbol, contract_address, amount);
 
             require!(result, "Token does not exist");
@@ -205,8 +205,9 @@ pub trait Gateway:
         for index in 0..commands_length {
             let command_id_ref = execute_data.command_ids.get(index);
             let command_id = command_id_ref.deref();
+            let command_id_hash = self.get_is_command_executed_key(command_id);
 
-            if self.command_executed().contains(command_id) {
+            if self.command_executed().contains(&command_id_hash) {
                 continue;
             }
 
@@ -243,7 +244,7 @@ pub trait Gateway:
             }
 
             if success {
-                self.command_executed().add(command_id);
+                self.command_executed().add(&command_id_hash);
 
                 self.executed_event(command_id);
             }
@@ -267,7 +268,7 @@ pub trait Gateway:
             payload_hash,
         );
 
-        self.approved_key_bool().contains(&hash)
+        self.contract_call_approved().contains(&hash)
     }
 
     #[view(isContractCallAndMintApproved)]
@@ -278,7 +279,7 @@ pub trait Gateway:
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
         payload_hash: &ManagedBuffer,
-        symbol: EgldOrEsdtTokenIdentifier,
+        symbol: &EgldOrEsdtTokenIdentifier,
         amount: &BigUint,
     ) -> bool {
         let hash = self.get_is_contract_call_approved_with_mint_key(
@@ -291,14 +292,14 @@ pub trait Gateway:
             amount,
         );
 
-        self.approved_key_bool().contains(&hash)
+        self.contract_call_approved().contains(&hash)
     }
 
     #[view(isCommandExecuted)]
     fn is_command_executed(&self, command_id: &ManagedBuffer) -> bool {
         let hash = self.get_is_command_executed_key(command_id);
 
-        self.approved_key_bool().contains(&hash)
+        self.command_executed().contains(&hash)
     }
 
     // TODO: Is this really needed?
@@ -321,58 +322,6 @@ pub trait Gateway:
         self.crypto().keccak256(encoded)
     }
 
-    fn get_is_contract_call_approved_key(
-        &self,
-        command_id: &ManagedBuffer,
-        source_chain: &ManagedBuffer,
-        source_address: &ManagedBuffer,
-        contract_address: &ManagedAddress,
-        payload_hash: &ManagedBuffer,
-    ) -> ManagedByteArray<32> {
-        let prefix: ManagedByteArray<32> = self
-            .crypto()
-            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_CONTRACT_CALL_APPROVED));
-
-        let mut encoded = ManagedBuffer::new();
-
-        encoded.append(prefix.as_managed_buffer());
-        encoded.append(command_id);
-        encoded.append(source_chain);
-        encoded.append(source_address);
-        encoded.append(contract_address.as_managed_buffer());
-        encoded.append(payload_hash);
-
-        self.crypto().keccak256(encoded)
-    }
-
-    fn get_is_contract_call_approved_with_mint_key(
-        &self,
-        command_id: &ManagedBuffer,
-        source_chain: &ManagedBuffer,
-        source_address: &ManagedBuffer,
-        contract_address: &ManagedAddress,
-        payload_hash: &ManagedBuffer,
-        symbol: EgldOrEsdtTokenIdentifier,
-        amount: &BigUint,
-    ) -> ManagedByteArray<32> {
-        let prefix: ManagedByteArray<32> = self.crypto().keccak256(ManagedBuffer::new_from_bytes(
-            PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT,
-        ));
-
-        let mut encoded = ManagedBuffer::new();
-
-        encoded.append(prefix.as_managed_buffer());
-        encoded.append(command_id);
-        encoded.append(source_chain);
-        encoded.append(source_address);
-        encoded.append(contract_address.as_managed_buffer());
-        encoded.append(payload_hash);
-        encoded.append(&symbol.into_name());
-        encoded.append(&amount.to_bytes_be_buffer());
-
-        self.crypto().keccak256(encoded)
-    }
-
     #[view(authModule)]
     #[storage_mapper("auth_module")]
     fn auth_module(&self) -> SingleValueMapper<ManagedAddress>;
@@ -381,13 +330,13 @@ pub trait Gateway:
     #[storage_mapper("token_deployer_implementation")]
     fn token_deployer_implementation(&self) -> SingleValueMapper<ManagedAddress>;
 
-    #[view(implementation)]
-    #[storage_mapper("implementation")]
-    fn implementation(&self) -> SingleValueMapper<ManagedAddress>;
-
-    #[storage_mapper("approved_key_bool")]
-    fn approved_key_bool(&self) -> WhitelistMapper<ManagedByteArray<32>>;
-
     #[storage_mapper("command_executed")]
-    fn command_executed(&self) -> WhitelistMapper<ManagedBuffer>;
+    fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<32>>;
+
+    // TODO: Functions not yet implemented:
+    // setup - not sure how this can be implented and if relevant with native upgrading of MultiversX
+    // _hasCode - no equivalent on MultiversX
+    // _getCreate2Address - not sure how to handle the DepositHandler from sol
+    // _setImplementation - since MultiversX supports native upgrades, nothing related to that was put here
+    // upgrade - function was not implemented since MultiversX contracts are upgradable
 }

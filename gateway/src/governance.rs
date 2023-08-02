@@ -46,11 +46,9 @@ pub trait Governance: tokens::Tokens + events::Events {
             // TODO: Should we implement `tokenAddresses` instead?
             require!(!self.token_type(&symbol).is_empty(), "Token does not exist");
 
-            self.set_token_mint_limit(symbol, limit_ref.deref());
+            self.set_token_mint_limit(&symbol, limit_ref.deref());
         }
     }
-
-    // TODO: The `upgrade` function was not implemented since MultiversX contracts are upgradable. Is this correct or should the function be implemented?
 
     fn transfer_governance_raw(&self, new_governance: ManagedAddress) {
         self.governance().set(&new_governance);
@@ -85,7 +83,7 @@ pub trait Governance: tokens::Tokens + events::Events {
 
     #[view(governance)]
     #[storage_mapper("governance")]
-    fn governance(&self) -> SingleValueMapper<ManagedAddress>;
+    fn governance(&self) -> SingleValueMapper<ManagedAddress>; // TODO: Nothing related to governance is used currently because native upgrades on MultiversX. Is this correct?
 
     #[view(mintLimiter)]
     #[storage_mapper("mint_limiter")]

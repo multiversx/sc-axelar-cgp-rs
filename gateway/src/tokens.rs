@@ -41,7 +41,7 @@ pub trait Tokens: events::Events {
     ) -> bool {
         let token_type_mapper = self.token_type(symbol);
 
-        // This function was transformed to return bool because we don't want it to halt the whole contract execution in case of `execute` function
+        // This function was transformed to return bool because we don't want it to halt the whole contract execution in case of `execute` endpoint
         if !token_type_mapper.is_empty() {
             return false;
         }
@@ -64,8 +64,8 @@ pub trait Tokens: events::Events {
         return true;
     }
 
-    fn set_token_mint_limit(&self, symbol: EgldOrEsdtTokenIdentifier, limit: &BigUint) {
-        self.token_mint_limit(&symbol).set(limit);
+    fn set_token_mint_limit(&self, symbol: &EgldOrEsdtTokenIdentifier, limit: &BigUint) {
+        self.token_mint_limit(symbol).set(limit);
 
         self.token_mint_limit_updated_event(symbol, limit);
     }
@@ -100,7 +100,7 @@ pub trait Tokens: events::Events {
     fn token_mint_amount(
         &self,
         symbol: &EgldOrEsdtTokenIdentifier,
-        day: u64,
+        day: u64, // TODO: Why is the 'day' needed here?
     ) -> SingleValueMapper<BigUint>;
 
     #[view(getTokenType)]

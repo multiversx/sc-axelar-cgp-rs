@@ -5,10 +5,10 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           21
+// Endpoints:                           20
 // Async Callback (empty):               1
 // Promise callbacks:                    1
-// Total number of exported functions:  24
+// Total number of exported functions:  23
 
 #![no_std]
 #![feature(lang_items)]
@@ -32,7 +32,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         contractId => contract_id
         authModule => auth_module
         tokenDeployer => token_deployer_implementation
-        implementation => implementation
         tokenMintAmount => get_token_mint_amount
         tokenMintLimit => token_mint_limit
         getTokenType => token_type

@@ -1,7 +1,8 @@
 multiversx_sc::imports!();
 
-use crate::constants::{DeployTokenParams, TokenType, ESDT_ISSUE_COST, MintTokenParams, BurnTokenParams};
+use crate::constants::{ApproveContractCallParams, BurnTokenParams, DeployTokenParams, MintTokenParams, TokenType, ESDT_ISSUE_COST, PREFIX_CONTRACT_CALL_APPROVED, PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT, ApproveContractCallWithMintParams};
 use crate::{events, tokens};
+use crate::events::{ContractCallApprovedData, ContractCallApprovedWithMintData};
 
 #[multiversx_sc::module]
 pub trait Functions: tokens::Tokens + events::Events {
@@ -32,7 +33,10 @@ pub trait Functions: tokens::Tokens + events::Events {
                     params.decimals as usize,
                 )
                 .async_call_promise() // TODO: Is this feature live on mainnet?
-                .with_callback(self.callbacks().deploy_token_callback(params.symbol, params.mint_limit)) // TODO: The token issuance can fail async and we don't know this when executing the command
+                .with_callback(
+                    self.callbacks()
+                        .deploy_token_callback(params.symbol, params.mint_limit),
+                ) // TODO: The token issuance can fail async and we don't know this when executing the command
                 .register_promise();
         } else {
             let token = params.token.unwrap();
@@ -44,11 +48,10 @@ pub trait Functions: tokens::Tokens + events::Events {
             }
 
             self.token_type(&token).set(TokenType::External);
-            self.token_mint_limit(&token).set(params.mint_limit);
+            self.set_token_mint_limit(&token, &params.mint_limit);
 
             self.token_deployed_event(params.symbol, token);
         }
-
 
         return true;
     }
@@ -80,26 +83,134 @@ pub trait Functions: tokens::Tokens + events::Events {
         return true;
     }
 
-    fn approve_contract_call(&self, params: &ManagedBuffer, command_id: &ManagedBuffer) -> bool {
-        // TODO: Implement function
+    fn approve_contract_call(
+        &self,
+        params_raw: &ManagedBuffer,
+        command_id: &ManagedBuffer,
+    ) -> bool {
+        let params: ApproveContractCallParams<Self::Api> =
+            ApproveContractCallParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
+
+        let hash = self.get_is_contract_call_approved_key(
+            command_id,
+            &params.source_chain,
+            &params.source_address,
+            &params.contract_address,
+            &params.payload_hash,
+        );
+
+        self.contract_call_approved().add(&hash);
+
+        self.contract_call_approved_event(
+            command_id,
+            params.source_chain,
+            params.source_address,
+            params.contract_address,
+            params.payload_hash,
+            ContractCallApprovedData {
+                source_tx_hash: params.source_tx_hash,
+                source_event_index: params.source_event_index,
+            },
+        );
 
         return true;
     }
 
     fn approve_contract_call_with_mint(
         &self,
-        params: &ManagedBuffer,
+        params_raw: &ManagedBuffer,
         command_id: &ManagedBuffer,
     ) -> bool {
-        // TODO: Implement function
+        let params: ApproveContractCallWithMintParams<Self::Api> =
+            ApproveContractCallWithMintParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
+
+        let hash = self.get_is_contract_call_approved_with_mint_key(
+            command_id,
+            &params.source_chain,
+            &params.source_address,
+            &params.contract_address,
+            &params.payload_hash,
+            &params.symbol,
+            &params.amount,
+        );
+
+        self.contract_call_approved().add(&hash);
+
+        self.contract_call_approved_with_mint_event(
+            command_id,
+            params.source_chain,
+            params.source_address,
+            params.contract_address,
+            params.payload_hash,
+            ContractCallApprovedWithMintData {
+                symbol: params.symbol,
+                amount: params.amount,
+                source_tx_hash: params.source_tx_hash,
+                source_event_index: params.source_event_index,
+            },
+        );
 
         return true;
     }
 
     fn transfer_operatorship(&self, params: &ManagedBuffer) -> bool {
-        // TODO: Implement function
+        // TODO: Implement Auth contract and call that
+
+        self.operatorship_transferred_event(params);
 
         return true;
+    }
+
+    fn get_is_contract_call_approved_key(
+        &self,
+        command_id: &ManagedBuffer,
+        source_chain: &ManagedBuffer,
+        source_address: &ManagedBuffer,
+        contract_address: &ManagedAddress,
+        payload_hash: &ManagedBuffer,
+    ) -> ManagedByteArray<32> {
+        let prefix: ManagedByteArray<32> = self
+            .crypto()
+            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_CONTRACT_CALL_APPROVED));
+
+        let mut encoded = ManagedBuffer::new();
+
+        encoded.append(prefix.as_managed_buffer());
+        encoded.append(command_id);
+        encoded.append(source_chain);
+        encoded.append(source_address);
+        encoded.append(contract_address.as_managed_buffer());
+        encoded.append(payload_hash);
+
+        self.crypto().keccak256(encoded)
+    }
+
+    fn get_is_contract_call_approved_with_mint_key(
+        &self,
+        command_id: &ManagedBuffer,
+        source_chain: &ManagedBuffer,
+        source_address: &ManagedBuffer,
+        contract_address: &ManagedAddress,
+        payload_hash: &ManagedBuffer,
+        symbol: &EgldOrEsdtTokenIdentifier,
+        amount: &BigUint,
+    ) -> ManagedByteArray<32> {
+        let prefix: ManagedByteArray<32> = self.crypto().keccak256(ManagedBuffer::new_from_bytes(
+            PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT,
+        ));
+
+        let mut encoded = ManagedBuffer::new();
+
+        encoded.append(prefix.as_managed_buffer());
+        encoded.append(command_id);
+        encoded.append(source_chain);
+        encoded.append(source_address);
+        encoded.append(contract_address.as_managed_buffer());
+        encoded.append(payload_hash);
+        encoded.append(&symbol.clone().into_name());
+        encoded.append(&amount.to_bytes_be_buffer());
+
+        self.crypto().keccak256(encoded)
     }
 
     #[promises_callback]
@@ -113,8 +224,10 @@ pub trait Functions: tokens::Tokens + events::Events {
             ManagedAsyncCallResult::Ok(token_id_raw) => {
                 let token_id = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
 
-                self.token_type(&token_id).set(TokenType::InternalBurnableFrom);
-                self.token_mint_limit(&token_id).set(mint_limit);
+                self.token_type(&token_id)
+                    .set(TokenType::InternalBurnableFrom);
+
+                self.set_token_mint_limit(&token_id, &mint_limit);
 
                 self.token_deployed_event(symbol, token_id);
             }
@@ -131,4 +244,7 @@ pub trait Functions: tokens::Tokens + events::Events {
             }
         }
     }
+
+    #[storage_mapper("contract_call_approved")]
+    fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<32>>;
 }

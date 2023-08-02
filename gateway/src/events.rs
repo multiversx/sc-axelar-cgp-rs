@@ -15,6 +15,20 @@ pub struct ContractCallWithTokenData<M: ManagedTypeApi> {
     pub amount: BigUint<M>,
 }
 
+#[derive(TypeAbi, TopEncode)]
+pub struct ContractCallApprovedData<M: ManagedTypeApi> {
+    pub source_tx_hash: ManagedBuffer<M>,
+    pub source_event_index: BigUint<M>,
+}
+
+#[derive(TypeAbi, TopEncode)]
+pub struct ContractCallApprovedWithMintData<M: ManagedTypeApi> {
+    pub symbol: EgldOrEsdtTokenIdentifier<M>,
+    pub amount: BigUint<M>,
+    pub source_tx_hash: ManagedBuffer<M>,
+    pub source_event_index: BigUint<M>,
+}
+
 #[multiversx_sc::module]
 pub trait Events {
     #[event("token_sent_event")]
@@ -62,7 +76,7 @@ pub trait Events {
     #[event("token_mint_limit_updated_event")]
     fn token_mint_limit_updated_event(
         &self,
-        #[indexed] symbol: EgldOrEsdtTokenIdentifier,
+        #[indexed] symbol: &EgldOrEsdtTokenIdentifier,
         limit: &BigUint,
     );
 
@@ -77,4 +91,29 @@ pub trait Events {
 
     #[event("token_does_not_exist_event")]
     fn token_does_not_exist_event(&self, #[indexed] token: EgldOrEsdtTokenIdentifier);
+
+    #[event("contract_call_approved_event")]
+    fn contract_call_approved_event(
+        &self,
+        #[indexed] command_id: &ManagedBuffer,
+        #[indexed] source_chain: ManagedBuffer,
+        #[indexed] source_address: ManagedBuffer,
+        #[indexed] contract_address: ManagedAddress,
+        #[indexed] payload_hash: ManagedBuffer,
+        data: ContractCallApprovedData<Self::Api>,
+    );
+
+    #[event("contract_call_approved_with_mint_event")]
+    fn contract_call_approved_with_mint_event(
+        &self,
+        #[indexed] command_id: &ManagedBuffer,
+        #[indexed] source_chain: ManagedBuffer,
+        #[indexed] source_address: ManagedBuffer,
+        #[indexed] contract_address: ManagedAddress,
+        #[indexed] payload_hash: ManagedBuffer,
+        data: ContractCallApprovedWithMintData<Self::Api>,
+    );
+
+    #[event("operatorship_transferred_event")]
+    fn operatorship_transferred_event(&self, params: &ManagedBuffer);
 }
