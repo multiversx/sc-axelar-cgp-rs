@@ -60,5 +60,21 @@ pub trait Events {
     );
 
     #[event("token_mint_limit_updated_event")]
-    fn token_mint_limit_updated_event(&self, #[indexed] symbol: EgldOrEsdtTokenIdentifier, limit: &BigUint);
+    fn token_mint_limit_updated_event(
+        &self,
+        #[indexed] symbol: EgldOrEsdtTokenIdentifier,
+        limit: &BigUint,
+    );
+
+    #[event("executed_event")]
+    fn executed_event(&self, #[indexed] command_id: &ManagedBuffer);
+
+    #[event("token_deployed_event")]
+    fn token_deployed_event(&self, #[indexed] symbol: ManagedBuffer, token_id: EgldOrEsdtTokenIdentifier);
+
+    #[event("token_deploy_failed_event")]
+    fn token_deploy_failed_event(&self, #[indexed] symbol: ManagedBuffer);
+
+    #[event("token_does_not_exist_event")]
+    fn token_does_not_exist_event(&self, #[indexed] token: EgldOrEsdtTokenIdentifier);
 }

@@ -5,9 +5,10 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           20
+// Endpoints:                           21
 // Async Callback (empty):               1
-// Total number of exported functions:  22
+// Promise callbacks:                    1
+// Total number of exported functions:  24
 
 #![no_std]
 #![feature(lang_items)]
@@ -24,6 +25,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         callContractWithToken => call_contract_with_token
         validateContractCall => validate_contract_call
         validateContractCallAndMint => validate_contract_call_and_mint
+        execute => execute
         isContractCallApproved => is_contract_call_approved
         isContractCallAndMintApproved => is_contract_call_and_mint_approved
         isCommandExecuted => is_command_executed
@@ -39,6 +41,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         setTokenMintLimits => set_token_mint_limits
         governance => governance
         mintLimiter => mint_limiter
+        deploy_token_callback => deploy_token_callback
     )
 }
 

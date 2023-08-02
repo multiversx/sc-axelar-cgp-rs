@@ -15,13 +15,45 @@ pub const SELECTOR_APPROVE_CONTRACT_CALL: &[u8; 19] = b"approveContractCall";
 pub const SELECTOR_APPROVE_CONTRACT_CALL_WITH_MINT: &[u8; 27] = b"approveContractCallWithMint";
 pub const SELECTOR_TRANSFER_OPERATORSHIP: &[u8; 20] = b"transferOperatorship";
 
-#[derive(TypeAbi, TopEncode, TopDecode, Debug)]
+pub const HOURS_6_TO_SECONDS: u64 = 21_600;
+
+pub const AXELAR_GATEWAY: &[u8; 14] = b"axelar-gateway";
+
+pub const ESDT_ISSUE_COST: u64 = 5000000000000000;
+
+#[derive(TypeAbi, TopEncode, TopDecode, PartialEq, Debug)]
 pub enum TokenType {
-    InternalBurnable,
+    InternalBurnable, // TODO: How can a token like this even be added to the contract and what does it mean?
     InternalBurnableFrom,
     External,
 }
 
-pub const HOURS_6_TO_SECONDS: u64 = 21_600;
+#[derive(TypeAbi, TopDecode, Debug)]
+pub struct ExecuteData<M: ManagedTypeApi> {
+    pub command_ids: ManagedVec<M, ManagedBuffer<M>>,
+    pub commands: ManagedVec<M, ManagedBuffer<M>>,
+    pub params: ManagedVec<M, ManagedBuffer<M>>,
+}
 
-pub const AXELAR_GATEWAY: &[u8; 14] = b"axelar-gateway";
+#[derive(TypeAbi, TopDecode, Debug)]
+pub struct DeployTokenParams<M: ManagedTypeApi> {
+    pub name: ManagedBuffer<M>,
+    pub symbol: ManagedBuffer<M>,
+    pub decimals: u8,
+    pub cap: BigUint<M>,
+    pub token: Option<EgldOrEsdtTokenIdentifier<M>>,
+    pub mint_limit: BigUint<M>,
+}
+
+#[derive(TypeAbi, TopDecode, Debug)]
+pub struct MintTokenParams<M: ManagedTypeApi> {
+    pub symbol: EgldOrEsdtTokenIdentifier<M>,
+    pub account: ManagedAddress<M>,
+    pub amount: BigUint<M>,
+}
+
+#[derive(TypeAbi, TopDecode, Debug)]
+pub struct BurnTokenParams<M: ManagedTypeApi> {
+    pub symbol: EgldOrEsdtTokenIdentifier<M>,
+    pub salt: ManagedBuffer<M>, // TODO: What is this used for exactly?
+}

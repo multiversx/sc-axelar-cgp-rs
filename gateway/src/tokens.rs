@@ -20,7 +20,7 @@ pub trait Tokens: events::Events {
         let token_type: TokenType = token_type_mapper.get();
 
         match token_type {
-            TokenType::External => {} // nothing to do, tokens remain in contract
+            TokenType::External => {} // TODO: What to do here? Keep the tokens in contract?
             TokenType::InternalBurnableFrom => {
                 self.send()
                     .esdt_local_burn(&symbol.clone().unwrap_esdt(), 0, amount);
@@ -33,15 +33,18 @@ pub trait Tokens: events::Events {
         }
     }
 
-    fn mint_token(
+    fn mint_token_raw(
         &self,
         symbol: &EgldOrEsdtTokenIdentifier,
         account: &ManagedAddress,
         amount: &BigUint,
-    ) {
+    ) -> bool {
         let token_type_mapper = self.token_type(symbol);
 
-        require!(!token_type_mapper.is_empty(), "Token does not exist");
+        // This function was transformed to return bool because we don't want it to halt the whole contract execution in case of `execute` function
+        if !token_type_mapper.is_empty() {
+            return false;
+        }
 
         let token_type: TokenType = token_type_mapper.get();
 
@@ -57,6 +60,8 @@ pub trait Tokens: events::Events {
                     .esdt_local_mint(&symbol.clone().unwrap_esdt(), 0, amount);
             }
         }
+
+        return true;
     }
 
     fn set_token_mint_limit(&self, symbol: EgldOrEsdtTokenIdentifier, limit: &BigUint) {
@@ -102,7 +107,9 @@ pub trait Tokens: events::Events {
     #[storage_mapper("token_type")]
     fn token_type(&self, token: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<TokenType>;
 
-    // TODO: Do we need this?
+    // TODO: Do we need this? Currently the `symbol` above is considered to be a valid ESDT token identifier,
+    // but it can also be considered to be just the token ticker, and the 'address' from SOL could be equivalent to the ESDT token identifier,
+    // which we could store using this storage
     // #[view(tokenAddresses)]
     // #[storage_mapper("token_addresses")]
     // fn token_addresses(&self, token: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<ManagedAddress>;

@@ -4,14 +4,18 @@ multiversx_sc::imports!();
 
 mod constants;
 mod events;
+mod functions;
 mod governance;
 mod tokens;
 
 use crate::constants::*;
 use crate::events::{ContractCallData, ContractCallWithTokenData};
+use core::ops::Deref;
 
 #[multiversx_sc::contract]
-pub trait Gateway: tokens::Tokens + governance::Governance + events::Events {
+pub trait Gateway:
+    tokens::Tokens + governance::Governance + functions::Functions + events::Events
+{
     #[init]
     fn init(&self, auth_module: &ManagedAddress, token_deployer_implementation: &ManagedAddress) {
         require!(
@@ -154,10 +158,96 @@ pub trait Gateway: tokens::Tokens + governance::Governance + events::Events {
 
         if valid {
             self.approved_key_bool().remove(&hash);
-            self.mint_token(symbol, contract_address, amount);
+            let result = self.mint_token_raw(symbol, contract_address, amount);
+
+            require!(result, "Token does not exist");
         }
 
         valid
+    }
+
+    // External Functions
+    // TODO: Should `setup` function be implemented? And if so, how should the authentication work?
+    // It seems to be related to a proxy which I don't think we will implement on MultiversX
+
+    #[payable("*")] // Needs to be payable since tokens can be issued; TODO: Should we add some checks for these amounts?
+    #[endpoint(execute)]
+    fn execute(&self, data: ManagedBuffer, _proof: &ManagedBuffer) {
+        // TODO: This hash uses ECDSA.toEthSignedMessageHash in SOL, not sure if there is any equivalent if that on MultiversX
+        // let message_hash = self.crypto().keccak256(data);
+
+        // TODO: Implement Auth contract and call it since now this endpoint is not authenticated
+        // let allow_operatorship_transfer: bool = self.validate_proof(message_hash, proof);
+        let mut allow_operatorship_transfer: bool = false;
+
+        // TODO: Should we improve this and have the struct fields as function arguments instead?
+        let execute_data: ExecuteData<Self::Api> =
+            ExecuteData::<Self::Api>::top_decode(data).unwrap();
+
+        let commands_length = execute_data.command_ids.len();
+
+        require!(
+            commands_length == execute_data.commands.len()
+                && commands_length == execute_data.params.len(),
+            "Invalid commands"
+        );
+
+        let selector_deploy_token = &ManagedBuffer::new_from_bytes(SELECTOR_DEPLOY_TOKEN);
+        let selector_mint_token = &ManagedBuffer::new_from_bytes(SELECTOR_MINT_TOKEN);
+        let selector_approve_contract_call =
+            &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL);
+        let selector_approve_contract_call_with_mint =
+            &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL_WITH_MINT);
+        let selector_burn_token = &ManagedBuffer::new_from_bytes(SELECTOR_BURN_TOKEN);
+        let selector_transfer_operatorship =
+            &ManagedBuffer::new_from_bytes(SELECTOR_TRANSFER_OPERATORSHIP);
+
+        for index in 0..commands_length {
+            let command_id_ref = execute_data.command_ids.get(index);
+            let command_id = command_id_ref.deref();
+
+            if self.command_executed().contains(command_id) {
+                continue;
+            }
+
+            // TODO: In the SOL contract, this comparison is done using keccak256, but since we can not store
+            // those as constants I just left normal comparisons here without hash, should be the same
+            let command_ref = execute_data.commands.get(index);
+            let command = command_ref.deref();
+
+            let success: bool;
+
+            if command == selector_deploy_token {
+                success = self.deploy_token(execute_data.params.get(index).deref());
+            } else if command == selector_mint_token {
+                success = self.mint_token(execute_data.params.get(index).deref());
+            } else if command == selector_approve_contract_call {
+                success =
+                    self.approve_contract_call(execute_data.params.get(index).deref(), command_id);
+            } else if command == selector_approve_contract_call_with_mint {
+                success = self.approve_contract_call_with_mint(
+                    execute_data.params.get(index).deref(),
+                    command_id,
+                );
+            } else if command == selector_burn_token {
+                success = self.burn_token(execute_data.params.get(index).deref());
+            } else if command == selector_transfer_operatorship {
+                if !allow_operatorship_transfer {
+                    continue;
+                }
+
+                allow_operatorship_transfer = false;
+                success = self.transfer_operatorship(execute_data.params.get(index).deref());
+            } else {
+                continue; // ignore if unknown command received
+            }
+
+            if success {
+                self.command_executed().add(command_id);
+
+                self.executed_event(command_id);
+            }
+        }
     }
 
     #[view(isContractCallApproved)]
@@ -297,4 +387,7 @@ pub trait Gateway: tokens::Tokens + governance::Governance + events::Events {
 
     #[storage_mapper("approved_key_bool")]
     fn approved_key_bool(&self) -> WhitelistMapper<ManagedByteArray<32>>;
+
+    #[storage_mapper("command_executed")]
+    fn command_executed(&self) -> WhitelistMapper<ManagedBuffer>;
 }
