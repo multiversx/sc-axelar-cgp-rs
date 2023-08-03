@@ -18,11 +18,11 @@ pub trait Functions: tokens::Tokens + events::Events {
         if params.token.is_none() {
             // If token address is no specified, it indicates a request to deploy one.
 
-            // TODO: Store this issue cost in a mapper?
+            // TODO: Store this issue cost in a mapper or something else?
             let issue_cost = BigUint::from(ESDT_ISSUE_COST);
 
             // TODO: In the SOL implementation, the token deployer is called. What should we do here?
-            // TODO: Also, the cap is not utilized here at all, since tokens can be minted and burned on MultiversX without a cap
+            // Also, the cap is not utilized here at all, since tokens can be minted and burned on MultiversX without a cap
             self.send()
                 .esdt_system_sc_proxy()
                 .issue_and_set_all_roles(
@@ -36,8 +36,11 @@ pub trait Functions: tokens::Tokens + events::Events {
                 .with_callback(
                     self.callbacks()
                         .deploy_token_callback(params.symbol, params.mint_limit),
-                ) // TODO: The token issuance can fail async and we don't know this when executing the command
+                )
                 .register_promise();
+            // TODO: The token issuance can fail async and we don't know this when executing the command
+            // Because of this, the command_id_hash is still added to command_executed and the
+            // executed event is still dispatched. There needs to be a way to revert these
         } else {
             let token = params.token.unwrap();
             // If token address is specified, ensure that there is a valid token id provided
@@ -73,11 +76,9 @@ pub trait Functions: tokens::Tokens + events::Events {
             return false;
         }
 
+        // TODO: The SOL logic here is complex, not sure what to do here exactly...
         if token_type_mapper.get() == TokenType::External {
-            // TODO: The SOL logic here is complex, not sure what exactly we should do here.
-            // Should we just leave the tokens inside this contract?
         } else {
-            // TODO: What should we do here?
         }
 
         return true;

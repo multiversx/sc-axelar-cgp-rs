@@ -3,6 +3,8 @@ multiversx_sc::imports!();
 use crate::constants::*;
 use crate::events;
 
+// TODO: Not exactly sure how to handle tokens. Should we also implement an external Token Manager?
+// Currently the minting/burning of tokens is not finished
 #[multiversx_sc::module]
 pub trait Tokens: events::Events {
     fn burn_token_from(
@@ -20,16 +22,12 @@ pub trait Tokens: events::Events {
         let token_type: TokenType = token_type_mapper.get();
 
         match token_type {
-            TokenType::External => {} // TODO: What to do here? Keep the tokens in contract?
+            TokenType::External => {}
             TokenType::InternalBurnableFrom => {
                 self.send()
                     .esdt_local_burn(&symbol.clone().unwrap_esdt(), 0, amount);
             }
-            TokenType::InternalBurnable => {
-                // TODO: What should we do with the tokens in this case? Since ESDTs don't have any external contract to call
-                self.send()
-                    .esdt_local_burn(&symbol.clone().unwrap_esdt(), 0, amount);
-            }
+            TokenType::InternalBurnable => {}
         }
     }
 
@@ -53,11 +51,13 @@ pub trait Tokens: events::Events {
         match token_type {
             TokenType::External => {
                 self.send().direct(account, symbol, 0, amount);
-            }
-            _ => {
-                // TODO: What should we do with the tokens in this case? Since ESDTs don't have any external contract to call
+            },
+            TokenType::InternalBurnableFrom => {
                 self.send()
                     .esdt_local_mint(&symbol.clone().unwrap_esdt(), 0, amount);
+            },
+            TokenType::InternalBurnable => {
+                self.send().direct(account, symbol, 0, amount);
             }
         }
 
@@ -70,18 +70,18 @@ pub trait Tokens: events::Events {
         self.token_mint_limit_updated_event(symbol, limit);
     }
 
-    fn set_token_mint_amount(&self, symbol: &EgldOrEsdtTokenIdentifier, amount: BigUint) {
+    fn set_token_mint_amount(&self, symbol: &EgldOrEsdtTokenIdentifier, total_amount: BigUint) {
         let token_mint_limit_storage = self.token_mint_limit(symbol);
 
         require!(
-            token_mint_limit_storage.is_empty() || token_mint_limit_storage.get() >= amount,
+            token_mint_limit_storage.is_empty() || token_mint_limit_storage.get() >= total_amount,
             "Exceed mint limit"
         );
 
         let timestamp = self.blockchain().get_block_timestamp();
 
         self.token_mint_amount(symbol, timestamp / HOURS_6_TO_SECONDS)
-            .set(amount);
+            .set(total_amount);
     }
 
     #[view(tokenMintAmount)]
@@ -107,8 +107,8 @@ pub trait Tokens: events::Events {
     #[storage_mapper("token_type")]
     fn token_type(&self, token: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<TokenType>;
 
-    // TODO: Do we need this? Currently the `symbol` above is considered to be a valid ESDT token identifier,
-    // but it can also be considered to be just the token ticker, and the 'address' from SOL could be equivalent to the ESDT token identifier,
+    // TODO: Do we need this? Currently the `symbol` is considered to be the ESDT identifier of the token globally in the SC. Is this correct?
+    // But it can also be considered to be just the token symbol, and the 'address' from SOL contract could be equivalent to the ESDT token identifier,
     // which we could store using this storage
     // #[view(tokenAddresses)]
     // #[storage_mapper("token_addresses")]

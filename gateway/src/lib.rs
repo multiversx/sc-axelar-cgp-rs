@@ -302,7 +302,7 @@ pub trait Gateway:
         self.command_executed().contains(&hash)
     }
 
-    // TODO: Is this really needed?
+    // TODO: Is this really needed? What is it used for?
     #[view(contractId)]
     fn contract_id(&self) -> ManagedByteArray<32> {
         self.crypto()

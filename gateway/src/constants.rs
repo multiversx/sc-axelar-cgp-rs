@@ -3,7 +3,6 @@ multiversx_sc::derive_imports!();
 
 /// Will be used for generating keccak256 hash
 pub const PREFIX_COMMAND_EXECUTED: &[u8; 16] = b"command-executed";
-// pub const PREFIX_TOKEN_ADDRESS: &[u8; 13] = b"token-address"; // TODO: Should we add storage for 'token address' which on MultiversX it might be the ESDT identifier of the token?
 pub const PREFIX_CONTRACT_CALL_APPROVED: &[u8; 22] = b"contract-call-approved";
 pub const PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT: &[u8; 32] = b"contract-call-approved-with-mint";
 
@@ -22,7 +21,7 @@ pub const ESDT_ISSUE_COST: u64 = 5000000000000000;
 
 #[derive(TypeAbi, TopEncode, TopDecode, PartialEq, Debug)]
 pub enum TokenType {
-    InternalBurnable, // TODO: How can a token like this even be added to the contract and what does it mean?
+    InternalBurnable, // TODO: How can a token with this type be added to the contract and what does it mean?
     InternalBurnableFrom,
     External,
 }
