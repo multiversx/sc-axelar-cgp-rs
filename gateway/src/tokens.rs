@@ -40,7 +40,7 @@ pub trait Tokens: events::Events {
         let token_type_mapper = self.token_type(symbol);
 
         // This function was transformed to return bool because we don't want it to halt the whole contract execution in case of `execute` endpoint
-        if !token_type_mapper.is_empty() {
+        if token_type_mapper.is_empty() {
             return false;
         }
 

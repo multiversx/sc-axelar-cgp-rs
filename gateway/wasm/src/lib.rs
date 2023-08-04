@@ -7,8 +7,7 @@
 // Init:                                 1
 // Endpoints:                           20
 // Async Callback (empty):               1
-// Promise callbacks:                    1
-// Total number of exported functions:  23
+// Total number of exported functions:  22
 
 #![no_std]
 #![feature(lang_items)]
@@ -40,7 +39,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         setTokenMintLimits => set_token_mint_limits
         governance => governance
         mintLimiter => mint_limiter
-        deploy_token_callback => deploy_token_callback
     )
 }
 

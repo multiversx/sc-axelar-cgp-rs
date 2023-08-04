@@ -3,6 +3,7 @@ import { envChain } from "xsuite/interact";
 import { World } from "xsuite/world";
 // @ts-ignore
 import data from "./data.json";
+import { e } from 'xsuite/data';
 
 const world = World.new({
   proxyUrl: envChain.publicProxyUrl(),
@@ -14,13 +15,19 @@ export const loadWallet = () => world.newWalletFromFile("wallet.json");
 
 const program = new Command();
 
+const MOCK_CONTRACT_ADDRESS_1: string = "erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax";
+const MOCK_CONTRACT_ADDRESS_2: string = "erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh";
+
 program.command("deploy").action(async () => {
   const wallet = await loadWallet();
   const result = await wallet.deployContract({
     code: data.code,
     codeMetadata: ["upgradeable"],
     gasLimit: 100_000_000,
-    codeArgs: [],
+    codeArgs: [
+      e.Addr(MOCK_CONTRACT_ADDRESS_1),
+      e.Addr(MOCK_CONTRACT_ADDRESS_2),
+    ],
   });
   console.log("Result:", result);
 });

@@ -178,7 +178,7 @@ pub trait Gateway:
 
         // TODO: Implement Auth contract and call it since now this endpoint is not authenticated
         // let allow_operatorship_transfer: bool = self.validate_proof(message_hash, proof);
-        let mut allow_operatorship_transfer: bool = false;
+        let mut allow_operatorship_transfer: bool = true;
 
         // TODO: Should we improve this and have the struct fields as function arguments instead?
         let execute_data: ExecuteData<Self::Api> =

@@ -23,21 +23,21 @@ pub trait Functions: tokens::Tokens + events::Events {
 
             // TODO: In the SOL implementation, the token deployer is called. What should we do here?
             // Also, the cap is not utilized here at all, since tokens can be minted and burned on MultiversX without a cap
-            self.send()
-                .esdt_system_sc_proxy()
-                .issue_and_set_all_roles(
-                    issue_cost,
-                    params.symbol.clone(),
-                    params.symbol.clone(),
-                    EsdtTokenType::Fungible,
-                    params.decimals as usize,
-                )
-                .async_call_promise() // TODO: Is this feature live on mainnet?
-                .with_callback(
-                    self.callbacks()
-                        .deploy_token_callback(params.symbol, params.mint_limit),
-                )
-                .register_promise();
+            // self.send()
+            //     .esdt_system_sc_proxy()
+            //     .issue_and_set_all_roles(
+            //         issue_cost,
+            //         params.symbol.clone(),
+            //         params.symbol.clone(),
+            //         EsdtTokenType::Fungible,
+            //         params.decimals as usize,
+            //     )
+            //     .async_call_promise() // TODO: This feature is not supported yet
+            //     .with_callback(
+            //         self.callbacks()
+            //             .deploy_token_callback(params.symbol, params.mint_limit),
+            //     )
+            //     .register_promise();
             // TODO: The token issuance can fail async and we don't know this when executing the command
             // Because of this, the command_id_hash is still added to command_executed and the
             // executed event is still dispatched. There needs to be a way to revert these
@@ -214,37 +214,37 @@ pub trait Functions: tokens::Tokens + events::Events {
         self.crypto().keccak256(encoded)
     }
 
-    #[promises_callback]
-    fn deploy_token_callback(
-        &self,
-        #[call_result] result: ManagedAsyncCallResult<TokenIdentifier>,
-        symbol: ManagedBuffer,
-        mint_limit: BigUint,
-    ) {
-        match result {
-            ManagedAsyncCallResult::Ok(token_id_raw) => {
-                let token_id = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
-
-                self.token_type(&token_id)
-                    .set(TokenType::InternalBurnableFrom);
-
-                self.set_token_mint_limit(&token_id, &mint_limit);
-
-                self.token_deployed_event(symbol, token_id);
-            }
-            ManagedAsyncCallResult::Err(_) => {
-                // TODO: To whom should we return tokens? How should we handle this exactly?
-                self.token_deploy_failed_event(symbol);
-
-                let caller = self.blockchain().get_owner_address();
-                let returned = self.call_value().egld_or_single_esdt();
-                if returned.token_identifier.is_egld() && returned.amount > 0 {
-                    self.send()
-                        .direct(&caller, &returned.token_identifier, 0, &returned.amount);
-                }
-            }
-        }
-    }
+    // #[promises_callback]
+    // fn deploy_token_callback(
+    //     &self,
+    //     #[call_result] result: ManagedAsyncCallResult<TokenIdentifier>,
+    //     symbol: ManagedBuffer,
+    //     mint_limit: BigUint,
+    // ) {
+    //     match result {
+    //         ManagedAsyncCallResult::Ok(token_id_raw) => {
+    //             let token_id = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
+    //
+    //             self.token_type(&token_id)
+    //                 .set(TokenType::InternalBurnableFrom);
+    //
+    //             self.set_token_mint_limit(&token_id, &mint_limit);
+    //
+    //             self.token_deployed_event(symbol, token_id);
+    //         }
+    //         ManagedAsyncCallResult::Err(_) => {
+    //             // TODO: To whom should we return tokens? How should we handle this exactly?
+    //             self.token_deploy_failed_event(symbol);
+    //
+    //             let caller = self.blockchain().get_owner_address();
+    //             let returned = self.call_value().egld_or_single_esdt();
+    //             if returned.token_identifier.is_egld() && returned.amount > 0 {
+    //                 self.send()
+    //                     .direct(&caller, &returned.token_identifier, 0, &returned.amount);
+    //             }
+    //         }
+    //     }
+    // }
 
     #[storage_mapper("contract_call_approved")]
     fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<32>>;
