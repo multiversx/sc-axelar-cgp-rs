@@ -13,6 +13,8 @@
     "interact:mainnet": "CHAIN=mainnet tsx interact/index.ts"
   },
   "devDependencies": {
+    "@multiversx/sdk-core": "^12.5.0",
+    "@multiversx/sdk-wallet": "^4.2.0",
     "@types/node": "^18.16.18",
     "commander": "11.0.0",
     "tsx": "^3.12.7",

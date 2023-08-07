@@ -30,6 +30,7 @@ pub trait Auth {
             &proof_data.weights,
             &proof_data.threshold,
         );
+
         let operators_epoch_mapper = self.epoch_for_hash(&operators_hash);
         let epoch = self.current_epoch().get();
 
@@ -56,8 +57,11 @@ pub trait Auth {
         let transfer_data: TransferData<Self::Api> =
             TransferData::<Self::Api>::top_decode(params).unwrap();
 
-        // TODO: Add check for operators to not be duplicated
-        require!(transfer_data.new_operators.len() > 0, "Invalid operators");
+        require!(
+            transfer_data.new_operators.len() > 0
+                && self.contains_no_duplicate(&transfer_data.new_operators),
+            "Invalid operators"
+        );
 
         require!(
             transfer_data.new_weights.len() == transfer_data.new_operators.len(),
@@ -125,7 +129,7 @@ pub trait Auth {
             let current_weight = weights.get(operator_index);
             weight += current_weight.deref();
 
-            if weight > threshold {
+            if weight >= threshold {
                 return;
             }
 
@@ -156,6 +160,23 @@ pub trait Auth {
         self.crypto().keccak256(encoded)
     }
 
+    // TODO: Check for a better way of doing this
+    fn contains_no_duplicate(&self, operators: &ManagedVec<ManagedAddress>) -> bool {
+        for iindex in 0..operators.len() {
+            for jindex in 0..operators.len() {
+                if iindex == jindex {
+                    continue;
+                }
+
+                if operators.get(iindex) == operators.get(jindex) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
     #[event("operatorship_transferred_event")]
     fn operatorship_transferred_event(&self, data: TransferData<Self::Api>);
 
@@ -166,6 +187,7 @@ pub trait Auth {
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> SingleValueMapper<u64>;
 
+    // TODO: What is this used for?
     #[view]
     #[storage_mapper("hash_for_epoch")]
     fn hash_for_epoch(
