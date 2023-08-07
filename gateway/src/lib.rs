@@ -6,6 +6,7 @@ mod constants;
 mod events;
 mod functions;
 mod governance;
+mod proxy;
 mod tokens;
 
 use crate::constants::*;
@@ -15,7 +16,7 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::contract]
 pub trait Gateway:
-    tokens::Tokens + governance::Governance + functions::Functions + events::Events
+    tokens::Tokens + governance::Governance + functions::Functions + proxy::ProxyModule + events::Events
 {
     #[init]
     fn init(&self, auth_module: &ManagedAddress, token_deployer_implementation: &ManagedAddress) {
@@ -171,15 +172,14 @@ pub trait Gateway:
     // TODO: Should `setup` function be implemented? And if so, how should the authentication work?
     // It seems to be related to a proxy which I don't think we will implement on MultiversX
 
-    #[payable("*")] // Needs to be payable since tokens can be issued; TODO: Should we add some checks for these amounts?
+    #[payable("*")]
+    // Needs to be payable since tokens can be issued; TODO: Should we add some checks for these amounts?
     #[endpoint(execute)]
-    fn execute(&self, data: ManagedBuffer, _proof: ManagedBuffer) {
-        // TODO: This hash uses ECDSA.toEthSignedMessageHash in SOL, not sure if there is any equivalent if that on MultiversX
-        // let message_hash = self.crypto().keccak256(data);
+    fn execute(&self, data: ManagedBuffer, proof: ManagedBuffer) {
+        // TODO: This hash uses ECDSA.toEthSignedMessageHash in SOL, not sure if there is any equivalent of that on MultiversX
+        let message_hash = self.crypto().keccak256(&data);
 
-        // TODO: Implement Auth contract and call it since now this endpoint is not authenticated
-        // let allow_operatorship_transfer: bool = self.validate_proof(message_hash, proof);
-        let mut allow_operatorship_transfer: bool = true;
+        let mut allow_operatorship_transfer: bool = self.auth_validate_proof(&message_hash, &proof);
 
         // TODO: Should we improve this and have the struct fields as function arguments instead?
         let execute_data: ExecuteData<Self::Api> =
@@ -310,7 +310,10 @@ pub trait Gateway:
             .keccak256(ManagedBuffer::new_from_bytes(AXELAR_GATEWAY))
     }
 
-    fn get_is_command_executed_key(&self, command_id: &ManagedBuffer) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+    fn get_is_command_executed_key(
+        &self,
+        command_id: &ManagedBuffer,
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let prefix: ManagedByteArray<KECCAK256_RESULT_LEN> = self
             .crypto()
             .keccak256(ManagedBuffer::new_from_bytes(PREFIX_COMMAND_EXECUTED));
@@ -323,10 +326,7 @@ pub trait Gateway:
         self.crypto().keccak256(encoded)
     }
 
-    #[view(authModule)]
-    #[storage_mapper("auth_module")]
-    fn auth_module(&self) -> SingleValueMapper<ManagedAddress>;
-
+    // TODO: This is currently unused. For what should we use it?
     #[view(tokenDeployer)]
     #[storage_mapper("token_deployer_implementation")]
     fn token_deployer_implementation(&self) -> SingleValueMapper<ManagedAddress>;

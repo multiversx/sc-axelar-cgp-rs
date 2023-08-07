@@ -17,6 +17,8 @@ pub trait Auth {
         }
     }
 
+    // TODO: This uses ECDSA.recoverSigner in SOL, not sure if there is any equivalent of that on MultiversX
+    // so instead we use ed25519 signatures here
     #[endpoint(validateProof)]
     fn validate_proof(
         &self,

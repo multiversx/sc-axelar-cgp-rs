@@ -3,14 +3,12 @@ import { assertAccount } from "xsuite/assert";
 import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
 import { e } from "xsuite/data";
 import createKeccakHash from "keccak";
+import { MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2 } from './helpers';
 
 let world: FWorld;
 let deployer: FWorldWallet;
 let contract: FWorldContract;
 let address: string;
-
-const MOCK_CONTRACT_ADDRESS_1: string = "erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax";
-const MOCK_CONTRACT_ADDRESS_2: string = "erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh";
 
 const TOKEN_ID: string = "WEGLD-123456";
 

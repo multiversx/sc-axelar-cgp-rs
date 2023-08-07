@@ -2,16 +2,16 @@ multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::constants::{ApproveContractCallParams, BurnTokenParams, DeployTokenParams, MintTokenParams, TokenType, ESDT_ISSUE_COST, PREFIX_CONTRACT_CALL_APPROVED, PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT, ApproveContractCallWithMintParams};
-use crate::{events, tokens};
+use crate::{events, proxy, tokens};
 use crate::events::{ContractCallApprovedData, ContractCallApprovedWithMintData};
 
 #[multiversx_sc::module]
-pub trait Functions: tokens::Tokens + events::Events {
+pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
     fn deploy_token(&self, params_raw: &ManagedBuffer) -> bool {
         let params: DeployTokenParams<Self::Api> =
             DeployTokenParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
 
-        // TODO: Should we implement this
+        // TODO: Should we implement this?
         // if !self.token_addresses(&params.symbol).is_empty() {
         //     return false;
         // }
@@ -156,7 +156,7 @@ pub trait Functions: tokens::Tokens + events::Events {
     }
 
     fn transfer_operatorship(&self, params: &ManagedBuffer) -> bool {
-        // TODO: Implement Auth contract and call that
+        self.auth_transfer_operatorship(params);
 
         self.operatorship_transferred_event(params);
 

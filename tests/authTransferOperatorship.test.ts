@@ -1,19 +1,13 @@
-import { afterEach, assert, beforeEach, test } from "vitest";
+import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount } from "xsuite/assert";
 import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
 import { e } from "xsuite/data";
-import createKeccakHash from "keccak";
-import fs from 'fs';
-import { UserSecretKey } from '@multiversx/sdk-wallet/out';
-import { Address } from '@multiversx/sdk-core/out';
+import { ALICE_ADDR, BOB_ADDR, getOperatorsHash } from './helpers';
 
 let world: FWorld;
 let deployer: FWorldWallet;
 let contract: FWorldContract;
 let address: string;
-
-const ALICE_ADDR = 'erd1qyu5wthldzr8wx5c9ucg8kjagg0jfs53s8nr3zpz3hypefsdd8ssycr6th';
-const BOB_ADDR = 'erd1spyavw0956vq68xj8y4tenjpq2wd5a9p2c6j8gsz7ztyrnpxrruqzu66jx';
 
 beforeEach(async () => {
   world = await FWorld.start();
@@ -44,29 +38,6 @@ const deployContract = async () => {
     balance: 0n,
     allPairs: [],
   });
-}
-
-const getOperatorsHash = (addresses: string[], weights: number[], threshold: number) => {
-  let thresholdHex = threshold.toString(16);
-  if (thresholdHex.length % 2) {
-    thresholdHex = '0' + thresholdHex;
-  }
-
-  let data = Buffer.concat([
-    // price_keys
-    ...addresses.map(address => Address.fromBech32(address).pubkey()),
-    ...weights.map(weight => {
-      let weightHex = weight.toString(16);
-      if (weightHex.length % 2) {
-        weightHex = '0' + weightHex;
-      }
-
-      return Buffer.from(weightHex, 'hex');
-    }),
-    Buffer.from(thresholdHex, 'hex'),
-  ]);
-
-  return createKeccakHash('keccak256').update(data).digest();
 }
 
 test("Transfer operatorship not owner", async () => {

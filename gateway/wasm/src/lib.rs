@@ -29,7 +29,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         isContractCallAndMintApproved => is_contract_call_and_mint_approved
         isCommandExecuted => is_command_executed
         contractId => contract_id
-        authModule => auth_module
         tokenDeployer => token_deployer_implementation
         tokenMintAmount => get_token_mint_amount
         tokenMintLimit => token_mint_limit
@@ -39,6 +38,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         setTokenMintLimits => set_token_mint_limits
         governance => governance
         mintLimiter => mint_limiter
+        authModule => auth_module
     )
 }
 

@@ -3,14 +3,14 @@ import { assertAccount } from "xsuite/assert";
 import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
 import { e } from "xsuite/data";
 import createKeccakHash from "keccak";
+import { ALICE_ADDR, BOB_ADDR, generateSignature, getOperatorsHash, MOCK_CONTRACT_ADDRESS_2 } from './helpers';
 
 let world: FWorld;
 let deployer: FWorldWallet;
 let contract: FWorldContract;
 let address: string;
-
-const MOCK_CONTRACT_ADDRESS_1: string = "erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax";
-const MOCK_CONTRACT_ADDRESS_2: string = "erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh";
+let contractAuth: FWorldContract;
+let addressAuth: string;
 
 const TOKEN_ID: string = "WEGLD-123456";
 
@@ -39,12 +39,19 @@ afterEach(async () => {
 });
 
 const deployContract = async () => {
+  ({ contract: contractAuth, address: addressAuth } = await deployer.deployContract({
+    code: "file:auth/output/auth.wasm",
+    codeMetadata: ["upgradeable"],
+    gasLimit: 100_000_000,
+    codeArgs: []
+  }));
+
   ({ contract, address } = await deployer.deployContract({
     code: "file:gateway/output/gateway.wasm",
     codeMetadata: ["upgradeable"],
     gasLimit: 100_000_000,
     codeArgs: [
-      e.Addr(MOCK_CONTRACT_ADDRESS_1),
+      e.Addr(addressAuth),
       e.Addr(MOCK_CONTRACT_ADDRESS_2),
     ]
   }));
@@ -53,9 +60,24 @@ const deployContract = async () => {
   assertAccount(pairs, {
     balance: 0n,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     ],
+  });
+
+  const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
+  const operatorsHashCanTransfer = getOperatorsHash([ALICE_ADDR, BOB_ADDR], [10, 2], 12);
+  // Set gateway contract as owner of auth contract for transfer operatorship
+  await contractAuth.setAccount({
+    ...await contractAuth.getAccount(),
+    owner: address,
+    pairs: [
+      // Manually add epoch for hash & current epoch
+      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHashCanTransfer)).Value(e.U64(16)),
+
+      e.p.Mapper("current_epoch").Value(e.U64(16)),
+    ]
   });
 }
 
@@ -75,7 +97,7 @@ const setTokenType = async () => {
     ...await contract.getAccount(),
     codeMetadata: ["payable"],
     pairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       // Manually add external token
@@ -86,6 +108,49 @@ const setTokenType = async () => {
   });
 }
 
+const generateProof = (data: any): any => {
+  const hash = createKeccakHash('keccak256').update(Buffer.from(data.toTopHex(), 'hex')).digest('hex');
+  const signature = generateSignature(hash);
+
+  const proof = e.Tuple(
+    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.U(10)),
+    e.U(10),
+    e.List(e.Bytes(signature))
+  );
+
+  return { hash, proof };
+}
+
+test("Execute invalid proof", async () => {
+  await deployContract();
+
+  const data = e.Tuple(
+    e.List(e.Str("commandId")),
+    e.List(e.Str("deployToken"), e.Str("mintToken")),
+    e.List()
+  );
+
+  const hash = createKeccakHash('keccak256').update(Buffer.from(data.toTopHex(), 'hex')).digest('hex');
+  const signature = generateSignature(hash);
+  const proof = e.Tuple(
+    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.U(11)), // wrong weight
+    e.U(10),
+    e.List(e.Bytes(signature))
+  );
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: "execute",
+    funcArgs: [
+      data,
+      proof,
+    ],
+  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
+});
+
 test("Execute invalid commands", async () => {
   await deployContract();
 
@@ -95,13 +160,26 @@ test("Execute invalid commands", async () => {
     e.List()
   );
 
+  const { hash, proof } = generateProof(data);
+
+  // First check if the proof is valid
+  await deployer.callContract({
+    callee: contractAuth,
+    gasLimit: 10_000_000,
+    funcName: "validateProof",
+    funcArgs: [
+      e.Bytes(hash),
+      proof,
+    ],
+  });
+
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   }).assertFail({ code: 4, message: 'Invalid commands' });
 });
@@ -126,13 +204,15 @@ test("Execute deploy token should deploy new token", async () => {
     )
   );
 
+  const { proof } = generateProof(data);
+
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
+    gasLimit: 12_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   });
 
@@ -142,7 +222,7 @@ test("Execute deploy token should deploy new token", async () => {
   assertAccount(pairs, {
     balance: 0,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
@@ -152,11 +232,11 @@ test("Execute deploy token should deploy new token", async () => {
   // Calling again with same command does nothing
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
+    gasLimit: 12_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   });
 
@@ -164,7 +244,7 @@ test("Execute deploy token should deploy new token", async () => {
   assertAccount(pairs, {
     balance: 0,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
@@ -202,13 +282,15 @@ test("Execute deploy token external", async () => {
     )
   );
 
+  const { proof } = generateProof(data);
+
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
+    gasLimit: 15_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   });
 
@@ -218,7 +300,7 @@ test("Execute deploy token external", async () => {
   assertAccount(pairs, {
     balance: 0,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
@@ -259,13 +341,15 @@ test("Execute mint token external", async () => {
     timestamp: 21_600 * 10,
   });
 
+  const { proof } = generateProof(data);
+
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
+    gasLimit: 15_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   });
 
@@ -275,7 +359,7 @@ test("Execute mint token external", async () => {
   assertAccount(pairs, {
     balance: 0,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
@@ -306,13 +390,15 @@ test("Execute approve contract call", async () => {
     )
   );
 
+  const { proof } = generateProof(data);
+
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
+    gasLimit: 15_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   });
 
@@ -336,7 +422,7 @@ test("Execute approve contract call", async () => {
   assertAccount(pairs, {
     balance: 0,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
@@ -374,13 +460,15 @@ test("Execute approve contract call with mint", async () => {
     )
   );
 
+  const { proof } = generateProof(data);
+
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
+    gasLimit: 15_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   });
 
@@ -406,7 +494,7 @@ test("Execute approve contract call with mint", async () => {
   assertAccount(pairs, {
     balance: 0,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
@@ -440,13 +528,15 @@ test("Execute burn token", async () => {
     )
   );
 
+  const { proof } = generateProof(data);
+
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
+    gasLimit: 15_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   });
 
@@ -456,7 +546,7 @@ test("Execute burn token", async () => {
   assertAccount(pairs, {
     balance: 0,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
@@ -468,8 +558,7 @@ test("Execute burn token", async () => {
   });
 });
 
-
-test("Execute transfer operatorship", async () => {
+test("Execute transfer operatorship wrong proof", async () => {
   await deployContract();
 
   const data = e.Tuple(
@@ -481,13 +570,15 @@ test("Execute transfer operatorship", async () => {
     )
   );
 
+  const { proof } = generateProof(data);
+
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
+    gasLimit: 15_000_000,
     funcName: "execute",
     funcArgs: [
       data,
-      e.Str("proof"),
+      proof,
     ],
   });
 
@@ -497,10 +588,99 @@ test("Execute transfer operatorship", async () => {
   assertAccount(pairs, {
     balance: 0,
     allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
+      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+    ],
+  });
+});
+
+test("Execute transfer operatorship", async () => {
+  await deployContract();
+
+  const data = e.Tuple(
+    e.List(e.Str("commandId")),
+    e.List(e.Str("transferOperatorship")),
+    e.List(
+      e.Buffer(
+        e.Tuple(
+          e.List(e.Addr(BOB_ADDR)),
+          e.List(e.U(2)),
+          e.U(2),
+        ).toTopBytes()
+      )
+    )
+  );
+
+  const hash = createKeccakHash('keccak256').update(Buffer.from(data.toTopHex(), 'hex')).digest('hex');
+  const signature = generateSignature(hash);
+  const signatureBob = generateSignature(hash, './bob.pem');
+
+  const proof = e.Tuple(
+    e.List(e.Addr(ALICE_ADDR), e.Addr(BOB_ADDR)),
+    e.List(e.U(10), e.U(2)),
+    e.U(12),
+    e.List(e.Bytes(signature), e.Bytes(signatureBob))
+  );
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 20_000_000,
+    funcName: "execute",
+    funcArgs: [
+      data,
+      proof,
+    ],
+  });
+
+  const commandIdHash = getCommandIdHash();
+
+  let pairs = await contract.getAccountWithPairs();
+  assertAccount(pairs, {
+    balance: 0,
+    allPairs: [
+      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
     ],
   });
+
+  const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
+  const operatorsHash2 = getOperatorsHash([ALICE_ADDR, BOB_ADDR], [10, 2], 12);
+  const operatorsHash3 = getOperatorsHash([BOB_ADDR], [2], 2);
+
+  // Check that Auth contract was updated
+  pairs = await contractAuth.getAccountWithPairs();
+  assertAccount(pairs, {
+    balance: 0,
+    allPairs: [
+      // Manually add epoch for hash & current epoch
+      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash2)).Value(e.U64(16)),
+      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash3)).Value(e.U64(17)),
+
+      e.p.Mapper("hash_for_epoch", e.U64(17)).Value(e.Bytes(operatorsHash3)),
+
+      e.p.Mapper("current_epoch").Value(e.U64(17)),
+    ],
+  });
+
+  // Using old proof will not work anymore
+  const dataOther = e.Tuple(
+    e.List(e.Str("commandId")),
+    e.List(e.Str("deployToken"), e.Str("mintToken")),
+    e.List()
+  );
+
+  const { proof: proofOld } = generateProof(dataOther);
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: "execute",
+    funcArgs: [
+      dataOther,
+      proofOld,
+    ],
+  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 });
