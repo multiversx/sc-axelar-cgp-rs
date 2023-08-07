@@ -1,5 +1,6 @@
 multiversx_sc::imports!();
 
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::constants::{ApproveContractCallParams, BurnTokenParams, DeployTokenParams, MintTokenParams, TokenType, ESDT_ISSUE_COST, PREFIX_CONTRACT_CALL_APPROVED, PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT, ApproveContractCallWithMintParams};
 use crate::{events, tokens};
 use crate::events::{ContractCallApprovedData, ContractCallApprovedWithMintData};
@@ -169,8 +170,8 @@ pub trait Functions: tokens::Tokens + events::Events {
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
         payload_hash: &ManagedBuffer,
-    ) -> ManagedByteArray<32> {
-        let prefix: ManagedByteArray<32> = self
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        let prefix: ManagedByteArray<KECCAK256_RESULT_LEN> = self
             .crypto()
             .keccak256(ManagedBuffer::new_from_bytes(PREFIX_CONTRACT_CALL_APPROVED));
 
@@ -195,8 +196,8 @@ pub trait Functions: tokens::Tokens + events::Events {
         payload_hash: &ManagedBuffer,
         symbol: &EgldOrEsdtTokenIdentifier,
         amount: &BigUint,
-    ) -> ManagedByteArray<32> {
-        let prefix: ManagedByteArray<32> = self.crypto().keccak256(ManagedBuffer::new_from_bytes(
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        let prefix: ManagedByteArray<KECCAK256_RESULT_LEN> = self.crypto().keccak256(ManagedBuffer::new_from_bytes(
             PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT,
         ));
 
@@ -247,5 +248,5 @@ pub trait Functions: tokens::Tokens + events::Events {
     // }
 
     #[storage_mapper("contract_call_approved")]
-    fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<32>>;
+    fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 }

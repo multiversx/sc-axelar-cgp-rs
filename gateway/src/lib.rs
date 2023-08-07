@@ -11,6 +11,7 @@ mod tokens;
 use crate::constants::*;
 use crate::events::{ContractCallData, ContractCallWithTokenData};
 use core::ops::Deref;
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::contract]
 pub trait Gateway:
@@ -172,7 +173,7 @@ pub trait Gateway:
 
     #[payable("*")] // Needs to be payable since tokens can be issued; TODO: Should we add some checks for these amounts?
     #[endpoint(execute)]
-    fn execute(&self, data: ManagedBuffer, _proof: &ManagedBuffer) {
+    fn execute(&self, data: ManagedBuffer, _proof: ManagedBuffer) {
         // TODO: This hash uses ECDSA.toEthSignedMessageHash in SOL, not sure if there is any equivalent if that on MultiversX
         // let message_hash = self.crypto().keccak256(data);
 
@@ -304,13 +305,13 @@ pub trait Gateway:
 
     // TODO: Is this really needed? What is it used for?
     #[view(contractId)]
-    fn contract_id(&self) -> ManagedByteArray<32> {
+    fn contract_id(&self) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         self.crypto()
             .keccak256(ManagedBuffer::new_from_bytes(AXELAR_GATEWAY))
     }
 
-    fn get_is_command_executed_key(&self, command_id: &ManagedBuffer) -> ManagedByteArray<32> {
-        let prefix: ManagedByteArray<32> = self
+    fn get_is_command_executed_key(&self, command_id: &ManagedBuffer) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        let prefix: ManagedByteArray<KECCAK256_RESULT_LEN> = self
             .crypto()
             .keccak256(ManagedBuffer::new_from_bytes(PREFIX_COMMAND_EXECUTED));
 
@@ -331,7 +332,7 @@ pub trait Gateway:
     fn token_deployer_implementation(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[storage_mapper("command_executed")]
-    fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<32>>;
+    fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
     // TODO: Functions not yet implemented:
     // setup - not sure how this can be implented and if relevant with native upgrading of MultiversX

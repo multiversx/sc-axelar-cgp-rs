@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                            0
+// Endpoints:                            5
 // Async Callback (empty):               1
-// Total number of exported functions:   2
+// Total number of exported functions:   7
 
 #![no_std]
 #![feature(lang_items)]
@@ -19,6 +19,11 @@ multiversx_sc_wasm_adapter::endpoints! {
     auth
     (
         init => init
+        validateProof => validate_proof
+        transferOperatorship => transfer_operatorship
+        epoch_for_hash => epoch_for_hash
+        hash_for_epoch => hash_for_epoch
+        current_epoch => current_epoch
     )
 }
 

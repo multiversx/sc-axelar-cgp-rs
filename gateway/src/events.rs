@@ -1,15 +1,17 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
+
 #[derive(TypeAbi, TopEncode)]
 pub struct ContractCallData<M: ManagedTypeApi> {
-    pub hash: ManagedByteArray<M, 32>,
+    pub hash: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
     pub payload: ManagedBuffer<M>,
 }
 
 #[derive(TypeAbi, TopEncode)]
 pub struct ContractCallWithTokenData<M: ManagedTypeApi> {
-    pub hash: ManagedByteArray<M, 32>,
+    pub hash: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
     pub payload: ManagedBuffer<M>,
     pub symbol: EgldOrEsdtTokenIdentifier<M>,
     pub amount: BigUint<M>,
