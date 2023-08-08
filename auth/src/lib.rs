@@ -189,7 +189,6 @@ pub trait Auth {
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> SingleValueMapper<u64>;
 
-    // TODO: What is this used for?
     #[view]
     #[storage_mapper("hash_for_epoch")]
     fn hash_for_epoch(
@@ -197,8 +196,7 @@ pub trait Auth {
         epoch: u64,
     ) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
-    // TODO: In Ethereum epochs are every 6.4 minutes? and in MultiversX epochs are once per day
-    // Should we update this to use blocks instead?
+    // This epoch has nothing to do with the blockchain epoch, it is an internal naming convention
     #[view]
     #[storage_mapper("current_epoch")]
     fn current_epoch(&self) -> SingleValueMapper<u64>;

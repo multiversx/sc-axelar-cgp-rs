@@ -1,7 +1,13 @@
 {
   "code": "file:gateway/output/gateway.wasm",
+  "codeAuth": "file:auth/output/auth.wasm",
   "address": {
-    "devnet": "",
+    "devnet": "erd1qqqqqqqqqqqqqpgq4w583jnepjucpgma7ttmgxk2q6wzkxajkklsyzk06g",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressAuth": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqrftmqxqs6f2k76nx3aypgk795wly0hsnkkls4yjf7y",
     "testnet": "",
     "mainnet": ""
   }

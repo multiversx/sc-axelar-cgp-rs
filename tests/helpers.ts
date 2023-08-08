@@ -2,6 +2,7 @@ import fs from "fs"
 import { UserSecretKey } from "@multiversx/sdk-wallet/out"
 import { Address } from "@multiversx/sdk-core/out"
 import createKeccakHash from "keccak";
+import { e } from 'xsuite/data';
 
 export const MOCK_CONTRACT_ADDRESS_1: string = "erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax";
 export const MOCK_CONTRACT_ADDRESS_2: string = "erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh";
@@ -37,4 +38,18 @@ export const getOperatorsHash = (addresses: string[], weights: number[], thresho
   ]);
 
   return createKeccakHash('keccak256').update(data).digest();
+}
+
+export const generateProof = (data: any): any => {
+  const hash = createKeccakHash('keccak256').update(Buffer.from(data.toTopHex(), 'hex')).digest('hex');
+  const signature = generateSignature(hash);
+
+  const proof = e.Tuple(
+    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.U(10)),
+    e.U(10),
+    e.List(e.Bytes(signature))
+  );
+
+  return { hash, proof };
 }

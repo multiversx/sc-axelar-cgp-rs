@@ -3,7 +3,14 @@ import { assertAccount } from "xsuite/assert";
 import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
 import { e } from "xsuite/data";
 import createKeccakHash from "keccak";
-import { ALICE_ADDR, BOB_ADDR, generateSignature, getOperatorsHash, MOCK_CONTRACT_ADDRESS_2 } from './helpers';
+import {
+  ALICE_ADDR,
+  BOB_ADDR,
+  generateProof,
+  generateSignature,
+  getOperatorsHash,
+  MOCK_CONTRACT_ADDRESS_2
+} from './helpers';
 
 let world: FWorld;
 let deployer: FWorldWallet;
@@ -106,20 +113,6 @@ const setTokenType = async () => {
       e.p.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ]
   });
-}
-
-const generateProof = (data: any): any => {
-  const hash = createKeccakHash('keccak256').update(Buffer.from(data.toTopHex(), 'hex')).digest('hex');
-  const signature = generateSignature(hash);
-
-  const proof = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
-    e.List(e.U(10)),
-    e.U(10),
-    e.List(e.Bytes(signature))
-  );
-
-  return { hash, proof };
 }
 
 test("Execute invalid proof", async () => {
@@ -581,8 +574,6 @@ test("Execute transfer operatorship wrong proof", async () => {
       proof,
     ],
   });
-
-  const commandIdHash = getCommandIdHash();
 
   let pairs = await contract.getAccountWithPairs();
   assertAccount(pairs, {
