@@ -99,6 +99,21 @@ program.command("ClaimDeveloperRewards").action(async () => {
   console.log("Result:", result);
 });
 
+program.command("callContract").action(async () => {
+  const wallet = await loadWallet();
+  const result = await wallet.callContract({
+    callee: envChain.select(data.address),
+    funcName: "callContract",
+    gasLimit: 10_000_000,
+    funcArgs: [
+      e.Str("ethereum-2"),
+      e.Bytes(Buffer.from("Fb7378D0997B0092bE6bBf278Ca9b8058C24752f", 'hex')),
+      e.Bytes(Buffer.from("095ea7b30000000000000000000000004a24b5268a5d286f1602a965ac72913b997858d50000000000000000000000000000000000000000000000000000000000000000", 'hex')),
+    ]
+  });
+  console.log("Result:", result);
+});
+
 program.command("executeApproveContractCall").action(async () => {
   const wallet = await loadWallet();
 

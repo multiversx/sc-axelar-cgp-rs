@@ -19,30 +19,35 @@ pub trait Gateway:
     tokens::Tokens + governance::Governance + functions::Functions + proxy::ProxyModule + events::Events
 {
     #[init]
-    fn init(&self, auth_module: &ManagedAddress, token_deployer_implementation: &ManagedAddress) {
+    fn init(&self, auth_module: &ManagedAddress, mint_limiter: &ManagedAddress) {
         require!(
             self.blockchain().is_smart_contract(auth_module),
             "Invalid auth module"
         );
         require!(
             self.blockchain()
-                .is_smart_contract(token_deployer_implementation),
-            "Invalid token deployer"
+                .is_smart_contract(mint_limiter),
+            "Invalid mint limiter"
         );
 
         self.auth_module().set_if_empty(auth_module);
-        self.token_deployer_implementation()
-            .set_if_empty(token_deployer_implementation);
+        self.mint_limiter()
+            .set_if_empty(mint_limiter);
     }
 
     #[payable("*")]
     #[endpoint(sendToken)]
-    fn send_token(&self, destination_chain: ManagedBuffer, destination_address: ManagedBuffer) {
-        let (symbol, amount) = self.call_value().egld_or_single_fungible_esdt();
+    fn send_token(
+        &self,
+        destination_chain: ManagedBuffer,
+        destination_address: ManagedBuffer,
+        symbol: ManagedBuffer,
+    ) {
+        let (token, amount) = self.call_value().egld_or_single_fungible_esdt();
 
         let caller = self.blockchain().get_caller();
 
-        self.burn_token_from(&caller, &symbol, &amount);
+        self.burn_token_from(&caller, &symbol, token, &amount);
 
         self.token_sent_event(
             caller,
@@ -80,12 +85,13 @@ pub trait Gateway:
         destination_chain: ManagedBuffer,
         destination_contract_address: ManagedBuffer,
         payload: ManagedBuffer,
+        symbol: ManagedBuffer,
     ) {
-        let (symbol, amount) = self.call_value().egld_or_single_fungible_esdt();
+        let (token, amount) = self.call_value().egld_or_single_fungible_esdt();
 
         let caller = self.blockchain().get_caller();
 
-        self.burn_token_from(&caller, &symbol, &amount);
+        self.burn_token_from(&caller, &symbol, token, &amount);
 
         self.contract_call_with_token_event(
             caller,
@@ -136,7 +142,7 @@ pub trait Gateway:
         source_chain: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedBuffer,
-        symbol: &EgldOrEsdtTokenIdentifier,
+        symbol: &ManagedBuffer,
         amount: &BigUint,
     ) -> bool {
         let contract_address = &self.blockchain().get_caller();
@@ -164,11 +170,11 @@ pub trait Gateway:
     }
 
     // External Functions
-    // TODO: Should `setup` function be implemented? And if so, how should the authentication work?
-    // It seems to be related to a proxy which I don't think we will implement on MultiversX
 
-    #[payable("*")]
-    // Needs to be payable since tokens can be issued; TODO: Should we add some checks for these amounts?
+    #[payable("EGLD")]
+    // TODO: Needs to be payable since tokens can be issued.
+    // Should we add some checks for this amount? And validation that egld is only sent if a command
+    // for minting tokens?
     #[endpoint(execute)]
     fn execute(&self, data: ManagedBuffer, proof: ManagedBuffer) {
         // TODO: This hash uses ECDSA.toEthSignedMessageHash in SOL, not sure if there is any equivalent of that on MultiversX
@@ -176,7 +182,6 @@ pub trait Gateway:
 
         let mut allow_operatorship_transfer: bool = self.auth_validate_proof(&message_hash, &proof);
 
-        // TODO: Should we improve this and have the struct fields as function arguments instead?
         let execute_data: ExecuteData<Self::Api> =
             ExecuteData::<Self::Api>::top_decode(data).unwrap();
 
@@ -201,16 +206,12 @@ pub trait Gateway:
         for index in 0..commands_length {
             let command_id_ref = execute_data.command_ids.get(index);
             let command_id = command_id_ref.deref();
-            // TODO: The command_id_hash is not really needed, so the gas cost can be improved if we
-            // use the command id directly here
             let command_id_hash = self.get_is_command_executed_key(command_id);
 
             if self.command_executed().contains(&command_id_hash) {
                 continue;
             }
 
-            // TODO: In the SOL contract, this comparison is done using keccak256, but since we can not store
-            // those as constants I just left normal comparisons here without hash, should be the same
             let command_ref = execute_data.commands.get(index);
             let command = command_ref.deref();
 
@@ -277,7 +278,7 @@ pub trait Gateway:
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
         payload_hash: &ManagedBuffer,
-        symbol: &EgldOrEsdtTokenIdentifier,
+        symbol: &ManagedBuffer,
         amount: &BigUint,
     ) -> bool {
         let hash = self.get_is_contract_call_approved_with_mint_key(
@@ -300,41 +301,13 @@ pub trait Gateway:
         self.command_executed().contains(&hash)
     }
 
-    // TODO: Is this really needed? What is it used for?
-    #[view(contractId)]
-    fn contract_id(&self) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        self.crypto()
-            .keccak256(ManagedBuffer::new_from_bytes(AXELAR_GATEWAY))
-    }
-
     fn get_is_command_executed_key(
         &self,
         command_id: &ManagedBuffer,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        let prefix: ManagedByteArray<KECCAK256_RESULT_LEN> = self
-            .crypto()
-            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_COMMAND_EXECUTED));
-
-        let mut encoded = ManagedBuffer::new();
-
-        encoded.append(prefix.as_managed_buffer());
-        encoded.append(command_id);
-
-        self.crypto().keccak256(encoded)
+        self.crypto().keccak256(command_id)
     }
-
-    // TODO: This is currently unused. For what should we use it?
-    #[view(tokenDeployer)]
-    #[storage_mapper("token_deployer_implementation")]
-    fn token_deployer_implementation(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[storage_mapper("command_executed")]
     fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
-
-    // TODO: Functions not yet implemented:
-    // setup - not sure how this can be implented and if relevant with native upgrading of MultiversX
-    // _hasCode - no equivalent on MultiversX
-    // _getCreate2Address - not sure how to handle the DepositHandler from sol
-    // _setImplementation - since MultiversX supports native upgrades, nothing related to that was put here
-    // upgrade - function was not implemented since MultiversX contracts are upgradable
 }

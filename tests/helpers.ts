@@ -10,6 +10,10 @@ export const MOCK_CONTRACT_ADDRESS_2: string = "erd1qqqqqqqqqqqqqpgq7ykazrzd905z
 export const ALICE_ADDR = 'erd1qyu5wthldzr8wx5c9ucg8kjagg0jfs53s8nr3zpz3hypefsdd8ssycr6th';
 export const BOB_ADDR = 'erd1spyavw0956vq68xj8y4tenjpq2wd5a9p2c6j8gsz7ztyrnpxrruqzu66jx';
 
+export const TOKEN_SYMBOL: string = "WEGLD";
+export const TOKEN_ID: string = "WEGLD-123456";
+export const TOKEN_ID2: string = "OTHER-654321";
+
 export const generateSignature = (dataHash: string, signerPem = './alice.pem') => {
   const file = fs.readFileSync(signerPem).toString();
   const privateKey = UserSecretKey.fromPem(file);

@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           20
+// Endpoints:                           15
 // Async Callback (empty):               1
-// Total number of exported functions:  22
+// Total number of exported functions:  17
 
 #![no_std]
 #![feature(lang_items)]
@@ -28,15 +28,10 @@ multiversx_sc_wasm_adapter::endpoints! {
         isContractCallApproved => is_contract_call_approved
         isContractCallAndMintApproved => is_contract_call_and_mint_approved
         isCommandExecuted => is_command_executed
-        contractId => contract_id
-        tokenDeployer => token_deployer_implementation
         tokenMintAmount => get_token_mint_amount
-        tokenMintLimit => token_mint_limit
-        getTokenType => token_type
-        transferGovernance => transfer_governance
+        getTokenType => supported_tokens
         transferMintLimiter => transfer_mint_limiter
         setTokenMintLimits => set_token_mint_limits
-        governance => governance
         mintLimiter => mint_limiter
         authModule => auth_module
     )

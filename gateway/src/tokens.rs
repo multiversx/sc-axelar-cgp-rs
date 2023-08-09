@@ -10,22 +10,25 @@ pub trait Tokens: events::Events {
     fn burn_token_from(
         &self,
         _caller: &ManagedAddress,
-        symbol: &EgldOrEsdtTokenIdentifier,
+        symbol: &ManagedBuffer,
+        token: EgldOrEsdtTokenIdentifier,
         amount: &BigUint,
     ) {
         require!(amount > &BigUint::zero(), "Invalid amount");
 
-        let token_type_mapper = self.token_type(symbol);
+        let supported_token_mapper = self.supported_tokens(symbol);
 
-        require!(!token_type_mapper.is_empty(), "Token does not exist");
+        require!(!supported_token_mapper.is_empty(), "Token does not exist");
 
-        let token_type: TokenType = token_type_mapper.get();
+        let supported_token: SupportedToken<Self::Api> = supported_token_mapper.get();
 
-        match token_type {
+        require!(supported_token.identifier == token, "Invalid token sent");
+
+        match supported_token.token_type {
             TokenType::External => {}
             TokenType::InternalBurnableFrom => {
                 self.send()
-                    .esdt_local_burn(&symbol.clone().unwrap_esdt(), 0, amount);
+                    .esdt_local_burn(&supported_token.identifier.clone().unwrap_esdt(), 0, amount);
             }
             TokenType::InternalBurnable => {}
         }
@@ -33,48 +36,42 @@ pub trait Tokens: events::Events {
 
     fn mint_token_raw(
         &self,
-        symbol: &EgldOrEsdtTokenIdentifier,
+        symbol: &ManagedBuffer,
         account: &ManagedAddress,
         amount: &BigUint,
     ) -> bool {
-        let token_type_mapper = self.token_type(symbol);
+        let supported_token_mapper = self.supported_tokens(symbol);
 
         // This function was transformed to return bool because we don't want it to halt the whole contract execution in case of `execute` endpoint
-        if token_type_mapper.is_empty() {
+        if supported_token_mapper.is_empty() {
             return false;
         }
 
-        let token_type: TokenType = token_type_mapper.get();
+        let supported_token: SupportedToken<Self::Api> = supported_token_mapper.get();
 
-        self.set_token_mint_amount(symbol, &self.get_token_mint_amount(symbol) + amount);
+        self.set_token_mint_amount(symbol, &self.get_token_mint_amount(symbol) + amount, supported_token.mint_limit);
 
-        match token_type {
+        let token = supported_token.identifier;
+
+        match supported_token.token_type {
             TokenType::External => {
-                self.send().direct(account, symbol, 0, amount);
+                self.send().direct(account, &token, 0, amount);
             },
             TokenType::InternalBurnableFrom => {
                 self.send()
-                    .esdt_local_mint(&symbol.clone().unwrap_esdt(), 0, amount);
+                    .esdt_local_mint(&token.clone().unwrap_esdt(), 0, amount);
             },
             TokenType::InternalBurnable => {
-                self.send().direct(account, symbol, 0, amount);
+                self.send().direct(account, &token, 0, amount);
             }
         }
 
         return true;
     }
 
-    fn set_token_mint_limit(&self, symbol: &EgldOrEsdtTokenIdentifier, limit: &BigUint) {
-        self.token_mint_limit(symbol).set(limit);
-
-        self.token_mint_limit_updated_event(symbol, limit);
-    }
-
-    fn set_token_mint_amount(&self, symbol: &EgldOrEsdtTokenIdentifier, total_amount: BigUint) {
-        let token_mint_limit_storage = self.token_mint_limit(symbol);
-
+    fn set_token_mint_amount(&self, symbol: &ManagedBuffer, total_amount: BigUint, mint_limit: BigUint) {
         require!(
-            token_mint_limit_storage.is_empty() || token_mint_limit_storage.get() >= total_amount,
+            mint_limit == BigUint::zero() || mint_limit >= total_amount,
             "Exceed mint limit"
         );
 
@@ -85,32 +82,21 @@ pub trait Tokens: events::Events {
     }
 
     #[view(tokenMintAmount)]
-    fn get_token_mint_amount(&self, symbol: &EgldOrEsdtTokenIdentifier) -> BigUint {
+    fn get_token_mint_amount(&self, symbol: &ManagedBuffer) -> BigUint {
         let timestamp = self.blockchain().get_block_timestamp();
 
         self.token_mint_amount(symbol, timestamp / HOURS_6_TO_SECONDS)
             .get()
     }
 
-    #[view(tokenMintLimit)]
-    #[storage_mapper("token_mint_limit")]
-    fn token_mint_limit(&self, symbol: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<BigUint>;
-
     #[storage_mapper("token_mint_amount")]
     fn token_mint_amount(
         &self,
-        symbol: &EgldOrEsdtTokenIdentifier,
+        symbol: &ManagedBuffer,
         day: u64, // TODO: Why is the 'day' needed here?
     ) -> SingleValueMapper<BigUint>;
 
     #[view(getTokenType)]
-    #[storage_mapper("token_type")]
-    fn token_type(&self, token: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<TokenType>;
-
-    // TODO: Do we need this? Currently the `symbol` is considered to be the ESDT identifier of the token globally in the SC. Is this correct?
-    // But it can also be considered to be just the token symbol, and the 'address' from SOL contract could be equivalent to the ESDT token identifier,
-    // which we could store using this storage
-    // #[view(tokenAddresses)]
-    // #[storage_mapper("token_addresses")]
-    // fn token_addresses(&self, token: &EgldOrEsdtTokenIdentifier) -> SingleValueMapper<ManagedAddress>;
+    #[storage_mapper("supported_tokens")]
+    fn supported_tokens(&self, token: &ManagedBuffer) -> SingleValueMapper<SupportedToken<Self::Api>>;
 }
