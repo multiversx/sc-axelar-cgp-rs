@@ -30,14 +30,9 @@ pub trait Gateway:
             "Invalid token deployer"
         );
 
-        if self.auth_module().is_empty() {
-            self.auth_module().set(auth_module);
-        }
-
-        if self.token_deployer_implementation().is_empty() {
-            self.token_deployer_implementation()
-                .set(token_deployer_implementation);
-        }
+        self.auth_module().set_if_empty(auth_module);
+        self.token_deployer_implementation()
+            .set_if_empty(token_deployer_implementation);
     }
 
     #[payable("*")]
@@ -206,6 +201,8 @@ pub trait Gateway:
         for index in 0..commands_length {
             let command_id_ref = execute_data.command_ids.get(index);
             let command_id = command_id_ref.deref();
+            // TODO: The command_id_hash is not really needed, so the gas cost can be improved if we
+            // use the command id directly here
             let command_id_hash = self.get_is_command_executed_key(command_id);
 
             if self.command_executed().contains(&command_id_hash) {

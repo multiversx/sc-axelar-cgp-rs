@@ -164,12 +164,8 @@ pub trait Auth {
 
     // TODO: Check for a better way of doing this
     fn contains_no_duplicate(&self, operators: &ManagedVec<ManagedAddress>) -> bool {
-        for iindex in 0..operators.len() {
-            for jindex in 0..operators.len() {
-                if iindex == jindex {
-                    continue;
-                }
-
+        for iindex in 0..(operators.len() - 1) {
+            for jindex in (iindex + 1)..operators.len() {
                 if operators.get(iindex) == operators.get(jindex) {
                     return false;
                 }

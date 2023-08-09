@@ -44,7 +44,7 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
             // executed event is still dispatched. There needs to be a way to revert these
         } else {
             let token = params.token.unwrap();
-            // If token address is specified, ensure that there is a valid token id provided
+            // If token is specified, ensure that there is a valid token id provided
             if !token.is_valid() {
                 self.token_does_not_exist_event(token);
 

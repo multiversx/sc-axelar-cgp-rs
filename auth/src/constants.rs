@@ -5,6 +5,7 @@ use multiversx_sc::api::ED25519_SIGNATURE_BYTE_LEN;
 
 pub const OLD_KEY_RETENTION: u64 = 16;
 
+// TODO: Should operators be ManagedBuffer and not specific MultiversX addresses?
 #[derive(TypeAbi, TopDecode, Debug)]
 pub struct ProofData<M: ManagedTypeApi> {
     pub operators: ManagedVec<M, ManagedAddress<M>>,
