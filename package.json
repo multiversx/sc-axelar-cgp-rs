@@ -1,12 +1,12 @@
 {
   "private": true,
   "scripts": {
-    "build": "npm run build:gateway && npm run build:auth",
+    "build": "npm run build:gateway && npm run build:auth && npm run build:gas-service",
     "build:gateway": "cd gateway && mxpy contract build",
     "build:auth": "cd auth && mxpy contract build",
+    "build:gas-service": "cd gas-service && mxpy contract build",
     "test": "vitest run",
-    "test:contract": "cd gateway && cargo test",
-    "test:all": "npm run build && npm run test && npm run test:contract",
+    "test:all": "npm run build && npm run test",
     "typecheck": "tsc --noEmit",
     "interact:devnet": "CHAIN=devnet tsx interact/index.ts",
     "interact:testnet": "CHAIN=testnet tsx interact/index.ts",
@@ -20,7 +20,7 @@
     "tsx": "^3.12.7",
     "typescript": "^5.0.4",
     "vitest": "^0.33.0",
-    "xsuite": "0.0.28",
+    "xsuite": "0.0.29",
     "keccak": "^3.0.3"
   }
 }
