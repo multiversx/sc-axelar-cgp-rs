@@ -70,8 +70,20 @@ program.command("deploy").action(async () => {
   });
   console.log("Result Change Owner:", resultChangeOwner);
 
+  // Deploy gas receiver
+  const resultGasReceiver = await wallet.deployContract({
+    code: data.codeGasReceiver,
+    codeMetadata: ["upgradeable"],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      wallet,
+    ],
+  });
+  console.log("Result Gas Receiver:", resultGasReceiver);
+
   console.log('Deployed Auth Contract:', resultAuth.address);
   console.log('Deployed Gateway Contract:', result.address);
+  console.log('Deployed Gas Receiver Contract:', resultGasReceiver.address);
 });
 
 program.command("upgrade").action(async () => {
