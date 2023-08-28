@@ -55,5 +55,9 @@ export const generateProof = (data: any): any => {
     e.List(e.Bytes(signature))
   );
 
+  console.log('data hash', hash);
+  console.log('signature', signature.toString('hex'));
+  console.log('proof', proof.toTopHex());
+
   return { hash, proof };
 }
