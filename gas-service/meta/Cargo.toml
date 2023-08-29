@@ -1,0 +1,14 @@
+[package]
+name = "gas-service-meta"
+version = "0.0.0"
+edition = "2018"
+publish = false
+authors = [ "you",]
+
+[dev-dependencies]
+
+[dependencies.gas-service]
+path = ".."
+
+[dependencies.multiversx-sc-meta]
+version = "0.42.0"
