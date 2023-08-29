@@ -1,13 +1,19 @@
 {
   "code": "file:gateway/output/gateway.wasm",
   "codeAuth": "file:auth/output/auth.wasm",
+  "codeGasReceiver": "file:gas-service/output/gas-service.wasm",
   "address": {
-    "devnet": "erd1qqqqqqqqqqqqqpgq4w583jnepjucpgma7ttmgxk2q6wzkxajkklsyzk06g",
+    "devnet": "erd1qqqqqqqqqqqqqpgqsvzyz88e8v8j6x3wquatxuztnxjwnw92kkls6rdtzx",
     "testnet": "",
     "mainnet": ""
   },
   "addressAuth": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqrftmqxqs6f2k76nx3aypgk795wly0hsnkkls4yjf7y",
+    "devnet": "erd1qqqqqqqqqqqqqpgq9h9cyn94q0rcqxg2dsn6h2qj8kcfls5ykklsgky0zf",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressGasService": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqzp2whhz9rqvy9zjgfv8z2twz6xd7rnwqkklsng70lg",
     "testnet": "",
     "mainnet": ""
   }

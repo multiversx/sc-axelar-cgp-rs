@@ -1,9 +1,9 @@
 multiversx_sc::imports!();
 
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use crate::constants::{ApproveContractCallParams, BurnTokenParams, DeployTokenParams, MintTokenParams, TokenType, ESDT_ISSUE_COST, PREFIX_CONTRACT_CALL_APPROVED, PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT, ApproveContractCallWithMintParams};
-use crate::{events, proxy, tokens};
+use crate::constants::{ApproveContractCallParams, ApproveContractCallWithMintParams, BurnTokenParams, DeployTokenParams, MintTokenParams, TokenType, ESDT_ISSUE_COST, SupportedToken};
 use crate::events::{ContractCallApprovedData, ContractCallApprovedWithMintData};
+use crate::{events, proxy, tokens};
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::module]
 pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
@@ -11,19 +11,23 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
         let params: DeployTokenParams<Self::Api> =
             DeployTokenParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
 
-        // TODO: Should we implement this?
-        // if !self.token_addresses(&params.symbol).is_empty() {
-        //     return false;
-        // }
+        let supported_token_mapper = self.supported_tokens(&params.symbol);
+
+        if !supported_token_mapper.is_empty() {
+            return false;
+        }
 
         if params.token.is_none() {
             // If token address is no specified, it indicates a request to deploy one.
 
             // TODO: Store this issue cost in a mapper or something else?
-            let issue_cost = BigUint::from(ESDT_ISSUE_COST);
+            let _issue_cost = BigUint::from(ESDT_ISSUE_COST);
 
             // TODO: In the SOL implementation, the token deployer is called. What should we do here?
             // Also, the cap is not utilized here at all, since tokens can be minted and burned on MultiversX without a cap
+            // The token issuance can also fail async and we don't know this when executing the command
+            // Because of this, the command_id_hash is still added to command_executed and the
+            // executed event is still dispatched. There needs to be a way to revert these
             // self.send()
             //     .esdt_system_sc_proxy()
             //     .issue_and_set_all_roles(
@@ -39,9 +43,6 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
             //             .deploy_token_callback(params.symbol, params.mint_limit),
             //     )
             //     .register_promise();
-            // TODO: The token issuance can fail async and we don't know this when executing the command
-            // Because of this, the command_id_hash is still added to command_executed and the
-            // executed event is still dispatched. There needs to be a way to revert these
         } else {
             let token = params.token.unwrap();
             // If token is specified, ensure that there is a valid token id provided
@@ -51,10 +52,14 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
                 return false;
             }
 
-            self.token_type(&token).set(TokenType::External);
-            self.set_token_mint_limit(&token, &params.mint_limit);
+            self.token_deployed_event(&params.symbol, &token);
+            self.token_mint_limit_updated_event(&params.symbol, &params.mint_limit);
 
-            self.token_deployed_event(params.symbol, token);
+            supported_token_mapper.set(SupportedToken {
+                token_type: TokenType::External,
+                identifier: token,
+                mint_limit: params.mint_limit,
+            });
         }
 
         return true;
@@ -71,14 +76,14 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
         let params: BurnTokenParams<Self::Api> =
             BurnTokenParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
 
-        let token_type_mapper = self.token_type(&params.symbol);
+        let supported_tokens_mapper = self.supported_tokens(&params.symbol);
 
-        if token_type_mapper.is_empty() {
+        if supported_tokens_mapper.is_empty() {
             return false;
         }
 
         // TODO: The SOL logic here is complex, not sure what to do here exactly...
-        if token_type_mapper.get() == TokenType::External {
+        if supported_tokens_mapper.get().token_type == TokenType::External {
         } else {
         }
 
@@ -171,13 +176,8 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
         contract_address: &ManagedAddress,
         payload_hash: &ManagedBuffer,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        let prefix: ManagedByteArray<KECCAK256_RESULT_LEN> = self
-            .crypto()
-            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_CONTRACT_CALL_APPROVED));
-
         let mut encoded = ManagedBuffer::new();
 
-        encoded.append(prefix.as_managed_buffer());
         encoded.append(command_id);
         encoded.append(source_chain);
         encoded.append(source_address);
@@ -194,22 +194,17 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
         payload_hash: &ManagedBuffer,
-        symbol: &EgldOrEsdtTokenIdentifier,
+        symbol: &ManagedBuffer,
         amount: &BigUint,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        let prefix: ManagedByteArray<KECCAK256_RESULT_LEN> = self.crypto().keccak256(ManagedBuffer::new_from_bytes(
-            PREFIX_CONTRACT_CALL_APPROVED_WITH_MINT,
-        ));
-
         let mut encoded = ManagedBuffer::new();
 
-        encoded.append(prefix.as_managed_buffer());
         encoded.append(command_id);
         encoded.append(source_chain);
         encoded.append(source_address);
         encoded.append(contract_address.as_managed_buffer());
         encoded.append(payload_hash);
-        encoded.append(&symbol.clone().into_name());
+        encoded.append(symbol);
         encoded.append(&amount.to_bytes_be_buffer());
 
         self.crypto().keccak256(encoded)
@@ -226,12 +221,13 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
     //         ManagedAsyncCallResult::Ok(token_id_raw) => {
     //             let token_id = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
     //
-    //             self.token_type(&token_id)
-    //                 .set(TokenType::InternalBurnableFrom);
+    //             self.token_deployed_event(&symbol, &token_id);
     //
-    //             self.set_token_mint_limit(&token_id, &mint_limit);
-    //
-    //             self.token_deployed_event(symbol, token_id);
+    //             self.supported_tokens(&symbol).set(SupportedToken {
+    //                 token_type: TokenType::InternalBurnableFrom,
+    //                 identifier: token_id,
+    //                 mint_limit,
+    //             });
     //         }
     //         ManagedAsyncCallResult::Err(_) => {
     //             // TODO: To whom should we return tokens? How should we handle this exactly?

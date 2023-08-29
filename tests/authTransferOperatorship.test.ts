@@ -2,7 +2,7 @@ import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount } from "xsuite/assert";
 import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
 import { e } from "xsuite/data";
-import { ALICE_ADDR, BOB_ADDR, getOperatorsHash } from './helpers';
+import { ALICE_ADDR, BOB_ADDR, getOperatorsHash, MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2 } from './helpers';
 
 let world: FWorld;
 let deployer: FWorldWallet;
@@ -85,6 +85,25 @@ test("Transfer operatorship invalid operators duplicate", async () => {
 
   const data = e.Tuple(
     e.List(e.Addr(ALICE_ADDR), e.Addr(ALICE_ADDR)),
+    e.List(e.U(10)),
+    e.U(10),
+  );
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: "transferOperatorship",
+    funcArgs: [
+      data,
+    ],
+  }).assertFail({ code: 4, message: 'Invalid operators' });
+});
+
+test("Transfer operatorship invalid operators duplicate 2", async () => {
+  await deployContract();
+
+  const data = e.Tuple(
+    e.List(e.Addr(ALICE_ADDR), e.Addr(BOB_ADDR), e.Addr(MOCK_CONTRACT_ADDRESS_1), e.Addr(BOB_ADDR), e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     e.List(e.U(10)),
     e.U(10),
   );

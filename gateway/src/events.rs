@@ -13,7 +13,7 @@ pub struct ContractCallData<M: ManagedTypeApi> {
 pub struct ContractCallWithTokenData<M: ManagedTypeApi> {
     pub hash: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
     pub payload: ManagedBuffer<M>,
-    pub symbol: EgldOrEsdtTokenIdentifier<M>,
+    pub symbol: ManagedBuffer<M>,
     pub amount: BigUint<M>,
 }
 
@@ -25,7 +25,7 @@ pub struct ContractCallApprovedData<M: ManagedTypeApi> {
 
 #[derive(TypeAbi, TopEncode)]
 pub struct ContractCallApprovedWithMintData<M: ManagedTypeApi> {
-    pub symbol: EgldOrEsdtTokenIdentifier<M>,
+    pub symbol: ManagedBuffer<M>,
     pub amount: BigUint<M>,
     pub source_tx_hash: ManagedBuffer<M>,
     pub source_event_index: BigUint<M>,
@@ -39,7 +39,7 @@ pub trait Events {
         #[indexed] sender: ManagedAddress,
         #[indexed] destination_chain: ManagedBuffer,
         #[indexed] destination_address: ManagedBuffer,
-        #[indexed] symbol: EgldOrEsdtTokenIdentifier,
+        #[indexed] symbol: ManagedBuffer,
         amount: BigUint,
     );
 
@@ -61,13 +61,6 @@ pub trait Events {
         data: ContractCallWithTokenData<Self::Api>,
     );
 
-    #[event("governance_transferred_event")]
-    fn governance_transferred_event(
-        &self,
-        #[indexed] previous_governance: ManagedAddress,
-        #[indexed] new_governance: ManagedAddress,
-    );
-
     #[event("mint_limiter_transferred_event")]
     fn mint_limiter_transferred_event(
         &self,
@@ -78,7 +71,7 @@ pub trait Events {
     #[event("token_mint_limit_updated_event")]
     fn token_mint_limit_updated_event(
         &self,
-        #[indexed] symbol: &EgldOrEsdtTokenIdentifier,
+        #[indexed] symbol: &ManagedBuffer,
         limit: &BigUint,
     );
 
@@ -86,7 +79,7 @@ pub trait Events {
     fn executed_event(&self, #[indexed] command_id: &ManagedBuffer);
 
     #[event("token_deployed_event")]
-    fn token_deployed_event(&self, #[indexed] symbol: ManagedBuffer, token_id: EgldOrEsdtTokenIdentifier);
+    fn token_deployed_event(&self, #[indexed] symbol: &ManagedBuffer, token_id: &EgldOrEsdtTokenIdentifier);
 
     #[event("token_deploy_failed_event")]
     fn token_deploy_failed_event(&self, #[indexed] symbol: ManagedBuffer);

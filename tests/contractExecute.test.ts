@@ -9,7 +9,7 @@ import {
   generateProof,
   generateSignature,
   getOperatorsHash,
-  MOCK_CONTRACT_ADDRESS_2
+  MOCK_CONTRACT_ADDRESS_2, TOKEN_ID, TOKEN_SYMBOL
 } from './helpers';
 
 let world: FWorld;
@@ -18,8 +18,6 @@ let contract: FWorldContract;
 let address: string;
 let contractAuth: FWorldContract;
 let addressAuth: string;
-
-const TOKEN_ID: string = "WEGLD-123456";
 
 beforeEach(async () => {
   world = await FWorld.start();
@@ -68,7 +66,7 @@ const deployContract = async () => {
     balance: 0n,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     ],
   });
 
@@ -89,26 +87,23 @@ const deployContract = async () => {
 }
 
 const getCommandIdHash = (commandId: string = 'commandId') => {
-  const commandExecutedHash = createKeccakHash('keccak256').update("command-executed").digest('hex');
-
-  const buffer = Buffer.concat([
-    Buffer.from(commandExecutedHash, 'hex'),
-    Buffer.from(commandId)
-  ]);
-
-  return createKeccakHash('keccak256').update(buffer).digest('hex');
+  return createKeccakHash('keccak256').update(Buffer.from(commandId)).digest('hex');
 }
 
-const setTokenType = async () => {
+const setSupportedToken = async () => {
   await contract.setAccount({
     ...await contract.getAccount(),
     codeMetadata: ["payable"],
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
-      // Manually add external token
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
 
       e.p.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ]
@@ -216,7 +211,7 @@ test("Execute deploy token should deploy new token", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
     ],
@@ -238,7 +233,7 @@ test("Execute deploy token should deploy new token", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
     ],
@@ -294,12 +289,16 @@ test("Execute deploy token external", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
-      e.p.Mapper("token_mint_limit", e.Str(TOKEN_ID)).Value(e.U(1_000_000)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(1_000_000),
+      )),
     ],
   });
 });
@@ -307,7 +306,7 @@ test("Execute deploy token external", async () => {
 test("Execute mint token external", async () => {
   await deployContract();
 
-  await setTokenType();
+  await setSupportedToken();
 
   const data = e.Tuple(
     e.List(e.Str("commandId"), e.Str("commandIdInvalid")),
@@ -315,14 +314,14 @@ test("Execute mint token external", async () => {
     e.List(
       e.Buffer(
         e.Tuple(
-          e.Str(TOKEN_ID),
+          e.Str(TOKEN_SYMBOL),
           e.Addr(deployer.toString()),
           e.U(1_000),
         ).toTopBytes(),
       ),
       e.Buffer(
         e.Tuple(
-          e.Str("OTHER-654321"),
+          e.Str("OTHER"),
           e.Addr(deployer.toString()),
           e.U(1_000),
         ).toTopBytes(),
@@ -353,12 +352,18 @@ test("Execute mint token external", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
-      e.p.Mapper("token_mint_amount", e.Str(TOKEN_ID), e.U64(10)).Value(e.U(1_000)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
+
+      e.p.Mapper("token_mint_amount", e.Str(TOKEN_SYMBOL), e.U64(10)).Value(e.U(1_000)),
     ],
   });
 });
@@ -397,11 +402,8 @@ test("Execute approve contract call", async () => {
 
   const commandIdHash = getCommandIdHash();
 
-  const contractCallHash = createKeccakHash('keccak256').update("contract-call-approved").digest('hex');
-
   // get_is_contract_call_approved_key hash
   let approvedData = Buffer.concat([
-    Buffer.from(contractCallHash, 'hex'),
     Buffer.from("commandId"),
     Buffer.from("ethereum"),
     Buffer.from("0x4976da71bF84D750b5451B053051158EC0A4E876"),
@@ -416,7 +418,7 @@ test("Execute approve contract call", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
@@ -467,11 +469,8 @@ test("Execute approve contract call with mint", async () => {
 
   const commandIdHash = getCommandIdHash();
 
-  const contractCallHash = createKeccakHash('keccak256').update("contract-call-approved-with-mint").digest('hex');
-
   // get_is_contract_call_approved_key hash
   let approvedData = Buffer.concat([
-    Buffer.from(contractCallHash, 'hex'),
     Buffer.from("commandId"),
     Buffer.from("ethereum"),
     Buffer.from("0x4976da71bF84D750b5451B053051158EC0A4E876"),
@@ -488,7 +487,7 @@ test("Execute approve contract call with mint", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
@@ -500,7 +499,7 @@ test("Execute approve contract call with mint", async () => {
 test("Execute burn token", async () => {
   await deployContract();
 
-  await setTokenType();
+  await setSupportedToken();
 
   const data = e.Tuple(
     e.List(e.Str("commandId"), e.Str("commandIdInvalid")),
@@ -508,7 +507,7 @@ test("Execute burn token", async () => {
     e.List(
       e.Buffer(
         e.Tuple(
-          e.Str(TOKEN_ID),
+          e.Str(TOKEN_SYMBOL),
           e.Str("salt"),
         ).toTopBytes(),
       ),
@@ -540,9 +539,14 @@ test("Execute burn token", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
@@ -580,7 +584,7 @@ test("Execute transfer operatorship wrong proof", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     ],
   });
 });
@@ -630,7 +634,7 @@ test("Execute transfer operatorship", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
     ],

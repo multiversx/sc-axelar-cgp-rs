@@ -3,14 +3,12 @@ import { assertAccount } from "xsuite/assert";
 import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
 import { e } from "xsuite/data";
 import createKeccakHash from "keccak";
-import { MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2 } from './helpers';
+import { MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2, TOKEN_ID, TOKEN_ID2, TOKEN_SYMBOL } from './helpers';
 
 let world: FWorld;
 let deployer: FWorldWallet;
 let contract: FWorldContract;
 let address: string;
-
-const TOKEN_ID: string = "WEGLD-123456";
 
 beforeEach(async () => {
   world = await FWorld.start();
@@ -26,6 +24,10 @@ beforeEach(async () => {
         {
           id: TOKEN_ID,
           amount: 100_000,
+        },
+        {
+          id: TOKEN_ID2,
+          amount: 10_000,
         }
       ])
     ]
@@ -52,23 +54,43 @@ const deployContract = async () => {
     balance: 0n,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     ],
   });
 }
 
-test("Send token external", async () => {
+test("Send token external not exists", async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: "sendToken",
+    funcArgs: [
+      e.Str("ethereum"),
+      e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
+      e.Str(TOKEN_SYMBOL),
+    ],
+    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+  }).assertFail({ code: 4, message: "Token does not exist" });
+});
+
+test("Send token external invalid", async () => {
   await deployContract();
 
   await contract.setAccount({
     ...await contract.getAccount(),
-    codeMetadata: ["payable"], // TODO: This should not be necessary, xSuite bug?
+    codeMetadata: ["payable"], // TODO: This should not be necessary, xSuite bug
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
-      // Manually add external token
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
     ]
   });
 
@@ -78,7 +100,40 @@ test("Send token external", async () => {
     funcName: "sendToken",
     funcArgs: [
       e.Str("ethereum"),
-      e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876")
+      e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
+      e.Str(TOKEN_SYMBOL),
+    ],
+    esdts: [{ id: TOKEN_ID2, amount: 1_000 }],
+  }).assertFail({ code: 4, message: "Invalid token sent" });
+});
+
+test("Send token external", async () => {
+  await deployContract();
+
+  await contract.setAccount({
+    ...await contract.getAccount(),
+    codeMetadata: ["payable"],
+    pairs: [
+      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
+    ]
+  });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: "sendToken",
+    funcArgs: [
+      e.Str("ethereum"),
+      e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
+      e.Str(TOKEN_SYMBOL),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   });
@@ -88,10 +143,14 @@ test("Send token external", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       // Manually add external token
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
 
       e.p.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ],
@@ -118,12 +177,29 @@ test("Call contract", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     ],
   });
 });
 
-test("Call contract with token", async () => {
+test("Call contract with token not exists", async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: "callContractWithToken",
+    funcArgs: [
+      e.Str("ethereum"),
+      e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
+      e.Str("payload"),
+      e.Str(TOKEN_SYMBOL),
+    ],
+    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+  }).assertFail({ code: 4, message: "Token does not exist" });
+});
+
+test("Call contract with token invalid", async () => {
   await deployContract();
 
   await contract.setAccount({
@@ -131,10 +207,14 @@ test("Call contract with token", async () => {
     codeMetadata: ["payable"],
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
-      // Manually add external token
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
     ]
   });
 
@@ -146,6 +226,40 @@ test("Call contract with token", async () => {
       e.Str("ethereum"),
       e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
       e.Str("payload"),
+      e.Str(TOKEN_SYMBOL),
+    ],
+    esdts: [{ id: TOKEN_ID2, amount: 1_000 }],
+  }).assertFail({ code: 4, message: "Invalid token sent" });
+});
+
+test("Call contract with token", async () => {
+  await deployContract();
+
+  await contract.setAccount({
+    ...await contract.getAccount(),
+    codeMetadata: ["payable"],
+    pairs: [
+      e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
+    ]
+  });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: "callContractWithToken",
+    funcArgs: [
+      e.Str("ethereum"),
+      e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
+      e.Str("payload"),
+      e.Str(TOKEN_SYMBOL),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   });
@@ -155,10 +269,14 @@ test("Call contract with token", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
-      // Manually add external token
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
 
       e.p.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ],
@@ -186,7 +304,7 @@ test("Validate contract call error", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     ],
   });
 });
@@ -194,11 +312,8 @@ test("Validate contract call error", async () => {
 test("Validate contract call", async () => {
   await deployContract();
 
-  const contractCallHash = createKeccakHash('keccak256').update("contract-call-approved").digest('hex');
-
   // get_is_contract_call_approved_key hash
   let data = Buffer.concat([
-    Buffer.from(contractCallHash, 'hex'),
     Buffer.from("commandId"),
     Buffer.from("ethereum"),
     Buffer.from("0x4976da71bF84D750b5451B053051158EC0A4E876"),
@@ -213,7 +328,7 @@ test("Validate contract call", async () => {
     codeMetadata: ["payable"],
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       // Manually approve call
       e.p.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
@@ -238,7 +353,7 @@ test("Validate contract call", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     ],
   });
 });
@@ -266,15 +381,13 @@ test("Validate contract call and mint error", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
     ],
   });
 });
 
 test("Validate contract call and mint external", async () => {
   await deployContract();
-
-  const contractCallHash = createKeccakHash('keccak256').update("contract-call-approved-with-mint").digest('hex');
 
   const amount = 1_000;
   let amountHex = amount.toString(16);
@@ -284,13 +397,12 @@ test("Validate contract call and mint external", async () => {
 
   // get_is_contract_call_approved_key hash
   let data = Buffer.concat([
-    Buffer.from(contractCallHash, 'hex'),
     Buffer.from("commandId"),
     Buffer.from("ethereum"),
     Buffer.from("0x4976da71bF84D750b5451B053051158EC0A4E876"),
     deployer.toTopBytes(),
     Buffer.from("payloadHash"),
-    Buffer.from(TOKEN_ID),
+    Buffer.from(TOKEN_SYMBOL),
     Buffer.from(amountHex, 'hex'),
   ]);
 
@@ -301,13 +413,17 @@ test("Validate contract call and mint external", async () => {
     codeMetadata: ["payable"],
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       // Manually approve call
       e.p.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
 
-      // Manually add external token
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
 
       e.p.Esdts([{ id: TOKEN_ID, amount }]),
     ]
@@ -326,7 +442,7 @@ test("Validate contract call and mint external", async () => {
       e.Str("ethereum"),
       e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
       e.Str("payloadHash"),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_SYMBOL),
       e.U(amount)
     ]
   });
@@ -337,14 +453,18 @@ test("Validate contract call and mint external", async () => {
     balance: 0,
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.p.Mapper("token_deployer_implementation").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
-      // Manually add external token
-      e.p.Mapper("token_type", e.Str(TOKEN_ID)).Value(e.U8(2)),
+      // Manually add supported token
+      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
+        e.U8(2),
+        e.Str(TOKEN_ID),
+        e.U(0),
+      )),
 
       e.p.Esdts([{ id: TOKEN_ID, amount: 0 }]),
 
-      e.p.Mapper("token_mint_amount", e.Str(TOKEN_ID), e.U64(10)).Value(e.U(amount)),
+      e.p.Mapper("token_mint_amount", e.Str(TOKEN_SYMBOL), e.U64(10)).Value(e.U(amount)),
     ],
   });
 
@@ -352,7 +472,10 @@ test("Validate contract call and mint external", async () => {
   assertAccount(pairs, {
     balance: 10_000_000_000n,
     allPairs: [
-      e.p.Esdts([{ id: TOKEN_ID, amount: 101_000 }]),
+      e.p.Esdts([
+        { id: TOKEN_ID, amount: 101_000 },
+        { id: TOKEN_ID2, amount: 10_000 }
+      ]),
     ],
   });
 });
