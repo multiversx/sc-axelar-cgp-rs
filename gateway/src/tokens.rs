@@ -46,7 +46,7 @@ pub trait Tokens: events::Events {
 
         let supported_token: SupportedToken<Self::Api> = supported_token_mapper.get();
 
-        self.set_token_mint_amount(symbol, &self.get_token_mint_amount(symbol) + amount, supported_token.mint_limit);
+        self.set_token_mint_amount(symbol, amount, &supported_token.mint_limit);
 
         let token = supported_token.identifier;
 
@@ -63,16 +63,18 @@ pub trait Tokens: events::Events {
         return true;
     }
 
-    fn set_token_mint_amount(&self, symbol: &ManagedBuffer, total_amount: BigUint, mint_limit: BigUint) {
+    fn set_token_mint_amount(&self, symbol: &ManagedBuffer, extra_amount: &BigUint, mint_limit: &BigUint) {
+        let timestamp = self.blockchain().get_block_timestamp();
+        let total_amount = self.token_mint_amount(symbol, timestamp / HOURS_6_TO_SECONDS)
+            .update(|old_amount| {
+                *old_amount += extra_amount;
+                old_amount.clone()
+            });
+
         require!(
-            mint_limit == BigUint::zero() || mint_limit >= total_amount,
+            mint_limit == &BigUint::zero() || mint_limit >= &total_amount,
             "Exceed mint limit"
         );
-
-        let timestamp = self.blockchain().get_block_timestamp();
-
-        self.token_mint_amount(symbol, timestamp / HOURS_6_TO_SECONDS)
-            .set(total_amount);
     }
 
     #[view(tokenMintAmount)]

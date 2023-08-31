@@ -25,8 +25,8 @@ pub trait Gateway:
         );
 
         self.auth_module().set_if_empty(auth_module);
-        self.mint_limiter()
-            .set_if_empty(mint_limiter);
+        self.mint_limiter().set_if_empty(mint_limiter);
+        self.esdt_issue_cost().set_if_empty(&BigUint::from(DEFAULT_ESDT_ISSUE_COST));
     }
 
     #[payable("*")]
@@ -192,6 +192,8 @@ pub trait Gateway:
             &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL_WITH_MINT);
         let selector_transfer_operatorship =
             &ManagedBuffer::new_from_bytes(SELECTOR_TRANSFER_OPERATORSHIP);
+        let selector_set_esdt_issue_cost =
+            &ManagedBuffer::new_from_bytes(SELECTOR_SET_ESDT_ISSUE_COST);
 
         let mut external_deploy_call: Option<AsyncCall> = Option::None;
 
@@ -211,9 +213,13 @@ pub trait Gateway:
 
             if command == selector_deploy_token {
                 // TODO: Change deploy token to use `async_call_promise` to support multiple token issues in the same transaction?
-                require!(external_deploy_call.is_none(), "Only one external token deploy command is allowed per transaction");
+                require!(
+                    external_deploy_call.is_none(),
+                    "Only one external token deploy command is allowed per transaction"
+                );
 
-                (success, external_deploy_call) = self.deploy_token(execute_data.params.get(index).deref(), command_id);
+                (success, external_deploy_call) =
+                    self.deploy_token(execute_data.params.get(index).deref(), command_id);
             } else if command == selector_mint_token {
                 success = self.mint_token(execute_data.params.get(index).deref());
             } else if command == selector_approve_contract_call {
@@ -231,6 +237,8 @@ pub trait Gateway:
 
                 allow_operatorship_transfer = false;
                 success = self.transfer_operatorship(execute_data.params.get(index).deref());
+            } else if command == selector_set_esdt_issue_cost {
+                success = self.set_esdt_issue_cost(execute_data.params.get(index).deref());
             } else {
                 continue; // ignore if unknown command received
             }

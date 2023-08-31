@@ -3,7 +3,14 @@ import { assertAccount } from "xsuite/assert";
 import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
 import { e } from "xsuite/data";
 import createKeccakHash from "keccak";
-import { MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2, TOKEN_ID, TOKEN_ID2, TOKEN_SYMBOL } from './helpers';
+import {
+  DEFAULT_ESDT_ISSUE_COST,
+  MOCK_CONTRACT_ADDRESS_1,
+  MOCK_CONTRACT_ADDRESS_2,
+  TOKEN_ID,
+  TOKEN_ID2,
+  TOKEN_SYMBOL
+} from './helpers';
 
 let world: FWorld;
 let deployer: FWorldWallet;
@@ -55,6 +62,7 @@ const deployContract = async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
     ],
   });
 }
@@ -84,6 +92,7 @@ test("Send token external invalid", async () => {
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
@@ -116,6 +125,7 @@ test("Send token external", async () => {
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
@@ -144,6 +154,7 @@ test("Send token external", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually add external token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
@@ -178,6 +189,7 @@ test("Call contract", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
     ],
   });
 });
@@ -208,6 +220,7 @@ test("Call contract with token invalid", async () => {
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
@@ -241,6 +254,7 @@ test("Call contract with token", async () => {
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
@@ -270,6 +284,7 @@ test("Call contract with token", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
@@ -305,6 +320,7 @@ test("Validate contract call error", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
     ],
   });
 });
@@ -329,6 +345,7 @@ test("Validate contract call", async () => {
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually approve call
       e.p.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
@@ -354,6 +371,7 @@ test("Validate contract call", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
     ],
   });
 });
@@ -382,6 +400,7 @@ test("Validate contract call and mint error", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
     ],
   });
 });
@@ -414,6 +433,7 @@ test("Validate contract call and mint external", async () => {
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually approve call
       e.p.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
@@ -454,6 +474,7 @@ test("Validate contract call and mint external", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(

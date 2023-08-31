@@ -6,10 +6,11 @@ pub const SELECTOR_MINT_TOKEN: &[u8; 9] = b"mintToken";
 pub const SELECTOR_APPROVE_CONTRACT_CALL: &[u8; 19] = b"approveContractCall";
 pub const SELECTOR_APPROVE_CONTRACT_CALL_WITH_MINT: &[u8; 27] = b"approveContractCallWithMint";
 pub const SELECTOR_TRANSFER_OPERATORSHIP: &[u8; 20] = b"transferOperatorship";
+pub const SELECTOR_SET_ESDT_ISSUE_COST: &[u8; 16] = b"setESDTIssueCost";
 
 pub const HOURS_6_TO_SECONDS: u64 = 21_600;
 
-pub const ESDT_ISSUE_COST: u64 = 5000000000000000;
+pub const DEFAULT_ESDT_ISSUE_COST: u64 = 5000000000000000;
 
 #[derive(TypeAbi, TopEncode, TopDecode, NestedEncode, NestedDecode, PartialEq, Debug)]
 pub enum TokenType {

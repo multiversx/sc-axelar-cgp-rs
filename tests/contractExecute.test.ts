@@ -5,7 +5,7 @@ import { e } from "xsuite/data";
 import createKeccakHash from "keccak";
 import {
   ALICE_ADDR,
-  BOB_ADDR,
+  BOB_ADDR, DEFAULT_ESDT_ISSUE_COST,
   generateProof,
   generateSignature,
   getOperatorsHash,
@@ -67,6 +67,7 @@ const deployContract = async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
     ],
   });
 
@@ -97,6 +98,7 @@ const setSupportedToken = async () => {
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
@@ -212,6 +214,7 @@ test("Execute deploy token should deploy new token", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(0)),
     ],
@@ -234,6 +237,7 @@ test("Execute deploy token should deploy new token", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(0)),
     ],
@@ -290,6 +294,7 @@ test("Execute deploy token external", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
@@ -353,6 +358,7 @@ test("Execute mint token external", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
@@ -419,6 +425,7 @@ test("Execute approve contract call", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
@@ -488,6 +495,7 @@ test("Execute approve contract call with mint", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
@@ -526,6 +534,7 @@ test("Execute transfer operatorship wrong proof", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
     ],
   });
 });
@@ -576,6 +585,7 @@ test("Execute transfer operatorship", async () => {
     allPairs: [
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+      e.p.Mapper("esdt_issue_cost").Value(e.U(DEFAULT_ESDT_ISSUE_COST)),
 
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
     ],

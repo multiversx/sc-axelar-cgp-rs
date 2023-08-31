@@ -1,6 +1,6 @@
 multiversx_sc::imports!();
 
-use crate::constants::{ApproveContractCallParams, ApproveContractCallWithMintParams, DeployTokenParams, MintTokenParams, TokenType, ESDT_ISSUE_COST, SupportedToken};
+use crate::constants::{ApproveContractCallParams, ApproveContractCallWithMintParams, DeployTokenParams, MintTokenParams, TokenType, SupportedToken};
 use crate::events::{ContractCallApprovedData, ContractCallApprovedWithMintData};
 use crate::{events, proxy, tokens};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
@@ -21,9 +21,7 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
 
         if params.token.is_none() {
             // If token address is no specified, it indicates a request to deploy one.
-
-            // TODO: Store this issue cost in a mapper or something else?
-            let issue_cost = BigUint::from(ESDT_ISSUE_COST);
+            let issue_cost = self.esdt_issue_cost().get();
 
             if self.blockchain().get_sc_balance(&EgldOrEsdtTokenIdentifier::egld(), 0) < issue_cost {
                 self.token_deploy_failed_not_enough_balance_event(params.symbol);
@@ -156,6 +154,16 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
         return true;
     }
 
+    fn set_esdt_issue_cost(&self, params: &ManagedBuffer) -> bool {
+        let issue_cost = BigUint::from(params);
+
+        self.esdt_issue_cost().set(&issue_cost);
+
+        self.set_esdt_issue_cost_event(issue_cost);
+
+        return true;
+    }
+
     fn get_is_contract_call_approved_key(
         &self,
         command_id: &ManagedBuffer,
@@ -250,4 +258,7 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
 
     #[storage_mapper("contract_call_approved")]
     fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
+
+    #[storage_mapper("esdt_issue_cost")]
+    fn esdt_issue_cost(&self) -> SingleValueMapper<BigUint>;
 }

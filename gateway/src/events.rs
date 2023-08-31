@@ -120,4 +120,7 @@ pub trait Events {
 
     #[event("operatorship_transferred_event")]
     fn operatorship_transferred_event(&self, params: &ManagedBuffer);
+
+    #[event("set_esdt_issue_cost_event")]
+    fn set_esdt_issue_cost_event(&self, issue_cost: BigUint);
 }
