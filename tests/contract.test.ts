@@ -80,14 +80,14 @@ test("Send token external invalid", async () => {
 
   await contract.setAccount({
     ...await contract.getAccount(),
-    codeMetadata: ["payable"], // TODO: This should not be necessary, xSuite bug
+    codeMetadata: ["payable"],
     pairs: [
       e.p.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -119,7 +119,7 @@ test("Send token external", async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -147,7 +147,7 @@ test("Send token external", async () => {
 
       // Manually add external token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -211,7 +211,7 @@ test("Call contract with token invalid", async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -244,7 +244,7 @@ test("Call contract with token", async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -273,7 +273,7 @@ test("Call contract with token", async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -420,7 +420,7 @@ test("Validate contract call and mint external", async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -457,7 +457,7 @@ test("Validate contract call and mint external", async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),

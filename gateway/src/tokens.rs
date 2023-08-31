@@ -3,8 +3,6 @@ multiversx_sc::imports!();
 use crate::constants::*;
 use crate::events;
 
-// TODO: Not exactly sure how to handle tokens. Should we also implement an external Token Manager?
-// Currently the minting/burning of tokens is not finished
 #[multiversx_sc::module]
 pub trait Tokens: events::Events {
     fn burn_token_from(
@@ -25,12 +23,11 @@ pub trait Tokens: events::Events {
         require!(supported_token.identifier == token, "Invalid token sent");
 
         match supported_token.token_type {
-            TokenType::External => {}
             TokenType::InternalBurnableFrom => {
                 self.send()
-                    .esdt_local_burn(&supported_token.identifier.clone().unwrap_esdt(), 0, amount);
-            }
-            TokenType::InternalBurnable => {}
+                    .esdt_local_burn(&token.unwrap_esdt(), 0, amount);
+            },
+            TokenType::External => {} // Nothing to do, tokens remain in contract
         }
     }
 
@@ -54,17 +51,14 @@ pub trait Tokens: events::Events {
         let token = supported_token.identifier;
 
         match supported_token.token_type {
-            TokenType::External => {
-                self.send().direct(account, &token, 0, amount);
-            },
+            TokenType::External => {}, // Nothing to do, tokens are already in contract
             TokenType::InternalBurnableFrom => {
                 self.send()
                     .esdt_local_mint(&token.clone().unwrap_esdt(), 0, amount);
-            },
-            TokenType::InternalBurnable => {
-                self.send().direct(account, &token, 0, amount);
             }
         }
+
+        self.send().direct(account, &token, 0, amount);
 
         return true;
     }
@@ -93,10 +87,10 @@ pub trait Tokens: events::Events {
     fn token_mint_amount(
         &self,
         symbol: &ManagedBuffer,
-        day: u64, // TODO: Why is the 'day' needed here?
+        day: u64, // TODO: Why is the 'day' needed here which is not really a day but 6 hours?
     ) -> SingleValueMapper<BigUint>;
 
-    #[view(getTokenType)]
+    #[view(getSupportedTokens)]
     #[storage_mapper("supported_tokens")]
     fn supported_tokens(&self, token: &ManagedBuffer) -> SingleValueMapper<SupportedToken<Self::Api>>;
 }

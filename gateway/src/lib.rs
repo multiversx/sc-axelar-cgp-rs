@@ -12,7 +12,6 @@ mod tokens;
 use crate::constants::*;
 use crate::events::{ContractCallData, ContractCallWithTokenData};
 use core::ops::Deref;
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::contract]
 pub trait Gateway:
@@ -23,11 +22,6 @@ pub trait Gateway:
         require!(
             self.blockchain().is_smart_contract(auth_module),
             "Invalid auth module"
-        );
-        require!(
-            self.blockchain()
-                .is_smart_contract(mint_limiter),
-            "Invalid mint limiter"
         );
 
         self.auth_module().set_if_empty(auth_module);
@@ -172,9 +166,6 @@ pub trait Gateway:
     // External Functions
 
     #[payable("EGLD")]
-    // TODO: Needs to be payable since tokens can be issued.
-    // Should we add some checks for this amount? And validation that egld is only sent if a command
-    // for minting tokens?
     #[endpoint(execute)]
     fn execute(&self, data: ManagedBuffer, proof: ManagedBuffer) {
         // TODO: This hash uses ECDSA.toEthSignedMessageHash in SOL, not sure if there is any equivalent of that on MultiversX
@@ -199,9 +190,10 @@ pub trait Gateway:
             &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL);
         let selector_approve_contract_call_with_mint =
             &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL_WITH_MINT);
-        let selector_burn_token = &ManagedBuffer::new_from_bytes(SELECTOR_BURN_TOKEN);
         let selector_transfer_operatorship =
             &ManagedBuffer::new_from_bytes(SELECTOR_TRANSFER_OPERATORSHIP);
+
+        let mut external_deploy_call: Option<AsyncCall> = Option::None;
 
         for index in 0..commands_length {
             let command_id_ref = execute_data.command_ids.get(index);
@@ -218,7 +210,10 @@ pub trait Gateway:
             let success: bool;
 
             if command == selector_deploy_token {
-                success = self.deploy_token(execute_data.params.get(index).deref());
+                // TODO: Change deploy token to use `async_call_promise` to support multiple token issues in the same transaction?
+                require!(external_deploy_call.is_none(), "Only one external token deploy command is allowed per transaction");
+
+                (success, external_deploy_call) = self.deploy_token(execute_data.params.get(index).deref(), command_id);
             } else if command == selector_mint_token {
                 success = self.mint_token(execute_data.params.get(index).deref());
             } else if command == selector_approve_contract_call {
@@ -229,8 +224,6 @@ pub trait Gateway:
                     execute_data.params.get(index).deref(),
                     command_id,
                 );
-            } else if command == selector_burn_token {
-                success = self.burn_token(execute_data.params.get(index).deref());
             } else if command == selector_transfer_operatorship {
                 if !allow_operatorship_transfer {
                     continue;
@@ -247,6 +240,10 @@ pub trait Gateway:
 
                 self.executed_event(command_id);
             }
+        }
+
+        if let Some(deploy_call) = external_deploy_call {
+            deploy_call.call_and_exit()
         }
     }
 
@@ -300,14 +297,4 @@ pub trait Gateway:
 
         self.command_executed().contains(&hash)
     }
-
-    fn get_is_command_executed_key(
-        &self,
-        command_id: &ManagedBuffer,
-    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        self.crypto().keccak256(command_id)
-    }
-
-    #[storage_mapper("command_executed")]
-    fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 }

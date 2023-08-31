@@ -1,55 +1,61 @@
 multiversx_sc::imports!();
 
-use crate::constants::{ApproveContractCallParams, ApproveContractCallWithMintParams, BurnTokenParams, DeployTokenParams, MintTokenParams, TokenType, ESDT_ISSUE_COST, SupportedToken};
+use crate::constants::{ApproveContractCallParams, ApproveContractCallWithMintParams, DeployTokenParams, MintTokenParams, TokenType, ESDT_ISSUE_COST, SupportedToken};
 use crate::events::{ContractCallApprovedData, ContractCallApprovedWithMintData};
 use crate::{events, proxy, tokens};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::module]
 pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
-    fn deploy_token(&self, params_raw: &ManagedBuffer) -> bool {
+    fn deploy_token(&self, params_raw: &ManagedBuffer, command_id: &ManagedBuffer) -> (bool, Option<AsyncCall>) {
         let params: DeployTokenParams<Self::Api> =
             DeployTokenParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
 
         let supported_token_mapper = self.supported_tokens(&params.symbol);
 
         if !supported_token_mapper.is_empty() {
-            return false;
+            self.token_already_exists_event(params.symbol);
+
+            return (false, Option::None);
         }
 
         if params.token.is_none() {
             // If token address is no specified, it indicates a request to deploy one.
 
             // TODO: Store this issue cost in a mapper or something else?
-            let _issue_cost = BigUint::from(ESDT_ISSUE_COST);
+            let issue_cost = BigUint::from(ESDT_ISSUE_COST);
 
-            // TODO: In the SOL implementation, the token deployer is called. What should we do here?
-            // Also, the cap is not utilized here at all, since tokens can be minted and burned on MultiversX without a cap
-            // The token issuance can also fail async and we don't know this when executing the command
-            // Because of this, the command_id_hash is still added to command_executed and the
-            // executed event is still dispatched. There needs to be a way to revert these
-            // self.send()
-            //     .esdt_system_sc_proxy()
-            //     .issue_and_set_all_roles(
-            //         issue_cost,
-            //         params.symbol.clone(),
-            //         params.symbol.clone(),
-            //         EsdtTokenType::Fungible,
-            //         params.decimals as usize,
-            //     )
-            //     .async_call_promise() // TODO: This feature is not supported yet
-            //     .with_callback(
-            //         self.callbacks()
-            //             .deploy_token_callback(params.symbol, params.mint_limit),
-            //     )
-            //     .register_promise();
+            if self.blockchain().get_sc_balance(&EgldOrEsdtTokenIdentifier::egld(), 0) < issue_cost {
+                self.token_deploy_failed_not_enough_balance_event(params.symbol);
+
+                return (false, Option::None);
+            }
+
+            // The cap is not utilized here at all, since tokens can be minted and burned on MultiversX without a cap
+            let async_call = self.send()
+                .esdt_system_sc_proxy()
+                .issue_and_set_all_roles(
+                    issue_cost,
+                    params.name.clone(),
+                    params.symbol.clone(),
+                    EsdtTokenType::Fungible,
+                    params.decimals as usize,
+                )
+                .async_call()
+                .with_callback(
+                    self.callbacks()
+                        .deploy_token_callback(params.symbol, params.mint_limit, command_id),
+                );
+
+            // Return false for success since the call will be handled async
+            return (false, Option::Some(async_call));
         } else {
             let token = params.token.unwrap();
             // If token is specified, ensure that there is a valid token id provided
             if !token.is_valid() {
-                self.token_does_not_exist_event(token);
+                self.token_id_does_not_exist_event(token);
 
-                return false;
+                return (false, Option::None);
             }
 
             self.token_deployed_event(&params.symbol, &token);
@@ -62,7 +68,7 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
             });
         }
 
-        return true;
+        return (true, Option::None);
     }
 
     fn mint_token(&self, params_raw: &ManagedBuffer) -> bool {
@@ -70,24 +76,6 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
             MintTokenParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
 
         return self.mint_token_raw(&params.symbol, &params.account, &params.amount);
-    }
-
-    fn burn_token(&self, params_raw: &ManagedBuffer) -> bool {
-        let params: BurnTokenParams<Self::Api> =
-            BurnTokenParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
-
-        let supported_tokens_mapper = self.supported_tokens(&params.symbol);
-
-        if supported_tokens_mapper.is_empty() {
-            return false;
-        }
-
-        // TODO: The SOL logic here is complex, not sure what to do here exactly...
-        if supported_tokens_mapper.get().token_type == TokenType::External {
-        } else {
-        }
-
-        return true;
     }
 
     fn approve_contract_call(
@@ -210,38 +198,55 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
         self.crypto().keccak256(encoded)
     }
 
-    // #[promises_callback]
-    // fn deploy_token_callback(
-    //     &self,
-    //     #[call_result] result: ManagedAsyncCallResult<TokenIdentifier>,
-    //     symbol: ManagedBuffer,
-    //     mint_limit: BigUint,
-    // ) {
-    //     match result {
-    //         ManagedAsyncCallResult::Ok(token_id_raw) => {
-    //             let token_id = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
-    //
-    //             self.token_deployed_event(&symbol, &token_id);
-    //
-    //             self.supported_tokens(&symbol).set(SupportedToken {
-    //                 token_type: TokenType::InternalBurnableFrom,
-    //                 identifier: token_id,
-    //                 mint_limit,
-    //             });
-    //         }
-    //         ManagedAsyncCallResult::Err(_) => {
-    //             // TODO: To whom should we return tokens? How should we handle this exactly?
-    //             self.token_deploy_failed_event(symbol);
-    //
-    //             let caller = self.blockchain().get_owner_address();
-    //             let returned = self.call_value().egld_or_single_esdt();
-    //             if returned.token_identifier.is_egld() && returned.amount > 0 {
-    //                 self.send()
-    //                     .direct(&caller, &returned.token_identifier, 0, &returned.amount);
-    //             }
-    //         }
-    //     }
-    // }
+    #[callback]
+    fn deploy_token_callback(
+        &self,
+        #[call_result] result: ManagedAsyncCallResult<TokenIdentifier>,
+        symbol: ManagedBuffer,
+        mint_limit: BigUint,
+        command_id: &ManagedBuffer,
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(token_id_raw) => {
+                let token_id = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
+
+                self.token_deployed_event(&symbol, &token_id);
+                self.token_mint_limit_updated_event(&symbol, &mint_limit);
+
+                self.supported_tokens(&symbol).set(SupportedToken {
+                    token_type: TokenType::InternalBurnableFrom,
+                    identifier: token_id,
+                    mint_limit,
+                });
+
+                let command_id_hash = self.get_is_command_executed_key(command_id);
+
+                self.command_executed().add(&command_id_hash);
+
+                self.executed_event(command_id);
+            }
+            ManagedAsyncCallResult::Err(_) => {
+                self.token_deploy_failed_event(symbol);
+
+                let caller = self.blockchain().get_owner_address();
+                let returned = self.call_value().egld_or_single_esdt();
+                if returned.token_identifier.is_egld() && returned.amount > 0 {
+                    self.send()
+                        .direct(&caller, &returned.token_identifier, 0, &returned.amount);
+                }
+            }
+        }
+    }
+
+    fn get_is_command_executed_key(
+        &self,
+        command_id: &ManagedBuffer,
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        self.crypto().keccak256(command_id)
+    }
+
+    #[storage_mapper("command_executed")]
+    fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
     #[storage_mapper("contract_call_approved")]
     fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;

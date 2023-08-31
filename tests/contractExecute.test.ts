@@ -100,7 +100,7 @@ const setSupportedToken = async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -213,7 +213,7 @@ test("Execute deploy token should deploy new token", async () => {
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
-      e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
+      e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(0)),
     ],
   });
 
@@ -235,7 +235,7 @@ test("Execute deploy token should deploy new token", async () => {
       e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
       e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
 
-      e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
+      e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(0)),
     ],
   });
 });
@@ -295,7 +295,7 @@ test("Execute deploy token external", async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(1_000_000),
       )),
@@ -358,7 +358,7 @@ test("Execute mint token external", async () => {
 
       // Manually add supported token
       e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
+        e.U8(1),
         e.Str(TOKEN_ID),
         e.U(0),
       )),
@@ -492,65 +492,6 @@ test("Execute approve contract call with mint", async () => {
       e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
 
       e.p.Mapper("contract_call_approved", e.Bytes(approvedDataHash)).Value(e.U8(1)),
-    ],
-  });
-});
-
-test("Execute burn token", async () => {
-  await deployContract();
-
-  await setSupportedToken();
-
-  const data = e.Tuple(
-    e.List(e.Str("commandId"), e.Str("commandIdInvalid")),
-    e.List(e.Str("burnToken"), e.Str("burnToken")),
-    e.List(
-      e.Buffer(
-        e.Tuple(
-          e.Str(TOKEN_SYMBOL),
-          e.Str("salt"),
-        ).toTopBytes(),
-      ),
-      e.Buffer(
-        e.Tuple(
-          e.Str("OTHER-654321"),
-          e.Str("salt"),
-        ).toTopBytes(),
-      ),
-    )
-  );
-
-  const { proof } = generateProof(data);
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 15_000_000,
-    funcName: "execute",
-    funcArgs: [
-      data,
-      proof,
-    ],
-  });
-
-  const commandIdHash = getCommandIdHash();
-
-  let pairs = await contract.getAccountWithPairs();
-  assertAccount(pairs, {
-    balance: 0,
-    allPairs: [
-      e.p.Mapper("auth_module").Value(e.Addr(addressAuth)),
-      e.p.Mapper("mint_limiter").Value(e.Addr(MOCK_CONTRACT_ADDRESS_2)),
-
-      // Manually add supported token
-      e.p.Mapper("supported_tokens", e.Str(TOKEN_SYMBOL)).Value(e.Tuple(
-        e.U8(2),
-        e.Str(TOKEN_ID),
-        e.U(0),
-      )),
-
-      e.p.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
-
-      e.p.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ],
   });
 });

@@ -81,11 +81,20 @@ pub trait Events {
     #[event("token_deployed_event")]
     fn token_deployed_event(&self, #[indexed] symbol: &ManagedBuffer, token_id: &EgldOrEsdtTokenIdentifier);
 
+    #[event("token_already_exists_event")]
+    fn token_already_exists_event(&self, #[indexed] symbol: ManagedBuffer);
+
     #[event("token_deploy_failed_event")]
     fn token_deploy_failed_event(&self, #[indexed] symbol: ManagedBuffer);
 
+    #[event("token_deploy_failed_not_enough_balance_event")]
+    fn token_deploy_failed_not_enough_balance_event(&self, #[indexed] symbol: ManagedBuffer);
+
     #[event("token_does_not_exist_event")]
-    fn token_does_not_exist_event(&self, #[indexed] token: EgldOrEsdtTokenIdentifier);
+    fn token_does_not_exist_event(&self, #[indexed] symbol: ManagedBuffer);
+
+    #[event("token_id_does_not_exist_event")]
+    fn token_id_does_not_exist_event(&self, #[indexed] token: EgldOrEsdtTokenIdentifier);
 
     #[event("contract_call_approved_event")]
     fn contract_call_approved_event(
