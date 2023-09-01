@@ -157,7 +157,7 @@ pub trait Gateway:
             self.contract_call_approved().remove(&hash);
             let result = self.mint_token_raw(symbol, contract_address, amount);
 
-            require!(result, "Token does not exist");
+            require!(result, "Cannot mint token");
         }
 
         valid
@@ -195,14 +195,15 @@ pub trait Gateway:
         let selector_set_esdt_issue_cost =
             &ManagedBuffer::new_from_bytes(SELECTOR_SET_ESDT_ISSUE_COST);
 
-        let mut external_deploy_call: Option<AsyncCall> = Option::None;
+        let mut async_deploy_call: Option<AsyncCall> = Option::None;
 
+        let command_executed_mapper = self.command_executed();
         for index in 0..commands_length {
             let command_id_ref = execute_data.command_ids.get(index);
             let command_id = command_id_ref.deref();
             let command_id_hash = self.get_is_command_executed_key(command_id);
 
-            if self.command_executed().contains(&command_id_hash) {
+            if command_executed_mapper.contains(&command_id_hash) {
                 continue;
             }
 
@@ -213,13 +214,19 @@ pub trait Gateway:
 
             if command == selector_deploy_token {
                 // TODO: Change deploy token to use `async_call_promise` to support multiple token issues in the same transaction?
+                let (success_temp, async_deploy_call_temp) =
+                    self.deploy_token(execute_data.params.get(index).deref(), command_id);
+
                 require!(
-                    external_deploy_call.is_none(),
-                    "Only one external token deploy command is allowed per transaction"
+                    async_deploy_call.is_none() || async_deploy_call_temp.is_none(),
+                    "Only one InternalBurnableFrom token deploy command is allowed per transaction"
                 );
 
-                (success, external_deploy_call) =
-                    self.deploy_token(execute_data.params.get(index).deref(), command_id);
+                if async_deploy_call.is_none() {
+                    async_deploy_call = async_deploy_call_temp;
+                }
+
+                success = success_temp;
             } else if command == selector_mint_token {
                 success = self.mint_token(execute_data.params.get(index).deref());
             } else if command == selector_approve_contract_call {
@@ -244,14 +251,14 @@ pub trait Gateway:
             }
 
             if success {
-                self.command_executed().add(&command_id_hash);
+                command_executed_mapper.add(&command_id_hash);
 
                 self.executed_event(command_id);
             }
         }
 
-        if let Some(deploy_call) = external_deploy_call {
-            deploy_call.call_and_exit()
+        if let Some(deploy_call) = async_deploy_call {
+            deploy_call.call_and_exit();
         }
     }
 

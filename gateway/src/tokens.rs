@@ -24,13 +24,13 @@ pub trait Tokens: events::Events {
 
         match supported_token.token_type {
             TokenType::InternalBurnableFrom => {
-                self.send()
-                    .esdt_local_burn(&token.unwrap_esdt(), 0, amount);
-            },
-            TokenType::External => {} // Nothing to do, tokens remain in contract
+                self.send().esdt_local_burn(&token.unwrap_esdt(), 0, amount);
+            }
+            TokenType::External => {} // Nothing to do, tokens remain locked in contract
         }
     }
 
+    // This function was transformed to return bool because we don't want it to halt the whole contract execution in case of `execute` endpoint
     fn mint_token_raw(
         &self,
         symbol: &ManagedBuffer,
@@ -39,19 +39,24 @@ pub trait Tokens: events::Events {
     ) -> bool {
         let supported_token_mapper = self.supported_tokens(symbol);
 
-        // This function was transformed to return bool because we don't want it to halt the whole contract execution in case of `execute` endpoint
         if supported_token_mapper.is_empty() {
+            self.token_does_not_exist_event(symbol);
+
             return false;
         }
 
         let supported_token: SupportedToken<Self::Api> = supported_token_mapper.get();
 
-        self.set_token_mint_amount(symbol, amount, &supported_token.mint_limit);
+        if !self.set_token_mint_amount(symbol, amount, &supported_token.mint_limit) {
+            self.exceed_mint_limit_event(symbol);
+
+            return false;
+        }
 
         let token = supported_token.identifier;
 
         match supported_token.token_type {
-            TokenType::External => {}, // Nothing to do, tokens are already in contract
+            TokenType::External => {} // Nothing to do, tokens are already in contract
             TokenType::InternalBurnableFrom => {
                 self.send()
                     .esdt_local_mint(&token.clone().unwrap_esdt(), 0, amount);
@@ -63,18 +68,25 @@ pub trait Tokens: events::Events {
         return true;
     }
 
-    fn set_token_mint_amount(&self, symbol: &ManagedBuffer, extra_amount: &BigUint, mint_limit: &BigUint) {
+    fn set_token_mint_amount(
+        &self,
+        symbol: &ManagedBuffer,
+        extra_amount: &BigUint,
+        mint_limit: &BigUint,
+    ) -> bool {
         let timestamp = self.blockchain().get_block_timestamp();
-        let total_amount = self.token_mint_amount(symbol, timestamp / HOURS_6_TO_SECONDS)
-            .update(|old_amount| {
-                *old_amount += extra_amount;
-                old_amount.clone()
-            });
+        let token_mint_amount_mapper =
+            self.token_mint_amount(symbol, timestamp / HOURS_6_TO_SECONDS);
 
-        require!(
-            mint_limit == &BigUint::zero() || mint_limit >= &total_amount,
-            "Exceed mint limit"
-        );
+        let total_amount = token_mint_amount_mapper.get() + extra_amount;
+
+        if mint_limit > &BigUint::zero() && &total_amount > mint_limit {
+            return false;
+        }
+
+        token_mint_amount_mapper.set(total_amount);
+
+        return true;
     }
 
     #[view(tokenMintAmount)]
@@ -94,5 +106,8 @@ pub trait Tokens: events::Events {
 
     #[view(getSupportedTokens)]
     #[storage_mapper("supported_tokens")]
-    fn supported_tokens(&self, token: &ManagedBuffer) -> SingleValueMapper<SupportedToken<Self::Api>>;
+    fn supported_tokens(
+        &self,
+        token: &ManagedBuffer,
+    ) -> SingleValueMapper<SupportedToken<Self::Api>>;
 }

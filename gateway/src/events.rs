@@ -91,7 +91,10 @@ pub trait Events {
     fn token_deploy_failed_not_enough_balance_event(&self, #[indexed] symbol: ManagedBuffer);
 
     #[event("token_does_not_exist_event")]
-    fn token_does_not_exist_event(&self, #[indexed] symbol: ManagedBuffer);
+    fn token_does_not_exist_event(&self, #[indexed] symbol: &ManagedBuffer);
+
+    #[event("exceed_mint_limit_event")]
+    fn exceed_mint_limit_event(&self, #[indexed] symbol: &ManagedBuffer);
 
     #[event("token_id_does_not_exist_event")]
     fn token_id_does_not_exist_event(&self, #[indexed] token: EgldOrEsdtTokenIdentifier);

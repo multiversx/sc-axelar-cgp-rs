@@ -73,7 +73,7 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
         let params: MintTokenParams<Self::Api> =
             MintTokenParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
 
-        return self.mint_token_raw(&params.symbol, &params.account, &params.amount);
+        self.mint_token_raw(&params.symbol, &params.account, &params.amount)
     }
 
     fn approve_contract_call(
@@ -236,12 +236,7 @@ pub trait Functions: tokens::Tokens + events::Events + proxy::ProxyModule {
             ManagedAsyncCallResult::Err(_) => {
                 self.token_deploy_failed_event(symbol);
 
-                let caller = self.blockchain().get_owner_address();
-                let returned = self.call_value().egld_or_single_esdt();
-                if returned.token_identifier.is_egld() && returned.amount > 0 {
-                    self.send()
-                        .direct(&caller, &returned.token_identifier, 0, &returned.amount);
-                }
+                // Leave issue cost egld payment in contract for use when retrying deployToken
             }
         }
     }
