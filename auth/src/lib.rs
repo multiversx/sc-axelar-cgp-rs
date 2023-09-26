@@ -11,7 +11,7 @@ use multiversx_sc::api::{ED25519_SIGNATURE_BYTE_LEN, KECCAK256_RESULT_LEN};
 #[multiversx_sc::contract]
 pub trait Auth {
     #[init]
-    fn init(&self, recent_operators: MultiValueEncoded<ManagedBuffer>) {
+    fn init(&self, recent_operators: MultiValueEncoded<TransferData<Self::Api>>) {
         for operator in recent_operators.into_iter() {
             self.transfer_operatorship(operator);
         }
@@ -23,10 +23,8 @@ pub trait Auth {
     fn validate_proof(
         &self,
         message_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        proof: ManagedBuffer,
+        proof_data: ProofData<Self::Api>,
     ) -> bool {
-        let proof_data: ProofData<Self::Api> = ProofData::<Self::Api>::top_decode(proof).unwrap();
-
         let operators_hash = self.get_operators_hash(
             &proof_data.operators,
             &proof_data.weights,
@@ -55,10 +53,7 @@ pub trait Auth {
 
     #[only_owner]
     #[endpoint(transferOperatorship)]
-    fn transfer_operatorship(&self, params: ManagedBuffer) {
-        let transfer_data: TransferData<Self::Api> =
-            TransferData::<Self::Api>::top_decode(params).unwrap();
-
+    fn transfer_operatorship(&self, transfer_data: TransferData<Self::Api>) {
         require!(
             transfer_data.new_operators.len() > 0
                 && self.contains_no_duplicate(&transfer_data.new_operators),

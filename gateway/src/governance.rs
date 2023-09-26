@@ -11,7 +11,9 @@ pub trait Governance: tokens::Tokens + events::Events {
 
         require!(!new_mint_limiter.is_zero(), "Invalid mint limiter");
 
-        self.transfer_mint_limiter_raw(new_mint_limiter);
+        self.mint_limiter().set(&new_mint_limiter);
+
+        self.mint_limiter_transferred_event(self.mint_limiter().get(), new_mint_limiter);
     }
 
     #[endpoint(setTokenMintLimits)]
@@ -45,12 +47,6 @@ pub trait Governance: tokens::Tokens + events::Events {
 
             supported_token_mapper.update(|v| v.mint_limit = limit);
         }
-    }
-
-    fn transfer_mint_limiter_raw(&self, new_mint_limiter: ManagedAddress) {
-        self.mint_limiter().set(&new_mint_limiter);
-
-        self.mint_limiter_transferred_event(self.mint_limiter().get(), new_mint_limiter);
     }
 
     // @dev Reverts with an error if the sender is not the mint limiter or governance.

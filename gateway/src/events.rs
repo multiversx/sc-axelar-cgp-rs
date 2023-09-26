@@ -81,11 +81,23 @@ pub trait Events {
     #[event("token_deployed_event")]
     fn token_deployed_event(&self, #[indexed] symbol: &ManagedBuffer, token_id: &EgldOrEsdtTokenIdentifier);
 
+    #[event("token_already_exists_event")]
+    fn token_already_exists_event(&self, #[indexed] symbol: ManagedBuffer);
+
     #[event("token_deploy_failed_event")]
     fn token_deploy_failed_event(&self, #[indexed] symbol: ManagedBuffer);
 
+    #[event("token_deploy_failed_not_enough_balance_event")]
+    fn token_deploy_failed_not_enough_balance_event(&self, #[indexed] symbol: ManagedBuffer);
+
     #[event("token_does_not_exist_event")]
-    fn token_does_not_exist_event(&self, #[indexed] token: EgldOrEsdtTokenIdentifier);
+    fn token_does_not_exist_event(&self, #[indexed] symbol: &ManagedBuffer);
+
+    #[event("exceed_mint_limit_event")]
+    fn exceed_mint_limit_event(&self, #[indexed] symbol: &ManagedBuffer);
+
+    #[event("token_id_does_not_exist_event")]
+    fn token_id_does_not_exist_event(&self, #[indexed] token: EgldOrEsdtTokenIdentifier);
 
     #[event("contract_call_approved_event")]
     fn contract_call_approved_event(
@@ -111,4 +123,7 @@ pub trait Events {
 
     #[event("operatorship_transferred_event")]
     fn operatorship_transferred_event(&self, params: &ManagedBuffer);
+
+    #[event("set_esdt_issue_cost_event")]
+    fn set_esdt_issue_cost_event(&self, issue_cost: BigUint);
 }

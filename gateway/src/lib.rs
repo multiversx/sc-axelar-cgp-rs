@@ -12,7 +12,6 @@ mod tokens;
 use crate::constants::*;
 use crate::events::{ContractCallData, ContractCallWithTokenData};
 use core::ops::Deref;
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::contract]
 pub trait Gateway:
@@ -24,15 +23,10 @@ pub trait Gateway:
             self.blockchain().is_smart_contract(auth_module),
             "Invalid auth module"
         );
-        require!(
-            self.blockchain()
-                .is_smart_contract(mint_limiter),
-            "Invalid mint limiter"
-        );
 
         self.auth_module().set_if_empty(auth_module);
-        self.mint_limiter()
-            .set_if_empty(mint_limiter);
+        self.mint_limiter().set_if_empty(mint_limiter);
+        self.esdt_issue_cost().set_if_empty(&BigUint::from(DEFAULT_ESDT_ISSUE_COST));
     }
 
     #[payable("*")]
@@ -163,7 +157,7 @@ pub trait Gateway:
             self.contract_call_approved().remove(&hash);
             let result = self.mint_token_raw(symbol, contract_address, amount);
 
-            require!(result, "Token does not exist");
+            require!(result, "Cannot mint token");
         }
 
         valid
@@ -172,9 +166,6 @@ pub trait Gateway:
     // External Functions
 
     #[payable("EGLD")]
-    // TODO: Needs to be payable since tokens can be issued.
-    // Should we add some checks for this amount? And validation that egld is only sent if a command
-    // for minting tokens?
     #[endpoint(execute)]
     fn execute(&self, data: ManagedBuffer, proof: ManagedBuffer) {
         // TODO: This hash uses ECDSA.toEthSignedMessageHash in SOL, not sure if there is any equivalent of that on MultiversX
@@ -199,16 +190,20 @@ pub trait Gateway:
             &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL);
         let selector_approve_contract_call_with_mint =
             &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL_WITH_MINT);
-        let selector_burn_token = &ManagedBuffer::new_from_bytes(SELECTOR_BURN_TOKEN);
         let selector_transfer_operatorship =
             &ManagedBuffer::new_from_bytes(SELECTOR_TRANSFER_OPERATORSHIP);
+        let selector_set_esdt_issue_cost =
+            &ManagedBuffer::new_from_bytes(SELECTOR_SET_ESDT_ISSUE_COST);
 
+        let mut async_deploy_call: Option<AsyncCall> = Option::None;
+
+        let command_executed_mapper = self.command_executed();
         for index in 0..commands_length {
             let command_id_ref = execute_data.command_ids.get(index);
             let command_id = command_id_ref.deref();
             let command_id_hash = self.get_is_command_executed_key(command_id);
 
-            if self.command_executed().contains(&command_id_hash) {
+            if command_executed_mapper.contains(&command_id_hash) {
                 continue;
             }
 
@@ -218,7 +213,20 @@ pub trait Gateway:
             let success: bool;
 
             if command == selector_deploy_token {
-                success = self.deploy_token(execute_data.params.get(index).deref());
+                // TODO: Change deploy token to use `async_call_promise` to support multiple token issues in the same transaction?
+                let (success_temp, async_deploy_call_temp) =
+                    self.deploy_token(execute_data.params.get(index).deref(), command_id);
+
+                require!(
+                    async_deploy_call.is_none() || async_deploy_call_temp.is_none(),
+                    "Only one InternalBurnableFrom token deploy command is allowed per transaction"
+                );
+
+                if async_deploy_call.is_none() {
+                    async_deploy_call = async_deploy_call_temp;
+                }
+
+                success = success_temp;
             } else if command == selector_mint_token {
                 success = self.mint_token(execute_data.params.get(index).deref());
             } else if command == selector_approve_contract_call {
@@ -229,8 +237,6 @@ pub trait Gateway:
                     execute_data.params.get(index).deref(),
                     command_id,
                 );
-            } else if command == selector_burn_token {
-                success = self.burn_token(execute_data.params.get(index).deref());
             } else if command == selector_transfer_operatorship {
                 if !allow_operatorship_transfer {
                     continue;
@@ -238,15 +244,21 @@ pub trait Gateway:
 
                 allow_operatorship_transfer = false;
                 success = self.transfer_operatorship(execute_data.params.get(index).deref());
+            } else if command == selector_set_esdt_issue_cost {
+                success = self.set_esdt_issue_cost(execute_data.params.get(index).deref());
             } else {
                 continue; // ignore if unknown command received
             }
 
             if success {
-                self.command_executed().add(&command_id_hash);
+                command_executed_mapper.add(&command_id_hash);
 
                 self.executed_event(command_id);
             }
+        }
+
+        if let Some(deploy_call) = async_deploy_call {
+            deploy_call.call_and_exit();
         }
     }
 
@@ -300,14 +312,4 @@ pub trait Gateway:
 
         self.command_executed().contains(&hash)
     }
-
-    fn get_is_command_executed_key(
-        &self,
-        command_id: &ManagedBuffer,
-    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        self.crypto().keccak256(command_id)
-    }
-
-    #[storage_mapper("command_executed")]
-    fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 }
