@@ -157,7 +157,7 @@ pub trait Auth {
         self.crypto().keccak256(encoded)
     }
 
-    // TODO: Check for a better way of doing this
+    // TODO: Check for a better way of doing this when ManagedMap is available
     fn contains_no_duplicate(&self, operators: &ManagedVec<ManagedAddress>) -> bool {
         for iindex in 0..(operators.len() - 1) {
             for jindex in (iindex + 1)..operators.len() {

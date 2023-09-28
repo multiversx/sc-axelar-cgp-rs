@@ -4,52 +4,25 @@ multiversx_sc::imports!();
 
 mod constants;
 mod events;
-mod functions;
-mod governance;
 mod proxy;
-mod tokens;
 
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::constants::*;
-use crate::events::{ContractCallData, ContractCallWithTokenData};
+use crate::events::{ContractCallApprovedData, ContractCallData};
 use core::ops::Deref;
 
 #[multiversx_sc::contract]
 pub trait Gateway:
-    tokens::Tokens + governance::Governance + functions::Functions + proxy::ProxyModule + events::Events
+    proxy::ProxyModule + events::Events
 {
     #[init]
-    fn init(&self, auth_module: &ManagedAddress, mint_limiter: &ManagedAddress) {
+    fn init(&self, auth_module: &ManagedAddress) {
         require!(
             self.blockchain().is_smart_contract(auth_module),
             "Invalid auth module"
         );
 
         self.auth_module().set_if_empty(auth_module);
-        self.mint_limiter().set_if_empty(mint_limiter);
-        self.esdt_issue_cost().set_if_empty(&BigUint::from(DEFAULT_ESDT_ISSUE_COST));
-    }
-
-    #[payable("*")]
-    #[endpoint(sendToken)]
-    fn send_token(
-        &self,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
-        symbol: ManagedBuffer,
-    ) {
-        let (token, amount) = self.call_value().egld_or_single_fungible_esdt();
-
-        let caller = self.blockchain().get_caller();
-
-        self.burn_token_from(&caller, &symbol, token, &amount);
-
-        self.token_sent_event(
-            caller,
-            destination_chain,
-            destination_address,
-            symbol,
-            amount,
-        );
     }
 
     #[endpoint(callContract)]
@@ -68,34 +41,6 @@ pub trait Gateway:
             ContractCallData {
                 hash: self.crypto().keccak256(&payload),
                 payload,
-            },
-        );
-    }
-
-    #[payable("*")]
-    #[endpoint(callContractWithToken)]
-    fn call_contract_with_token(
-        &self,
-        destination_chain: ManagedBuffer,
-        destination_contract_address: ManagedBuffer,
-        payload: ManagedBuffer,
-        symbol: ManagedBuffer,
-    ) {
-        let (token, amount) = self.call_value().egld_or_single_fungible_esdt();
-
-        let caller = self.blockchain().get_caller();
-
-        self.burn_token_from(&caller, &symbol, token, &amount);
-
-        self.contract_call_with_token_event(
-            caller,
-            destination_chain,
-            destination_contract_address,
-            ContractCallWithTokenData {
-                hash: self.crypto().keccak256(&payload),
-                payload,
-                symbol,
-                amount,
             },
         );
     }
@@ -128,51 +73,15 @@ pub trait Gateway:
         valid
     }
 
-    // Can only be called by the appropriate contract address
-    #[endpoint(validateContractCallAndMint)]
-    fn validate_contract_call_and_mint(
-        &self,
-        command_id: &ManagedBuffer,
-        source_chain: &ManagedBuffer,
-        source_address: &ManagedBuffer,
-        payload_hash: &ManagedBuffer,
-        symbol: &ManagedBuffer,
-        amount: &BigUint,
-    ) -> bool {
-        let contract_address = &self.blockchain().get_caller();
-
-        let hash = self.get_is_contract_call_approved_with_mint_key(
-            command_id,
-            source_chain,
-            source_address,
-            contract_address,
-            payload_hash,
-            symbol,
-            amount,
-        );
-
-        let valid = self.contract_call_approved().contains(&hash);
-
-        if valid {
-            self.contract_call_approved().remove(&hash);
-            let result = self.mint_token_raw(symbol, contract_address, amount);
-
-            require!(result, "Cannot mint token");
-        }
-
-        valid
-    }
-
     // External Functions
 
-    #[payable("EGLD")]
     #[endpoint(execute)]
     fn execute(&self, data: ManagedBuffer, proof: ManagedBuffer) {
-        // TODO: This hash uses ECDSA.toEthSignedMessageHash in SOL, not sure if there is any equivalent of that on MultiversX
         let message_hash = self.crypto().keccak256(&data);
 
         let mut allow_operatorship_transfer: bool = self.auth_validate_proof(&message_hash, &proof);
 
+        // TODO: Should we add chain id here?
         let execute_data: ExecuteData<Self::Api> =
             ExecuteData::<Self::Api>::top_decode(data).unwrap();
 
@@ -184,18 +93,10 @@ pub trait Gateway:
             "Invalid commands"
         );
 
-        let selector_deploy_token = &ManagedBuffer::new_from_bytes(SELECTOR_DEPLOY_TOKEN);
-        let selector_mint_token = &ManagedBuffer::new_from_bytes(SELECTOR_MINT_TOKEN);
         let selector_approve_contract_call =
             &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL);
-        let selector_approve_contract_call_with_mint =
-            &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL_WITH_MINT);
         let selector_transfer_operatorship =
             &ManagedBuffer::new_from_bytes(SELECTOR_TRANSFER_OPERATORSHIP);
-        let selector_set_esdt_issue_cost =
-            &ManagedBuffer::new_from_bytes(SELECTOR_SET_ESDT_ISSUE_COST);
-
-        let mut async_deploy_call: Option<AsyncCall> = Option::None;
 
         let command_executed_mapper = self.command_executed();
         for index in 0..commands_length {
@@ -212,31 +113,9 @@ pub trait Gateway:
 
             let success: bool;
 
-            if command == selector_deploy_token {
-                // TODO: Change deploy token to use `async_call_promise` to support multiple token issues in the same transaction?
-                let (success_temp, async_deploy_call_temp) =
-                    self.deploy_token(execute_data.params.get(index).deref(), command_id);
-
-                require!(
-                    async_deploy_call.is_none() || async_deploy_call_temp.is_none(),
-                    "Only one InternalBurnableFrom token deploy command is allowed per transaction"
-                );
-
-                if async_deploy_call.is_none() {
-                    async_deploy_call = async_deploy_call_temp;
-                }
-
-                success = success_temp;
-            } else if command == selector_mint_token {
-                success = self.mint_token(execute_data.params.get(index).deref());
-            } else if command == selector_approve_contract_call {
+            if command == selector_approve_contract_call {
                 success =
                     self.approve_contract_call(execute_data.params.get(index).deref(), command_id);
-            } else if command == selector_approve_contract_call_with_mint {
-                success = self.approve_contract_call_with_mint(
-                    execute_data.params.get(index).deref(),
-                    command_id,
-                );
             } else if command == selector_transfer_operatorship {
                 if !allow_operatorship_transfer {
                     continue;
@@ -244,8 +123,6 @@ pub trait Gateway:
 
                 allow_operatorship_transfer = false;
                 success = self.transfer_operatorship(execute_data.params.get(index).deref());
-            } else if command == selector_set_esdt_issue_cost {
-                success = self.set_esdt_issue_cost(execute_data.params.get(index).deref());
             } else {
                 continue; // ignore if unknown command received
             }
@@ -256,10 +133,82 @@ pub trait Gateway:
                 self.executed_event(command_id);
             }
         }
+    }
 
-        if let Some(deploy_call) = async_deploy_call {
-            deploy_call.call_and_exit();
-        }
+    // Self Functions
+
+    fn approve_contract_call(
+        &self,
+        params_raw: &ManagedBuffer,
+        command_id: &ManagedBuffer,
+    ) -> bool {
+        let params: ApproveContractCallParams<Self::Api> =
+            ApproveContractCallParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
+
+        let hash = self.get_is_contract_call_approved_key(
+            command_id,
+            &params.source_chain,
+            &params.source_address,
+            &params.contract_address,
+            &params.payload_hash,
+        );
+
+        self.contract_call_approved().add(&hash);
+
+        self.contract_call_approved_event(
+            command_id,
+            params.source_chain,
+            params.source_address,
+            params.contract_address,
+            params.payload_hash,
+            ContractCallApprovedData {
+                source_tx_hash: params.source_tx_hash,
+                source_event_index: params.source_event_index,
+            },
+        );
+
+        return true;
+    }
+
+    fn transfer_operatorship(&self, params: &ManagedBuffer) -> bool {
+        self.auth_transfer_operatorship(params);
+
+        self.operatorship_transferred_event(params);
+
+        return true;
+    }
+
+    fn get_is_command_executed_key(
+        &self,
+        command_id: &ManagedBuffer,
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        self.crypto().keccak256(command_id)
+    }
+
+    fn get_is_contract_call_approved_key(
+        &self,
+        command_id: &ManagedBuffer,
+        source_chain: &ManagedBuffer,
+        source_address: &ManagedBuffer,
+        contract_address: &ManagedAddress,
+        payload_hash: &ManagedBuffer,
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        let mut encoded = ManagedBuffer::new();
+
+        encoded.append(command_id);
+        encoded.append(source_chain);
+        encoded.append(source_address);
+        encoded.append(contract_address.as_managed_buffer());
+        encoded.append(payload_hash);
+
+        self.crypto().keccak256(encoded)
+    }
+
+    #[view(isCommandExecuted)]
+    fn is_command_executed(&self, command_id: &ManagedBuffer) -> bool {
+        let hash = self.get_is_command_executed_key(command_id);
+
+        self.command_executed().contains(&hash)
     }
 
     #[view(isContractCallApproved)]
@@ -282,34 +231,9 @@ pub trait Gateway:
         self.contract_call_approved().contains(&hash)
     }
 
-    #[view(isContractCallAndMintApproved)]
-    fn is_contract_call_and_mint_approved(
-        &self,
-        command_id: &ManagedBuffer,
-        source_chain: &ManagedBuffer,
-        source_address: &ManagedBuffer,
-        contract_address: &ManagedAddress,
-        payload_hash: &ManagedBuffer,
-        symbol: &ManagedBuffer,
-        amount: &BigUint,
-    ) -> bool {
-        let hash = self.get_is_contract_call_approved_with_mint_key(
-            command_id,
-            source_chain,
-            source_address,
-            contract_address,
-            payload_hash,
-            symbol,
-            amount,
-        );
+    #[storage_mapper("command_executed")]
+    fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
-        self.contract_call_approved().contains(&hash)
-    }
-
-    #[view(isCommandExecuted)]
-    fn is_command_executed(&self, command_id: &ManagedBuffer) -> bool {
-        let hash = self.get_is_command_executed_key(command_id);
-
-        self.command_executed().contains(&hash)
-    }
+    #[storage_mapper("contract_call_approved")]
+    fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 }

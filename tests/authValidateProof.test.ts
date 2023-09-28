@@ -1,17 +1,17 @@
 import { afterEach, assert, beforeEach, test } from "vitest";
-import { assertAccount } from "xsuite/assert";
-import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
-import { e } from "xsuite/data";
+import { assertAccount } from "xsuite";
+import { SWorld, SContract, SWallet } from "xsuite";
+import { e } from "xsuite";
 import createKeccakHash from "keccak";
 import { ALICE_ADDR, BOB_ADDR, generateSignature, getOperatorsHash } from './helpers';
 
-let world: FWorld;
-let deployer: FWorldWallet;
-let contract: FWorldContract;
+let world: SWorld;
+let deployer: SWallet;
+let contract: SContract;
 let address: string;
 
 beforeEach(async () => {
-  world = await FWorld.start();
+  world = await SWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -34,10 +34,10 @@ const deployContract = async () => {
     codeArgs: []
   }));
 
-  const pairs = await contract.getAccountWithPairs();
+  const pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0n,
-    allPairs: [],
+    allKvs: [],
   });
 }
 
@@ -70,11 +70,11 @@ test("Validate proof old epoch", async () => {
   const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
-    pairs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(17)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(17)),
     ]
   });
 
@@ -97,13 +97,13 @@ test("Validate proof old epoch", async () => {
     ],
   }).assertFail({ code: 4, message: 'Invalid operators' });
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+    allKvs: [
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(17)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(17)),
     ],
   });
 });
@@ -115,11 +115,11 @@ test("Validate proof wrong operators weight", async () => {
   const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
-    pairs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ]
   });
 
@@ -143,13 +143,13 @@ test("Validate proof wrong operators weight", async () => {
     ],
   }).assertFail({ code: 4, message: 'Invalid operators' });
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+    allKvs: [
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ],
   });
 });
@@ -160,11 +160,11 @@ test("Validate proof invalid signature", async () => {
   const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
-    pairs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ]
   });
 
@@ -188,13 +188,13 @@ test("Validate proof invalid signature", async () => {
     ],
   }).assertFail({ code: 10, message: 'invalid signature' });
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+    allKvs: [
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ],
   });
 });
@@ -205,11 +205,11 @@ test("Validate proof operators repeat", async () => {
   const operatorsHash = getOperatorsHash([ALICE_ADDR, ALICE_ADDR], [10, 10], 20);
   await contract.setAccount({
     ...await contract.getAccount(),
-    pairs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ]
   });
 
@@ -232,13 +232,13 @@ test("Validate proof operators repeat", async () => {
     ],
   }).assertFail({ code: 4, message: 'Malformed signers' });
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+    allKvs: [
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ],
   });
 });
@@ -249,11 +249,11 @@ test("Validate proof low signatures weight", async () => {
   const operatorsHash = getOperatorsHash([ALICE_ADDR], [9], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
-    pairs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ]
   });
 
@@ -276,13 +276,13 @@ test("Validate proof low signatures weight", async () => {
     ],
   }).assertFail({ code: 4, message: 'Low signatures weight' });
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+    allKvs: [
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ],
   });
 });
@@ -293,11 +293,11 @@ test("Validate proof only first operator checked", async () => {
   const operatorsHash = getOperatorsHash([ALICE_ADDR, BOB_ADDR], [10, 10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
-    pairs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(1)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(1)),
     ]
   });
 
@@ -321,13 +321,13 @@ test("Validate proof only first operator checked", async () => {
   });
   assert(result.returnData[0] === '01');
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+    allKvs: [
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(1)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(1)),
     ],
   });
 });
@@ -339,11 +339,11 @@ test("Validate proof", async () => {
   const operatorsHash = getOperatorsHash([ALICE_ADDR, BOB_ADDR], [10, 10], 20);
   await contract.setAccount({
     ...await contract.getAccount(),
-    pairs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ]
   });
 
@@ -368,13 +368,13 @@ test("Validate proof", async () => {
   });
   assert(result.returnData[0] === '');
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+    allKvs: [
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(16)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ],
   });
 });
