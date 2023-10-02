@@ -1,10 +1,18 @@
 multiversx_sc::imports!();
 
-mod gateway_proxy {
+pub mod gateway_proxy {
     multiversx_sc::imports!();
 
     #[multiversx_sc::proxy]
     pub trait Gateway {
+        #[endpoint(callContract)]
+        fn call_contract(
+            &self,
+            destination_chain: &ManagedBuffer,
+            destination_contract_address: &ManagedBuffer,
+            payload: &ManagedBuffer,
+        );
+
         #[endpoint(validateContractCall)]
         fn validate_contract_call(
             &self,

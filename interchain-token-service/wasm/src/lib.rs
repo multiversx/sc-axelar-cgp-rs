@@ -5,12 +5,14 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           12
+// Endpoints:                           15
 // Async Callback (empty):               1
-// Total number of exported functions:  14
+// Total number of exported functions:  17
 
 #![no_std]
-#![allow(internal_features)]
+
+// Configuration that works with rustc < 1.73.0.
+// TODO: Recommended rustc version: 1.73.0 or newer.
 #![feature(lang_items)]
 
 multiversx_sc_wasm_adapter::allocator!();
@@ -22,6 +24,9 @@ multiversx_sc_wasm_adapter::endpoints! {
         init => init
         registerCanonicalToken => register_canonical_token
         deployRemoteCanonicalToken => deploy_remote_canonical_token
+        deployCustomTokenManager => deploy_custom_token_manager
+        deployRemoteCustomTokenManager => deploy_remote_custom_token_manager
+        deployAndRegisterStandardizedToken => deploy_and_register_standardized_token
         get_canonical_token_id => get_canonical_token_id
         get_custom_token_id => get_custom_token_id
         get_implementation => get_implementation
