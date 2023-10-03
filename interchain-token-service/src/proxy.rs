@@ -1,8 +1,8 @@
 multiversx_sc::imports!();
 
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::executable;
 use crate::executable::gateway_proxy::ProxyTrait as GatewayProxyTrait;
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 pub mod remote_address_validator_proxy {
     multiversx_sc::imports!();
@@ -60,6 +60,23 @@ mod gas_service_proxy {
     }
 }
 
+pub mod executable_contract_proxy {
+    multiversx_sc::imports!();
+
+    #[multiversx_sc::proxy]
+    pub trait ExecutableContractProxy {
+        // TODO: A contract having this function should check that the InterchainTokenService contract called it
+        #[payable("*")]
+        #[endpoint(executeWithInterchainToken)]
+        fn execute_with_interchain_token(
+            &self,
+            source_chain: ManagedBuffer,
+            source_address: ManagedBuffer,
+            payload: ManagedBuffer,
+        ) -> BigUint;
+    }
+}
+
 #[multiversx_sc::module]
 pub trait ProxyModule: executable::ExecutableModule {
     fn remote_address_validator_chain_name(&self) -> ManagedBuffer {
@@ -114,6 +131,12 @@ pub trait ProxyModule: executable::ExecutableModule {
         self.gateway_proxy(self.gateway().get())
             .call_contract(destination_chain, destination_address, payload)
             .execute_on_dest_context::<()>();
+    }
+
+    fn gateway_is_command_executed(&self, command_id: &ManagedBuffer) -> bool {
+        self.gateway_proxy(self.gateway().get())
+            .is_command_executed(command_id)
+            .execute_on_dest_context::<bool>()
     }
 
     #[view]
@@ -187,4 +210,7 @@ pub trait ProxyModule: executable::ExecutableModule {
 
     #[proxy]
     fn gas_service_proxy(&self, sc_address: ManagedAddress) -> gas_service_proxy::Proxy<Self::Api>;
+
+    #[proxy]
+    fn executable_contract_proxy(&self, sc_address: ManagedAddress) -> executable_contract_proxy::Proxy<Self::Api>;
 }

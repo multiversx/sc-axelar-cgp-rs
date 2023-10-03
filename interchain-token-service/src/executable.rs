@@ -21,6 +21,9 @@ pub mod gateway_proxy {
             source_address: &ManagedBuffer,
             payload_hash: &ManagedBuffer,
         ) -> bool;
+
+        #[view(isCommandExecuted)]
+        fn is_command_executed(&self, command_id: &ManagedBuffer) -> bool;
     }
 }
 

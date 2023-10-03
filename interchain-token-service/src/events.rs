@@ -25,6 +25,15 @@ struct RemoteTokenManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
     params: ManagedBuffer<M>,
 }
 
+#[derive(TypeAbi, TopEncode)]
+struct StandardizedTokenDeployedEventData<M: ManagedTypeApi> {
+    name: ManagedBuffer<M>,
+    symbol: ManagedBuffer<M>,
+    decimals: u8,
+    mint_amount: BigUint<M>,
+    mint_to: ManagedAddress<M>,
+}
+
 #[multiversx_sc::module]
 pub trait Events {
     fn emit_remote_standardized_token_and_manager_deployment_initialized_event(
@@ -73,6 +82,27 @@ pub trait Events {
         self.remote_token_manager_deployment_initialized_event(token_id, data);
     }
 
+    fn emit_standardized_token_deployed_event(
+        &self,
+        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        distributor: ManagedAddress,
+        name: ManagedBuffer,
+        symbol: ManagedBuffer,
+        decimals: u8,
+        mint_amount: BigUint,
+        mint_to: ManagedAddress,
+    ) {
+        let data = StandardizedTokenDeployedEventData {
+            name,
+            symbol,
+            decimals,
+            mint_amount,
+            mint_to,
+        };
+
+        self.standardized_token_deployed_event(token_id, distributor, data);
+    }
+
     #[event("token_manager_deployed_event")]
     fn token_manager_deployed_event(
         &self,
@@ -101,5 +131,21 @@ pub trait Events {
         &self,
         #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         data: RemoteTokenManagerDeploymentInitializedEventData<Self::Api>,
+    );
+
+    #[event("standardized_token_deployed_event")]
+    fn standardized_token_deployed_event(
+        &self,
+        #[indexed] token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] distributor: ManagedAddress,
+        data: StandardizedTokenDeployedEventData<Self::Api>,
+    );
+
+    #[event("express_receive_event")]
+    fn express_receive_event(
+        &self,
+        #[indexed] command_id: &ManagedBuffer,
+        #[indexed] express_caller: &ManagedAddress,
+        payload: &ManagedBuffer,
     );
 }
