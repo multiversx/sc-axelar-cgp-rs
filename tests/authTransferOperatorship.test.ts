@@ -1,16 +1,14 @@
-import { afterEach, beforeEach, test } from "vitest";
-import { assertAccount } from "xsuite/assert";
-import { FWorld, FWorldContract, FWorldWallet } from "xsuite/world";
-import { e } from "xsuite/data";
+import { afterEach, beforeEach, test } from 'vitest';
+import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
 import { ALICE_ADDR, BOB_ADDR, getOperatorsHash, MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2 } from './helpers';
 
-let world: FWorld;
-let deployer: FWorldWallet;
-let contract: FWorldContract;
+let world: SWorld;
+let deployer: SWallet;
+let contract: SContract;
 let address: string;
 
 beforeEach(async () => {
-  world = await FWorld.start();
+  world = await SWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -33,10 +31,10 @@ const deployContract = async () => {
     codeArgs: []
   }));
 
-  const pairs = await contract.getAccountWithPairs();
+  const pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0n,
-    allPairs: [],
+    allKvs: [],
   });
 }
 
@@ -182,9 +180,9 @@ test("Transfer operatorship duplicate operators", async () => {
   await contract.setAccount({
     ...await contract.getAccount(),
     owner: deployer,
-    pairs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
     ]
   });
 
@@ -224,15 +222,15 @@ test("Transfer operatorship", async () => {
 
   const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
-      e.p.Mapper("hash_for_epoch", e.U64(1)).Value(e.Bytes(operatorsHash)),
+    allKvs: [
+      e.kvs.Mapper("hash_for_epoch", e.U64(1)).Value(e.Bytes(operatorsHash)),
 
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(1)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(1)),
     ],
   });
 });
@@ -264,19 +262,19 @@ test("Deploy with recent operators", async () => {
   const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
   const operatorsHash2 = getOperatorsHash([ALICE_ADDR, BOB_ADDR], [10, 2], 12);
 
-  let pairs = await contract.getAccountWithPairs();
+  let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allPairs: [
+    allKvs: [
       // epoch 1
-      e.p.Mapper("hash_for_epoch", e.U64(1)).Value(e.Bytes(operatorsHash)),
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper("hash_for_epoch", e.U64(1)).Value(e.Bytes(operatorsHash)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash)).Value(e.U64(1)),
 
       // epoch 2
-      e.p.Mapper("hash_for_epoch", e.U64(2)).Value(e.Bytes(operatorsHash2)),
-      e.p.Mapper("epoch_for_hash", e.Bytes(operatorsHash2)).Value(e.U64(2)),
+      e.kvs.Mapper("hash_for_epoch", e.U64(2)).Value(e.Bytes(operatorsHash2)),
+      e.kvs.Mapper("epoch_for_hash", e.Bytes(operatorsHash2)).Value(e.U64(2)),
 
-      e.p.Mapper("current_epoch").Value(e.U64(2)),
+      e.kvs.Mapper("current_epoch").Value(e.U64(2)),
     ],
   });
 });
