@@ -8,16 +8,20 @@ mod executable;
 mod proxy;
 
 use crate::constants::{
-    ReceiveTokenPayload, TokenManagerType, PREFIX_CUSTOM_TOKEN_ID, PREFIX_STANDARDIZED_TOKEN_ID,
-    SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN, SELECTOR_DEPLOY_TOKEN_MANAGER,
-    SELECTOR_SEND_TOKEN, SELECTOR_SEND_TOKEN_WITH_DATA,
+    Metadata, ReceiveTokenPayload, TokenManagerType, PREFIX_CUSTOM_TOKEN_ID,
+    PREFIX_STANDARDIZED_TOKEN_ID, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
+    SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_SEND_TOKEN, SELECTOR_SEND_TOKEN_WITH_DATA,
 };
 use crate::proxy::executable_contract_proxy::ProxyTrait as ExecutableContractProxyTrait;
+use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::contract]
 pub trait InterchainTokenServiceContract:
-    proxy::ProxyModule + executable::ExecutableModule + events::Events
+    proxy::ProxyModule
+    + executable::ExecutableModule
+    + events::Events
+    + multiversx_sc_modules::pause::PauseModule
 {
     /// token_manager_implementations - this need to have exactly 2 implementations in the following order: Lock/Unlock, mint/burn
     /// TODO: in sol contracts there is also a 3rd implementation for Lock/Unlock with fee and a 4th implementation for liquidity pool, do we need those as well?
@@ -71,6 +75,8 @@ pub trait InterchainTokenServiceContract:
         &self,
         token_address: TokenIdentifier,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        self.require_not_paused();
+
         self.validate_token(&token_address);
 
         let token_id = self.get_canonical_token_id(&token_address);
@@ -91,6 +97,8 @@ pub trait InterchainTokenServiceContract:
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
     ) {
+        self.require_not_paused();
+
         let token_address = self.get_token_address(token_id.clone());
 
         require!(
@@ -127,6 +135,8 @@ pub trait InterchainTokenServiceContract:
         token_manager_type: TokenManagerType,
         token_address: TokenIdentifier,
     ) {
+        self.require_not_paused();
+
         let deployer = self.blockchain().get_caller();
 
         let token_id = self.get_custom_token_id(&deployer, &salt);
@@ -145,6 +155,8 @@ pub trait InterchainTokenServiceContract:
         params: ManagedBuffer,
         gas_value: BigUint,
     ) {
+        self.require_not_paused();
+
         let deployer = self.blockchain().get_caller();
 
         let token_id = self.get_custom_token_id(&deployer, &salt);
@@ -170,6 +182,8 @@ pub trait InterchainTokenServiceContract:
         mint_amount: BigUint,
         distributor: ManagedAddress,
     ) {
+        self.require_not_paused();
+
         let sender = self.blockchain().get_caller();
 
         let token_id = self.get_custom_token_id(&sender, &salt);
@@ -206,6 +220,8 @@ pub trait InterchainTokenServiceContract:
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
     ) {
+        self.require_not_paused();
+
         let token_id = self.get_custom_token_id(&self.blockchain().get_caller(), &salt);
 
         self.deploy_remote_standardized_token(
@@ -272,30 +288,153 @@ pub trait InterchainTokenServiceContract:
         }
     }
 
+    #[payable("*")]
     #[endpoint(interchainTransfer)]
     fn interchain_transfer(
         &self,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
-        amount: BigUint,
         metadata: ManagedBuffer,
     ) {
-        // TODO:
-    }
+        // TODO: No amount parameter here because the amount is taken from the token payment
+        // These checks were added for MultiversX
+        let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
-    fn only_remote_service(&self, source_chain: ManagedBuffer, source_address: ManagedBuffer) {
-        require!(
-            self.remote_address_validator_validate_sender(source_chain, source_address),
-            "Not remote service"
+        let token_address = self.get_token_address(token_id.clone());
+
+        require!(token_identifier == token_address, "Wrong token sent");
+
+        let sender = self.blockchain().get_caller();
+
+        self.token_manager_take_token(&token_id, token_identifier, &sender, amount.clone());
+
+        // TODO: Check if this is correct and what this metadata actually is
+        let metadata = Metadata::<Self::Api>::top_decode(metadata);
+        let mut raw_metadata: Metadata<Self::Api>;
+
+        if metadata.is_err() {
+            raw_metadata = Metadata::<Self::Api> {
+                version: 0,
+                metadata: ManagedBuffer::new(),
+            };
+        } else {
+            raw_metadata = metadata.unwrap();
+        }
+
+        self.transmit_send_token_raw(
+            token_id,
+            sender,
+            destination_chain,
+            destination_address,
+            amount,
+            raw_metadata,
         );
     }
 
-    fn only_token_manager(&self, token_id: ManagedByteArray<KECCAK256_RESULT_LEN>) {
+    #[payable("*")]
+    #[endpoint(sendTokenWithData)]
+    fn send_token_with_data(
+        &self,
+        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        destination_chain: ManagedBuffer,
+        destination_address: ManagedBuffer,
+        data: ManagedBuffer,
+    ) {
+        // TODO: No amount parameter here because the amount is taken from the token payment
+        // These checks were added for MultiversX
+        let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
+
+        let token_address = self.get_token_address(token_id.clone());
+
+        require!(token_identifier == token_address, "Wrong token sent");
+
+        let sender = self.blockchain().get_caller();
+
+        self.token_manager_take_token(&token_id, token_identifier, &sender, amount.clone());
+
+        self.transmit_send_token_raw(
+            token_id,
+            sender,
+            destination_chain,
+            destination_address,
+            amount,
+            Metadata {
+                version: 0, // TODO: This is the prefix from sol, is this encoding right?
+                metadata: data,
+            },
+        );
+    }
+
+    /// Token Manager Functions
+
+    #[endpoint(transmitSendToken)]
+    fn transmit_send_token(
+        &self,
+        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        source_address: ManagedAddress,
+        destination_chain: ManagedBuffer,
+        destination_address: ManagedBuffer,
+        amount: BigUint,
+        metadata: ManagedBuffer,
+    ) {
+        self.require_not_paused();
+        self.only_token_manager(&token_id);
+
+        // TODO: Check if this is correct and what this metadata actually is
+        let metadata = Metadata::<Self::Api>::top_decode(metadata);
+        let mut raw_metadata: Metadata<Self::Api>;
+
+        if metadata.is_err() {
+            raw_metadata = Metadata::<Self::Api> {
+                version: 0,
+                metadata: ManagedBuffer::new(),
+            };
+        } else {
+            raw_metadata = metadata.unwrap();
+        }
+
+        self.transmit_send_token_raw(
+            token_id,
+            source_address,
+            destination_chain,
+            destination_address,
+            amount,
+            raw_metadata,
+        );
+    }
+
+    /// Owner functions
+
+    // TODO: Is only_owner correct or should we implement the operator like in sol?
+    #[only_owner]
+    #[endpoint(setFlowLimit)]
+    fn set_flow_limit(
+        &self,
+        token_ids: MultiValueManagedVecCounted<ManagedByteArray<KECCAK256_RESULT_LEN>>,
+        flow_limits: MultiValueManagedVecCounted<BigUint>,
+    ) {
+        require!(token_ids.len() == flow_limits.len(), "Length mismatch");
+
+        for (token_id, flow_limit) in token_ids
+            .into_vec()
+            .iter()
+            .zip(flow_limits.into_vec().iter())
+        {
+            self.token_manager_set_flow_limit(token_id.deref(), flow_limit.deref());
+        }
+    }
+
+    /// Internal Functions
+
+    // _setup, _sanitizeTokenManagerImplementation were not implemented
+    // _execute implemented in executable.rs - execute_raw
+
+    fn only_token_manager(&self, token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) {
         let caller = self.blockchain().get_caller();
 
         require!(
-            caller == self.token_manager_address(token_id).get(),
+            caller == self.get_valid_token_manager_address(token_id),
             "Not token manager"
         );
     }
@@ -494,6 +633,62 @@ pub trait InterchainTokenServiceContract:
         express_receive_token_slot_mapper.set(express_caller);
 
         self.express_receive_event(command_id, express_caller, payload);
+    }
+
+    fn transmit_send_token_raw(
+        &self,
+        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        source_address: ManagedAddress,
+        destination_chain: ManagedBuffer,
+        destination_address: ManagedBuffer,
+        amount: BigUint,
+        raw_metadata: Metadata<Self::Api>,
+    ) {
+        let mut payload = ManagedBuffer::new();
+
+        // TODO: Not sure what this metadata contains exactly and how to decode it
+        // This check was changed here because of different encoding/decoding
+        if raw_metadata.metadata.len() == 0 {
+            payload.append(&BigUint::from(SELECTOR_SEND_TOKEN).to_bytes_be_buffer());
+            payload.append(token_id.as_managed_buffer());
+            payload.append(&destination_address);
+            payload.append(&amount.to_bytes_be_buffer());
+
+            // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
+            self.call_contract(&destination_chain, &payload, &BigUint::zero());
+
+            self.emit_token_sent_event(token_id, destination_chain, destination_address, amount);
+
+            return;
+        }
+
+        let (version, metadata) = self.decode_metadata(raw_metadata);
+        require!(version == 0, "Invalid metadata version");
+
+        payload.append(&BigUint::from(SELECTOR_SEND_TOKEN_WITH_DATA).to_bytes_be_buffer());
+        payload.append(token_id.as_managed_buffer());
+        payload.append(&destination_address);
+        payload.append(&amount.to_bytes_be_buffer());
+        payload.append(&source_address.as_managed_buffer());
+        payload.append(&metadata);
+
+        // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
+        self.call_contract(&destination_chain, &payload, &BigUint::zero());
+
+        self.emit_token_sent_with_data_event(
+            token_id,
+            destination_chain,
+            destination_address,
+            amount,
+            source_address,
+            metadata,
+        );
+    }
+
+    fn decode_metadata(&self, raw_metadata: Metadata<Self::Api>) -> (u32, ManagedBuffer) {
+        // TODO: This does some Assembly logic specific to sol, what should we actually do here?
+        // Currently we use the MultiversX encoding/decoding and a custom struct for this
+        (raw_metadata.version, raw_metadata.metadata)
     }
 
     #[view]

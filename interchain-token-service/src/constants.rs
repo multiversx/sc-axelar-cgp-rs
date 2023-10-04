@@ -37,6 +37,7 @@ impl<M: ManagedTypeApi> TopDecode for ReceiveTokenPayload<M> {
     {
         let mut input = input.into_nested_buffer();
 
+        // TODO: In solidity this uses ABI encode/decode, check if this is correct
         let selector = BigUint::dep_decode(&mut input)?;
         let token_id = ManagedByteArray::<M, KECCAK256_RESULT_LEN>::dep_decode(&mut input)?;
         let destination_address = ManagedAddress::dep_decode(&mut input)?;
@@ -65,4 +66,10 @@ impl<M: ManagedTypeApi> TopDecode for ReceiveTokenPayload<M> {
             data: Some(data),
         })
     }
+}
+
+#[derive(TypeAbi, TopEncode, TopDecode)]
+pub struct Metadata<M: ManagedTypeApi> {
+    pub version: u32,
+    pub metadata: ManagedBuffer<M>,
 }

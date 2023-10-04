@@ -2,33 +2,21 @@ multiversx_sc::imports!();
 
 use crate::executable;
 use crate::executable::gateway_proxy::ProxyTrait as GatewayProxyTrait;
+use crate::executable::remote_address_validator_proxy::ProxyTrait as RemoteAddressValidatorProxyTrait;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
-pub mod remote_address_validator_proxy {
-    multiversx_sc::imports!();
-
-    #[multiversx_sc::proxy]
-    pub trait RemoteAddressValidatorProxy {
-        #[view(chainName)]
-        fn chain_name(&self) -> ManagedBuffer;
-
-        #[view(validateSender)]
-        fn validate_sender(
-            &self,
-            source_chain: ManagedBuffer,
-            source_address: ManagedBuffer,
-        ) -> bool;
-
-        #[view(getRemoteAddress)]
-        fn get_remote_address(&self, destination_chain: &ManagedBuffer) -> ManagedBuffer;
-    }
-}
 
 pub mod token_manager_proxy {
     multiversx_sc::imports!();
 
     #[multiversx_sc::proxy]
     pub trait TokenManagerProxy {
+        #[payable("*")]
+        #[endpoint(takeToken)]
+        fn take_token(&self, sender: &ManagedAddress);
+
+        #[endpoint(setFlowLimit)]
+        fn set_flow_limit(&self, flow_limit: &BigUint);
+
         #[view(tokenAddress)]
         fn token_address(&self) -> TokenIdentifier;
 
@@ -78,20 +66,10 @@ pub mod executable_contract_proxy {
 }
 
 #[multiversx_sc::module]
-pub trait ProxyModule: executable::ExecutableModule {
+pub trait ProxyModule: executable::ExecutableModule + multiversx_sc_modules::pause::PauseModule {
     fn remote_address_validator_chain_name(&self) -> ManagedBuffer {
         self.remote_address_validator_proxy(self.remote_address_validator().get())
             .chain_name()
-            .execute_on_dest_context()
-    }
-
-    fn remote_address_validator_validate_sender(
-        &self,
-        source_chain: ManagedBuffer,
-        source_address: ManagedBuffer,
-    ) -> bool {
-        self.remote_address_validator_proxy(self.remote_address_validator().get())
-            .validate_sender(source_chain, source_address)
             .execute_on_dest_context()
     }
 
@@ -139,10 +117,33 @@ pub trait ProxyModule: executable::ExecutableModule {
             .execute_on_dest_context::<bool>()
     }
 
+    fn token_manager_take_token(
+        &self,
+        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        sender: &ManagedAddress,
+        amount: BigUint,
+    ) {
+        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+            .take_token(sender)
+            .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(token_identifier, 0, amount))
+            .execute_on_dest_context::<()>();
+    }
+
+    fn token_manager_set_flow_limit(
+        &self,
+        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        flow_limit: &BigUint,
+    ) {
+        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+            .set_flow_limit(flow_limit)
+            .execute_on_dest_context::<()>();
+    }
+
     #[view]
     fn get_valid_token_manager_address(
         &self,
-        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> ManagedAddress {
         let token_manager_address_mapper = self.token_manager_address(token_id);
 
@@ -159,50 +160,41 @@ pub trait ProxyModule: executable::ExecutableModule {
         &self,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> TokenIdentifier {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.get_valid_token_manager_address(&token_id))
             .token_address()
             .execute_on_dest_context()
     }
 
     #[view]
     fn get_flow_limit(&self, token_id: ManagedByteArray<KECCAK256_RESULT_LEN>) -> BigUint {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.get_valid_token_manager_address(&token_id))
             .get_flow_limit()
             .execute_on_dest_context()
     }
 
     #[view]
     fn get_flow_out_amount(&self, token_id: ManagedByteArray<KECCAK256_RESULT_LEN>) -> BigUint {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.get_valid_token_manager_address(&token_id))
             .get_flow_out_amount()
             .execute_on_dest_context()
     }
 
     #[view]
     fn get_flow_in_amount(&self, token_id: ManagedByteArray<KECCAK256_RESULT_LEN>) -> BigUint {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.get_valid_token_manager_address(&token_id))
             .get_flow_in_amount()
             .execute_on_dest_context()
     }
-
-    #[storage_mapper("remote_address_validator")]
-    fn remote_address_validator(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[view]
     #[storage_mapper("token_manager_address")]
     fn token_manager_address(
         &self,
-        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> SingleValueMapper<ManagedAddress>;
 
     #[storage_mapper("gas_service")]
     fn gas_service(&self) -> SingleValueMapper<ManagedAddress>;
-
-    #[proxy]
-    fn remote_address_validator_proxy(
-        &self,
-        address: ManagedAddress,
-    ) -> remote_address_validator_proxy::Proxy<Self::Api>;
 
     #[proxy]
     fn token_manager_proxy(&self, address: ManagedAddress)
@@ -212,5 +204,8 @@ pub trait ProxyModule: executable::ExecutableModule {
     fn gas_service_proxy(&self, sc_address: ManagedAddress) -> gas_service_proxy::Proxy<Self::Api>;
 
     #[proxy]
-    fn executable_contract_proxy(&self, sc_address: ManagedAddress) -> executable_contract_proxy::Proxy<Self::Api>;
+    fn executable_contract_proxy(
+        &self,
+        sc_address: ManagedAddress,
+    ) -> executable_contract_proxy::Proxy<Self::Api>;
 }

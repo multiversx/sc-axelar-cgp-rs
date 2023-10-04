@@ -27,8 +27,28 @@ pub mod gateway_proxy {
     }
 }
 
+pub mod remote_address_validator_proxy {
+    multiversx_sc::imports!();
+
+    #[multiversx_sc::proxy]
+    pub trait RemoteAddressValidatorProxy {
+        #[view(chainName)]
+        fn chain_name(&self) -> ManagedBuffer;
+
+        #[view(validateSender)]
+        fn validate_sender(
+            &self,
+            source_chain: ManagedBuffer,
+            source_address: ManagedBuffer,
+        ) -> bool;
+
+        #[view(getRemoteAddress)]
+        fn get_remote_address(&self, destination_chain: &ManagedBuffer) -> ManagedBuffer;
+    }
+}
+
 #[multiversx_sc::module]
-pub trait ExecutableModule {
+pub trait ExecutableModule: multiversx_sc_modules::pause::PauseModule {
     fn executable_constructor(&self, gateway: ManagedAddress) {
         require!(!gateway.is_zero(), "Invalid address");
 
@@ -66,11 +86,41 @@ pub trait ExecutableModule {
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
+        self.require_not_paused();
+        self.only_remote_service(source_chain, source_address);
+
+        let selector = BigUint::top_decode(payload);
+    }
+
+    fn only_remote_service(&self, source_chain: ManagedBuffer, source_address: ManagedBuffer) {
+        require!(
+            self.remote_address_validator_validate_sender(source_chain, source_address),
+            "Not remote service"
+        );
+    }
+
+    fn remote_address_validator_validate_sender(
+        &self,
+        source_chain: ManagedBuffer,
+        source_address: ManagedBuffer,
+    ) -> bool {
+        self.remote_address_validator_proxy(self.remote_address_validator().get())
+            .validate_sender(source_chain, source_address)
+            .execute_on_dest_context()
     }
 
     #[storage_mapper("gateway")]
     fn gateway(&self) -> SingleValueMapper<ManagedAddress>;
 
+    #[storage_mapper("remote_address_validator")]
+    fn remote_address_validator(&self) -> SingleValueMapper<ManagedAddress>;
+
     #[proxy]
     fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway_proxy::Proxy<Self::Api>;
+
+    #[proxy]
+    fn remote_address_validator_proxy(
+        &self,
+        address: ManagedAddress,
+    ) -> remote_address_validator_proxy::Proxy<Self::Api>;
 }

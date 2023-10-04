@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           17
+// Endpoints:                           24
 // Async Callback (empty):               1
-// Total number of exported functions:  19
+// Total number of exported functions:  26
 
 #![no_std]
 
@@ -29,6 +29,10 @@ multiversx_sc_wasm_adapter::endpoints! {
         deployAndRegisterStandardizedToken => deploy_and_register_standardized_token
         deployAndRegisterRemoteStandardizedToken => deploy_and_register_remote_standardized_token
         expressReceiveToken => express_receive_token
+        interchainTransfer => interchain_transfer
+        sendTokenWithData => send_token_with_data
+        transmitSendToken => transmit_send_token
+        setFlowLimit => set_flow_limit
         get_canonical_token_id => get_canonical_token_id
         get_custom_token_id => get_custom_token_id
         get_implementation => get_implementation
@@ -39,6 +43,9 @@ multiversx_sc_wasm_adapter::endpoints! {
         get_flow_in_amount => get_flow_in_amount
         token_manager_address => token_manager_address
         execute => execute
+        pause => pause_endpoint
+        unpause => unpause_endpoint
+        isPaused => paused_status
     )
 }
 

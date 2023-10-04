@@ -34,6 +34,22 @@ struct StandardizedTokenDeployedEventData<M: ManagedTypeApi> {
     mint_to: ManagedAddress<M>,
 }
 
+#[derive(TypeAbi, TopEncode)]
+struct TokenSentEventData<M: ManagedTypeApi> {
+    destination_chain: ManagedBuffer<M>,
+    destination_address: ManagedBuffer<M>,
+    amount: BigUint<M>,
+}
+
+#[derive(TypeAbi, TopEncode)]
+struct TokenSentWithDataEventData<M: ManagedTypeApi> {
+    destination_chain: ManagedBuffer<M>,
+    destination_address: ManagedBuffer<M>,
+    amount: BigUint<M>,
+    source_address: ManagedAddress<M>,
+    metadata: ManagedBuffer<M>,
+}
+
 #[multiversx_sc::module]
 pub trait Events {
     fn emit_remote_standardized_token_and_manager_deployment_initialized_event(
@@ -103,6 +119,42 @@ pub trait Events {
         self.standardized_token_deployed_event(token_id, distributor, data);
     }
 
+    fn emit_token_sent_event(
+        &self,
+        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        destination_chain: ManagedBuffer,
+        destination_address: ManagedBuffer,
+        amount: BigUint,
+    ) {
+        let data = TokenSentEventData {
+            destination_chain,
+            destination_address,
+            amount,
+        };
+
+        self.token_sent_event(token_id, data);
+    }
+
+    fn emit_token_sent_with_data_event(
+        &self,
+        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        destination_chain: ManagedBuffer,
+        destination_address: ManagedBuffer,
+        amount: BigUint,
+        source_address: ManagedAddress,
+        metadata: ManagedBuffer,
+    ) {
+        let data = TokenSentWithDataEventData {
+            destination_chain,
+            destination_address,
+            amount,
+            source_address,
+            metadata,
+        };
+
+        self.token_sent_with_data_event(token_id, data);
+    }
+
     #[event("token_manager_deployed_event")]
     fn token_manager_deployed_event(
         &self,
@@ -147,5 +199,19 @@ pub trait Events {
         #[indexed] command_id: &ManagedBuffer,
         #[indexed] express_caller: &ManagedAddress,
         payload: &ManagedBuffer,
+    );
+
+    #[event("token_sent_event")]
+    fn token_sent_event(
+        &self,
+        #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        data: TokenSentEventData<Self::Api>,
+    );
+
+    #[event("token_sent_with_data_event")]
+    fn token_sent_with_data_event(
+        &self,
+        #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        data: TokenSentWithDataEventData<Self::Api>,
     );
 }
