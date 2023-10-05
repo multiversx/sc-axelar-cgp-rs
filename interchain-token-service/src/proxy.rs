@@ -1,35 +1,10 @@
 multiversx_sc::imports!();
 
-use crate::executable;
 use crate::executable::gateway_proxy::ProxyTrait as GatewayProxyTrait;
 use crate::executable::remote_address_validator_proxy::ProxyTrait as RemoteAddressValidatorProxyTrait;
+use crate::executable::token_manager_proxy::ProxyTrait as TokenManagerProxyTrait;
+use crate::{events, executable};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
-pub mod token_manager_proxy {
-    multiversx_sc::imports!();
-
-    #[multiversx_sc::proxy]
-    pub trait TokenManagerProxy {
-        #[payable("*")]
-        #[endpoint(takeToken)]
-        fn take_token(&self, sender: &ManagedAddress);
-
-        #[endpoint(setFlowLimit)]
-        fn set_flow_limit(&self, flow_limit: &BigUint);
-
-        #[view(tokenAddress)]
-        fn token_address(&self) -> TokenIdentifier;
-
-        #[view(getFlowLimit)]
-        fn get_flow_limit(&self) -> BigUint;
-
-        #[view(getFlowOutAmount)]
-        fn get_flow_out_amount(&self) -> BigUint;
-
-        #[view(getFlowInAmount)]
-        fn get_flow_in_amount(&self) -> BigUint;
-    }
-}
 
 mod gas_service_proxy {
     multiversx_sc::imports!();
@@ -48,25 +23,10 @@ mod gas_service_proxy {
     }
 }
 
-pub mod executable_contract_proxy {
-    multiversx_sc::imports!();
-
-    #[multiversx_sc::proxy]
-    pub trait ExecutableContractProxy {
-        // TODO: A contract having this function should check that the InterchainTokenService contract called it
-        #[payable("*")]
-        #[endpoint(executeWithInterchainToken)]
-        fn execute_with_interchain_token(
-            &self,
-            source_chain: ManagedBuffer,
-            source_address: ManagedBuffer,
-            payload: ManagedBuffer,
-        ) -> BigUint;
-    }
-}
-
 #[multiversx_sc::module]
-pub trait ProxyModule: executable::ExecutableModule + multiversx_sc_modules::pause::PauseModule {
+pub trait ProxyModule:
+    executable::ExecutableModule + events::EventsModule + multiversx_sc_modules::pause::PauseModule
+{
     fn remote_address_validator_chain_name(&self) -> ManagedBuffer {
         self.remote_address_validator_proxy(self.remote_address_validator().get())
             .chain_name()
@@ -126,7 +86,11 @@ pub trait ProxyModule: executable::ExecutableModule + multiversx_sc_modules::pau
     ) {
         self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
             .take_token(sender)
-            .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(token_identifier, 0, amount))
+            .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(
+                token_identifier,
+                0,
+                amount,
+            ))
             .execute_on_dest_context::<()>();
     }
 
@@ -138,31 +102,6 @@ pub trait ProxyModule: executable::ExecutableModule + multiversx_sc_modules::pau
         self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
             .set_flow_limit(flow_limit)
             .execute_on_dest_context::<()>();
-    }
-
-    #[view]
-    fn get_valid_token_manager_address(
-        &self,
-        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> ManagedAddress {
-        let token_manager_address_mapper = self.token_manager_address(token_id);
-
-        require!(
-            !token_manager_address_mapper.is_empty(),
-            "Token manager does not exist"
-        );
-
-        token_manager_address_mapper.get()
-    }
-
-    #[view]
-    fn get_token_address(
-        &self,
-        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> TokenIdentifier {
-        self.token_manager_proxy(self.get_valid_token_manager_address(&token_id))
-            .token_address()
-            .execute_on_dest_context()
     }
 
     #[view]
@@ -186,26 +125,9 @@ pub trait ProxyModule: executable::ExecutableModule + multiversx_sc_modules::pau
             .execute_on_dest_context()
     }
 
-    #[view]
-    #[storage_mapper("token_manager_address")]
-    fn token_manager_address(
-        &self,
-        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> SingleValueMapper<ManagedAddress>;
-
     #[storage_mapper("gas_service")]
     fn gas_service(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[proxy]
-    fn token_manager_proxy(&self, address: ManagedAddress)
-        -> token_manager_proxy::Proxy<Self::Api>;
-
-    #[proxy]
     fn gas_service_proxy(&self, sc_address: ManagedAddress) -> gas_service_proxy::Proxy<Self::Api>;
-
-    #[proxy]
-    fn executable_contract_proxy(
-        &self,
-        sc_address: ManagedAddress,
-    ) -> executable_contract_proxy::Proxy<Self::Api>;
 }

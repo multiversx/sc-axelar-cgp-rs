@@ -1,7 +1,7 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-use crate::constants::TokenManagerType;
+use crate::constants::{TokenId, TokenManagerType};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[derive(TypeAbi, TopEncode)]
@@ -50,8 +50,15 @@ struct TokenSentWithDataEventData<M: ManagedTypeApi> {
     metadata: ManagedBuffer<M>,
 }
 
+#[derive(TypeAbi, TopEncode)]
+struct TokenReceivedWithDataEventData<M: ManagedTypeApi> {
+    amount: BigUint<M>,
+    source_address: ManagedBuffer<M>,
+    data: ManagedBuffer<M>,
+}
+
 #[multiversx_sc::module]
-pub trait Events {
+pub trait EventsModule {
     fn emit_remote_standardized_token_and_manager_deployment_initialized_event(
         &self,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -155,6 +162,24 @@ pub trait Events {
         self.token_sent_with_data_event(token_id, data);
     }
 
+    fn emit_received_token_with_data_event(
+        &self,
+        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        source_chain: &ManagedBuffer,
+        destination_address: &ManagedAddress,
+        amount: BigUint,
+        source_address: ManagedBuffer,
+        metadata: ManagedBuffer,
+    ) {
+        let data = TokenReceivedWithDataEventData {
+            amount,
+            source_address,
+            data: metadata,
+        };
+
+        self.token_received_with_data_event(token_id, source_chain, destination_address, data);
+    }
+
     #[event("token_manager_deployed_event")]
     fn token_manager_deployed_event(
         &self,
@@ -213,5 +238,23 @@ pub trait Events {
         &self,
         #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         data: TokenSentWithDataEventData<Self::Api>,
+    );
+
+    #[event("token_received_event")]
+    fn token_received_event(
+        &self,
+        #[indexed] token_id: TokenId<Self::Api>,
+        #[indexed] source_chain: ManagedBuffer,
+        #[indexed] destination_address: ManagedAddress,
+        amount: BigUint,
+    );
+
+    #[event("token_received_with_data_event")]
+    fn token_received_with_data_event(
+        &self,
+        #[indexed] token_id: &TokenId<Self::Api>,
+        #[indexed] source_chain: &ManagedBuffer,
+        #[indexed] destination_address: &ManagedAddress,
+        data: TokenReceivedWithDataEventData<Self::Api>,
     );
 }
