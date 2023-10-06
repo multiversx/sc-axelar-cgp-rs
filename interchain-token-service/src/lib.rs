@@ -30,7 +30,7 @@ pub trait InterchainTokenServiceContract:
         gateway: ManagedAddress,
         gas_service: ManagedAddress,
         remote_address_validator: ManagedAddress,
-        token_manager_implementations: MultiValueEncoded<ManagedAddress>,
+        token_manager_implementations: MultiValueEncoded<ManagedAddress>, // TODO: The implementations should be held by the token manager deployer contract
     ) {
         self.executable_constructor(gateway);
 
@@ -81,7 +81,8 @@ pub trait InterchainTokenServiceContract:
         self.deploy_token_manager(
             &token_id,
             TokenManagerType::LockUnlock,
-            Option::Some(token_address),
+            self.blockchain().get_sc_address(),
+            Some(token_address),
         );
 
         token_id
@@ -130,6 +131,7 @@ pub trait InterchainTokenServiceContract:
         &self,
         salt: ManagedBuffer,
         token_manager_type: TokenManagerType,
+        operator: ManagedAddress,
         token_address: EgldOrEsdtTokenIdentifier,
     ) {
         self.require_not_paused();
@@ -138,7 +140,7 @@ pub trait InterchainTokenServiceContract:
 
         let token_id = self.get_custom_token_id(&deployer, &salt);
 
-        self.deploy_token_manager(&token_id, token_manager_type, Option::Some(token_address));
+        self.deploy_token_manager(&token_id, token_manager_type, operator, Some(token_address));
 
         self.custom_token_id_claimed_event(token_id, deployer, salt);
     }
@@ -198,7 +200,7 @@ pub trait InterchainTokenServiceContract:
         // let token_address = self.get_standardized_token_address(token_id);
 
         // let token_manager_address =
-        //     self.deploy_token_manager(&token_id, TokenManagerType::MintBurn, Option::None);
+        //     self.deploy_token_manager(&token_id, TokenManagerType::MintBurn, self.blockchain().get_caller(), Option::None);
 
         // TODO: Should we call the token manager here to actually deploy the token?
     }
@@ -682,7 +684,7 @@ pub trait InterchainTokenServiceContract:
     fn get_canonical_token_id(
         &self,
         token_address: &EgldOrEsdtTokenIdentifier,
-    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+    ) -> TokenId<Self::Api> {
         let prefix_standardized_token_id = self
             .crypto()
             .keccak256(ManagedBuffer::new_from_bytes(PREFIX_STANDARDIZED_TOKEN_ID));
@@ -702,7 +704,7 @@ pub trait InterchainTokenServiceContract:
         &self,
         sender: &ManagedAddress,
         salt: &ManagedBuffer,
-    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+    ) -> TokenId<Self::Api> {
         let prefix_custom_token_id = self
             .crypto()
             .keccak256(ManagedBuffer::new_from_bytes(PREFIX_CUSTOM_TOKEN_ID));

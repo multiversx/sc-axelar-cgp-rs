@@ -227,13 +227,31 @@ pub trait ExecutableModule:
         self.deploy_token_manager(
             &deploy_token_manager_payload.token_id,
             deploy_token_manager_payload.token_manager_type,
+            deploy_token_manager_payload.params.operator,
             Some(deploy_token_manager_payload.params.token_address),
         );
     }
 
     fn process_deploy_standardized_token_and_manager_payload(&self, payload: ManagedBuffer) {
-        let deploy_standardized_token_and_manager_payload =
+        let mut deploy_standardized_token_and_manager_payload =
             DeployStandardizedTokenAndManagerPayload::<Self::Api>::top_decode(payload).unwrap();
+
+        // self.deploy_standardized_token(
+        //     &token_id,
+        //     distributor,
+        //     name,
+        //     symbol,
+        //     decimals,
+        //     mint_amount,
+        //     sender,
+        // );
+
+        // self.deploy_token_manager(
+        //     &deploy_standardized_token_and_manager_payload.token_id,
+        //     TokenManagerType::MintBurn,
+        //     deploy_standardized_token_and_manager_payload.params.operator,
+        //     Some(deploy_standardized_token_and_manager_payload.params.token_address),
+        // );
 
         // TODO: There is no way to get the token_address (ESDT id) before it is deployed
 
@@ -274,6 +292,7 @@ pub trait ExecutableModule:
         &self,
         token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         token_manager_type: TokenManagerType,
+        operator: ManagedAddress,
         token_address: Option<EgldOrEsdtTokenIdentifier>,
     ) -> ManagedAddress {
         // TODO: This is done using a TokenManagerDeployer contract and TokenManagerProxy contract in sol but was simplified here
@@ -283,10 +302,11 @@ pub trait ExecutableModule:
 
         arguments.push_arg(self.blockchain().get_sc_address());
         arguments.push_arg(token_id);
-        // TODO: The sol contract also has a operator passed as params to TokenManager deploy, but that was not added here
+        arguments.push_arg(operator);
         arguments.push_arg(token_address);
 
         // TODO: What does this return when it fails?
+        // We should move this to a TokenManagerDeployer contract instead
         let (address, _) = self.send_raw().deploy_from_source_contract(
             self.blockchain().get_gas_left(),
             &BigUint::zero(),
@@ -327,6 +347,7 @@ pub trait ExecutableModule:
             .execute_on_dest_context()
     }
 
+    // TODO: This should be moved to a TokenManagerDeployer contract instead
     #[view]
     fn get_implementation(&self, token_manager_type: TokenManagerType) -> ManagedAddress {
         match token_manager_type {

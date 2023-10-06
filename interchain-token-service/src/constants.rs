@@ -104,7 +104,7 @@ pub struct Metadata<M: ManagedTypeApi> {
 
 #[derive(TypeAbi, TopDecode, NestedDecode)]
 pub struct DeployTokenManagerParams<M: ManagedTypeApi> {
-    pub operator: ManagedBuffer<M>, // TODO: Currently not used here
+    pub operator: ManagedAddress<M>,
     pub token_address: EgldOrEsdtTokenIdentifier<M>,
 }
 
