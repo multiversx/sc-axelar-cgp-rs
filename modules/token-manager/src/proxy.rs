@@ -13,10 +13,10 @@ mod interchain_token_service_proxy {
         fn transmit_send_token(
             &self,
             token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-            source_address: ManagedAddress,
+            source_address: &ManagedAddress,
             destination_chain: ManagedBuffer,
             destination_address: ManagedBuffer,
-            amount: BigUint,
+            amount: &BigUint,
             metadata: ManagedBuffer,
         );
     }
@@ -28,10 +28,10 @@ pub trait ProxyModule
     fn interchain_token_service_transmit_send_token(
         &self,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        source_address: ManagedAddress,
+        source_address: &ManagedAddress,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
-        amount: BigUint,
+        amount: &BigUint,
         metadata: ManagedBuffer,
     ) {
         self.interchain_token_service_proxy(self.interchain_token_service().get())

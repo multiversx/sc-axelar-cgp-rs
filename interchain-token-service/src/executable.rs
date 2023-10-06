@@ -1,6 +1,10 @@
 multiversx_sc::imports!();
 
-use crate::constants::{DeployTokenManagerPayload, SendTokenPayload, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN, SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_SEND_TOKEN, SELECTOR_SEND_TOKEN_WITH_DATA, TokenManagerType, DeployStandardizedTokenAndManagerPayload};
+use crate::constants::{
+    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId,
+    TokenManagerType, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
+    SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_SEND_TOKEN, SELECTOR_SEND_TOKEN_WITH_DATA,
+};
 use crate::events;
 use core::convert::TryFrom;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
@@ -68,6 +72,19 @@ pub mod token_manager_proxy {
         #[endpoint(setFlowLimit)]
         fn set_flow_limit(&self, flow_limit: &BigUint);
 
+        // Endpoint only available on MintBurn TokenManager
+        #[payable("*")]
+        #[endpoint(deployStandardizedToken)]
+        fn deploy_standardized_token(
+            &self,
+            _distributor: ManagedAddress, // TODO: For what is this used on Ethereum?
+            name: ManagedBuffer,
+            symbol: ManagedBuffer,
+            decimals: u8,
+            mint_amount: BigUint,
+            mint_to: ManagedAddress,
+        );
+
         #[view(tokenAddress)]
         fn token_address(&self) -> EgldOrEsdtTokenIdentifier;
 
@@ -110,6 +127,8 @@ pub trait ExecutableModule:
         self.gateway().set_if_empty(gateway);
     }
 
+    // Needs to be payable because it can issue ESDT token through the TokenManager
+    #[payable("EGLD")]
     #[endpoint]
     fn execute(
         &self,
@@ -233,25 +252,50 @@ pub trait ExecutableModule:
     }
 
     fn process_deploy_standardized_token_and_manager_payload(&self, payload: ManagedBuffer) {
-        let mut deploy_standardized_token_and_manager_payload =
+        let data =
             DeployStandardizedTokenAndManagerPayload::<Self::Api>::top_decode(payload).unwrap();
 
-        // self.deploy_standardized_token(
-        //     &token_id,
-        //     distributor,
-        //     name,
-        //     symbol,
-        //     decimals,
-        //     mint_amount,
-        //     sender,
-        // );
+        let operator_raw = ManagedAddress::try_from(data.operator);
+        let operator;
 
-        // self.deploy_token_manager(
-        //     &deploy_standardized_token_and_manager_payload.token_id,
-        //     TokenManagerType::MintBurn,
-        //     deploy_standardized_token_and_manager_payload.params.operator,
-        //     Some(deploy_standardized_token_and_manager_payload.params.token_address),
-        // );
+        if operator_raw.is_err() {
+            operator = self.blockchain().get_sc_address();
+        } else {
+            operator = operator_raw.unwrap();
+        }
+
+        let token_manager_address = self.deploy_token_manager(
+            &data.token_id,
+            TokenManagerType::MintBurn,
+            operator,
+            None,
+        );
+
+        let distributor_raw = ManagedAddress::try_from(data.distributor);
+        let distributor;
+        if distributor_raw.is_err() {
+            distributor = token_manager_address;
+        } else {
+            distributor = distributor_raw.unwrap();
+        }
+
+        let mint_to_raw = ManagedAddress::try_from(data.mint_to);
+        let mint_to;
+        if mint_to_raw.is_err() {
+            mint_to = distributor.clone();
+        } else {
+            mint_to = mint_to_raw.unwrap();
+        }
+
+        self.token_manager_deploy_standardized_token(
+            &data.token_id,
+            distributor,
+            data.name,
+            data.symbol,
+            data.decimals,
+            data.mint_amount,
+            mint_to,
+        );
 
         // TODO: There is no way to get the token_address (ESDT id) before it is deployed
 
@@ -286,6 +330,21 @@ pub trait ExecutableModule:
             .execute_on_dest_context()
     }
 
+    fn token_manager_deploy_standardized_token(
+        &self,
+        token_id: &TokenId<Self::Api>,
+        distributor: ManagedAddress,
+        name: ManagedBuffer,
+        symbol: ManagedBuffer,
+        decimals: u8,
+        mint_amount: BigUint,
+        mint_to: ManagedAddress,
+    ) {
+        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+            .deploy_standardized_token(distributor, name, symbol, decimals, mint_amount, mint_to)
+            .execute_on_dest_context::<()>();
+    }
+
     // TODO: This function takes as a last argument a more generic `params` object, check if our implementation is ok
     // or if we need to make it more generic
     fn deploy_token_manager(
@@ -318,6 +377,8 @@ pub trait ExecutableModule:
         require!(!address.is_zero(), "Token manager deployment failed");
 
         self.token_manager_deployed_event(token_id, token_manager_type, arguments);
+
+        self.token_manager_address(token_id).set(address.clone());
 
         address
     }

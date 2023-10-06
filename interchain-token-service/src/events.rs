@@ -5,7 +5,7 @@ use crate::constants::{TokenId, TokenManagerType};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[derive(TypeAbi, TopEncode)]
-struct RemoteStandardizedTokenAndManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
+pub struct RemoteStandardizedTokenAndManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
     name: ManagedBuffer<M>,
     symbol: ManagedBuffer<M>,
     decimals: u8,
@@ -18,7 +18,7 @@ struct RemoteStandardizedTokenAndManagerDeploymentInitializedEventData<M: Manage
 }
 
 #[derive(TypeAbi, TopEncode)]
-struct RemoteTokenManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
+pub struct RemoteTokenManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
     destination_chain: ManagedBuffer<M>,
     gas_value: BigUint<M>,
     token_manager_type: TokenManagerType,
@@ -26,7 +26,7 @@ struct RemoteTokenManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-struct StandardizedTokenDeployedEventData<M: ManagedTypeApi> {
+pub struct StandardizedTokenDeployedEventData<M: ManagedTypeApi> {
     name: ManagedBuffer<M>,
     symbol: ManagedBuffer<M>,
     decimals: u8,
@@ -35,14 +35,14 @@ struct StandardizedTokenDeployedEventData<M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-struct TokenSentEventData<M: ManagedTypeApi> {
+pub struct TokenSentEventData<M: ManagedTypeApi> {
     destination_chain: ManagedBuffer<M>,
     destination_address: ManagedBuffer<M>,
     amount: BigUint<M>,
 }
 
 #[derive(TypeAbi, TopEncode)]
-struct TokenSentWithDataEventData<M: ManagedTypeApi> {
+pub struct TokenSentWithDataEventData<M: ManagedTypeApi> {
     destination_chain: ManagedBuffer<M>,
     destination_address: ManagedBuffer<M>,
     amount: BigUint<M>,
@@ -51,7 +51,7 @@ struct TokenSentWithDataEventData<M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-struct TokenReceivedWithDataEventData<M: ManagedTypeApi> {
+pub struct TokenReceivedWithDataEventData<M: ManagedTypeApi> {
     amount: BigUint<M>,
     source_address: ManagedBuffer<M>,
     data: ManagedBuffer<M>,

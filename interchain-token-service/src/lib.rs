@@ -171,6 +171,8 @@ pub trait InterchainTokenServiceContract:
         self.custom_token_id_claimed_event(token_id, deployer, salt);
     }
 
+    // Needs to be payable because it can issue ESDT token through the TokenManager
+    #[payable("EGLD")]
     #[endpoint(deployAndRegisterStandardizedToken)]
     fn deploy_and_register_standardized_token(
         &self,
@@ -181,13 +183,16 @@ pub trait InterchainTokenServiceContract:
         mint_amount: BigUint,
         distributor: ManagedAddress,
     ) {
+        // TODO: Shouldn't there be checks for these functions to not be able to deploy more token managers for the same token?
         self.require_not_paused();
 
         let sender = self.blockchain().get_caller();
 
         let token_id = self.get_custom_token_id(&sender, &salt);
 
-        self.deploy_standardized_token(
+        self.deploy_token_manager(&token_id, TokenManagerType::MintBurn, self.blockchain().get_caller(), None);
+
+        self.token_manager_deploy_standardized_token(
             &token_id,
             distributor,
             name,
@@ -196,13 +201,6 @@ pub trait InterchainTokenServiceContract:
             mint_amount,
             sender,
         );
-        // TODO: There is no way to get the token_address (ESDT id) before it is deployed
-        // let token_address = self.get_standardized_token_address(token_id);
-
-        // let token_manager_address =
-        //     self.deploy_token_manager(&token_id, TokenManagerType::MintBurn, self.blockchain().get_caller(), Option::None);
-
-        // TODO: Should we call the token manager here to actually deploy the token?
     }
 
     #[endpoint(deployAndRegisterRemoteStandardizedToken)]
@@ -314,8 +312,7 @@ pub trait InterchainTokenServiceContract:
 
         // TODO: Check if this is correct and what this metadata actually is
         let metadata = Metadata::<Self::Api>::top_decode(metadata);
-        let mut raw_metadata: Metadata<Self::Api>;
-
+        let raw_metadata: Metadata<Self::Api>;
         if metadata.is_err() {
             raw_metadata = Metadata::<Self::Api> {
                 version: 0,
@@ -386,8 +383,7 @@ pub trait InterchainTokenServiceContract:
 
         // TODO: Check if this is correct and what this metadata actually is
         let metadata = Metadata::<Self::Api>::top_decode(metadata);
-        let mut raw_metadata: Metadata<Self::Api>;
-
+        let raw_metadata: Metadata<Self::Api>;
         if metadata.is_err() {
             raw_metadata = Metadata::<Self::Api> {
                 version: 0,
@@ -529,7 +525,7 @@ pub trait InterchainTokenServiceContract:
             operator: operator.clone(),
         };
 
-        data.top_encode(&mut payload);
+        let _ = data.top_encode(&mut payload);
 
         self.call_contract(&destination_chain, &payload, &gas_value);
 
@@ -544,45 +540,6 @@ pub trait InterchainTokenServiceContract:
             operator,
             destination_chain,
             gas_value,
-        );
-    }
-
-    fn deploy_standardized_token(
-        &self,
-        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-        distributor: ManagedAddress,
-        name: ManagedBuffer,
-        symbol: ManagedBuffer,
-        decimals: u8,
-        mint_amount: BigUint,
-        mint_to: ManagedAddress,
-    ) {
-        // TODO: Should this be in the token manager instead? Since this is done async and the token manager should be the owner of the token
-        // let async_call = self.send()
-        //     .esdt_system_sc_proxy()
-        //     .issue_and_set_all_roles(
-        //         issue_cost,
-        //         name.clone(),
-        //         symbol.clone(),
-        //         EsdtTokenType::Fungible,
-        //         decimals as usize,
-        //     )
-        //     .async_call()
-        //     .with_callback(
-        //         self.callbacks()
-        //             .deploy_standardized_token_callback(symbol, token_id),
-        //     );
-
-        // require!(sth, "Standardized token deployment failed");
-
-        self.emit_standardized_token_deployed_event(
-            token_id,
-            distributor,
-            name,
-            symbol,
-            decimals,
-            mint_amount,
-            mint_to,
         );
     }
 

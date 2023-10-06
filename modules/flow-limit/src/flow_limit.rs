@@ -6,7 +6,7 @@ const EPOCH_TIME: u64 = 6 * 3600; // 6 hours;
 
 #[multiversx_sc::module]
 pub trait FlowLimit {
-    fn set_flow_limit(&self, flow_limit: BigUint) {
+    fn set_flow_limit_raw(&self, flow_limit: BigUint) {
         self.flow_limit_set_event(&flow_limit);
 
         self.flow_limit().set(flow_limit);
@@ -31,21 +31,21 @@ pub trait FlowLimit {
         flow_limit: BigUint,
         slot_to_add: SingleValueMapper<BigUint>,
         slot_to_compare: SingleValueMapper<BigUint>,
-        flow_amount: BigUint,
+        flow_amount: &BigUint,
     ) {
         let flow_to_add = slot_to_add.get();
         let flow_to_compare = slot_to_compare.get();
 
         require!(
-            &flow_to_add + &flow_amount <= &flow_to_compare + &flow_limit
-                && &flow_amount <= &flow_limit,
+            &flow_to_add + flow_amount <= &flow_to_compare + &flow_limit
+                && flow_amount <= &flow_limit,
             "Flow limit exceeded"
         );
 
-        slot_to_add.set(&flow_to_add + &flow_amount);
+        slot_to_add.set(&flow_to_add + flow_amount);
     }
 
-    fn add_flow_out(&self, flow_out_amount: BigUint) {
+    fn add_flow_out(&self, flow_out_amount: &BigUint) {
         let flow_limit = self.flow_limit().get();
 
         if flow_limit == 0 {
@@ -59,7 +59,7 @@ pub trait FlowLimit {
         self.add_flow(flow_limit, slot_to_add, slot_to_compare, flow_out_amount);
     }
 
-    fn add_flow_int(&self, flow_in_amount: BigUint) {
+    fn add_flow_in(&self, flow_in_amount: &BigUint) {
         let flow_limit = self.flow_limit().get();
 
         if flow_limit == 0 {
