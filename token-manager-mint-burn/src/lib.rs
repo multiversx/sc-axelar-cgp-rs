@@ -4,9 +4,10 @@ multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-// If this needs updating, the contract from which deployments are made can be upgraded
+// If this needs updating, the TokenManagerMintBurn contract from which deployments are made can be upgraded
 const DEFAULT_ESDT_ISSUE_COST: u64 = 5000000000000000;
 
+// TODO: Add required for some functions to only be callable by the Gateway contract or operator address
 #[multiversx_sc::contract]
 pub trait TokenManagerMintBurnContract:
     token_manager::TokenManager + token_manager::proxy::ProxyModule + flow_limit::FlowLimit
@@ -17,14 +18,14 @@ pub trait TokenManagerMintBurnContract:
         interchain_token_service: ManagedAddress,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         operator: ManagedAddress,
-        token_address: Option<EgldOrEsdtTokenIdentifier>,
+        token_identifier: Option<EgldOrEsdtTokenIdentifier>,
     ) {
         require!(
-            token_address.is_none() || token_address.clone().unwrap().is_esdt(),
+            token_identifier.is_none() || token_identifier.clone().unwrap().is_esdt(),
             "Invalid token address"
         );
 
-        self.init_raw(interchain_token_service, token_id, operator, token_address);
+        self.init_raw(interchain_token_service, token_id, operator, token_identifier);
     }
 
     #[payable("*")]
@@ -77,7 +78,7 @@ pub trait TokenManagerMintBurnContract:
     #[endpoint(deployStandardizedToken)]
     fn deploy_standardized_token(
         &self,
-        _distributor: ManagedAddress, // TODO: For what is this used on Ethereum?
+        _distributor: ManagedAddress, // TODO: Should we set this address as ESDT token owner?
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
@@ -85,7 +86,7 @@ pub trait TokenManagerMintBurnContract:
         mint_to: ManagedAddress,
     ) {
         require!(
-            self.token_address().is_empty(),
+            self.token_identifier().is_empty(),
             "Token address already exists"
         );
 
@@ -110,17 +111,17 @@ pub trait TokenManagerMintBurnContract:
 
     fn take_token_raw(&self, _sender: &ManagedAddress, amount: &BigUint) -> BigUint {
         self.send()
-            .esdt_local_burn(&self.token_address().get().unwrap_esdt(), 0, amount);
+            .esdt_local_burn(&self.token_identifier().get().unwrap_esdt(), 0, amount);
 
         amount.clone()
     }
 
     fn give_token_raw(&self, destination_address: &ManagedAddress, amount: &BigUint) -> BigUint {
         self.send()
-            .esdt_local_mint(&self.token_address().get().unwrap_esdt(), 0, amount);
+            .esdt_local_mint(&self.token_identifier().get().unwrap_esdt(), 0, amount);
 
         self.send()
-            .direct(destination_address, &self.token_address().get(), 0, amount);
+            .direct(destination_address, &self.token_identifier().get(), 0, amount);
 
         amount.clone()
     }
@@ -134,11 +135,11 @@ pub trait TokenManagerMintBurnContract:
     ) {
         match result {
             ManagedAsyncCallResult::Ok(token_id_raw) => {
-                let token_address = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
+                let token_identifier = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
 
-                self.standardized_token_deployed(&token_address);
+                self.standardized_token_deployed(&token_identifier);
 
-                self.token_address().set(token_address);
+                self.token_identifier().set(token_identifier);
 
                 if mint_amount > 0 && mint_to != ManagedAddress::zero() {
                     self.give_token_raw(&mint_to, &mint_amount);
@@ -156,5 +157,5 @@ pub trait TokenManagerMintBurnContract:
     fn standardized_token_deployment_failed_event(&self);
 
     #[event("standardized_token_deployed")]
-    fn standardized_token_deployed(&self, #[indexed] token_address: &EgldOrEsdtTokenIdentifier);
+    fn standardized_token_deployed(&self, #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier);
 }

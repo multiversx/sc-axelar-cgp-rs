@@ -14,11 +14,11 @@ pub trait TokenManagerLockUnlockContract:
         interchain_token_service: ManagedAddress,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         operator: ManagedAddress,
-        token_address: Option<EgldOrEsdtTokenIdentifier>,
+        token_identifier: Option<EgldOrEsdtTokenIdentifier>,
     ) {
-        require!(token_address.is_some(), "Invalid token address");
+        require!(token_identifier.is_some(), "Invalid token address");
 
-        self.init_raw(interchain_token_service, token_id, operator, token_address);
+        self.init_raw(interchain_token_service, token_id, operator, token_identifier);
     }
 
     #[payable("*")]
@@ -69,7 +69,7 @@ pub trait TokenManagerLockUnlockContract:
     }
 
     fn give_token_raw(&self, destination_address: &ManagedAddress, amount: &BigUint) -> BigUint {
-        self.send().direct(destination_address, &self.token_address().get(), 0, amount);
+        self.send().direct(destination_address, &self.token_identifier().get(), 0, amount);
 
         amount.clone()
     }

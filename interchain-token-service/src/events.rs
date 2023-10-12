@@ -2,7 +2,6 @@ multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
 use crate::constants::{TokenId, TokenManagerType};
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[derive(TypeAbi, TopEncode)]
 pub struct RemoteStandardizedTokenAndManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
@@ -61,7 +60,7 @@ pub struct TokenReceivedWithDataEventData<M: ManagedTypeApi> {
 pub trait EventsModule {
     fn emit_remote_standardized_token_and_manager_deployment_initialized_event(
         &self,
-        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_id: TokenId<Self::Api>,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
@@ -89,7 +88,7 @@ pub trait EventsModule {
 
     fn emit_remote_token_manager_deployment_initialized(
         &self,
-        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
         token_manager_type: TokenManagerType,
@@ -107,7 +106,7 @@ pub trait EventsModule {
 
     fn emit_standardized_token_deployed_event(
         &self,
-        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_id: &TokenId<Self::Api>,
         distributor: ManagedAddress,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
@@ -128,7 +127,7 @@ pub trait EventsModule {
 
     fn emit_token_sent_event(
         &self,
-        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         amount: BigUint,
@@ -144,7 +143,7 @@ pub trait EventsModule {
 
     fn emit_token_sent_with_data_event(
         &self,
-        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         amount: BigUint,
@@ -164,7 +163,7 @@ pub trait EventsModule {
 
     fn emit_received_token_with_data_event(
         &self,
-        token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        token_id: &TokenId<Self::Api>,
         source_chain: &ManagedBuffer,
         destination_address: &ManagedAddress,
         amount: BigUint,
@@ -183,7 +182,7 @@ pub trait EventsModule {
     #[event("token_manager_deployed_event")]
     fn token_manager_deployed_event(
         &self,
-        #[indexed] token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] token_manager_type: TokenManagerType,
         data: ManagedArgBuffer<Self::Api>,
     );
@@ -191,14 +190,14 @@ pub trait EventsModule {
     #[event("remote_standardized_token_and_manager_deployment_initialized_event")]
     fn remote_standardized_token_and_manager_deployment_initialized_event(
         &self,
-        #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] token_id: TokenId<Self::Api>,
         data: RemoteStandardizedTokenAndManagerDeploymentInitializedEventData<Self::Api>,
     );
 
     #[event("custom_token_id_claimed_event")]
     fn custom_token_id_claimed_event(
         &self,
-        #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] token_id: TokenId<Self::Api>,
         #[indexed] deployer: ManagedAddress,
         data: ManagedBuffer,
     );
@@ -206,14 +205,14 @@ pub trait EventsModule {
     #[event("remote_token_manager_deployment_initialized_event")]
     fn remote_token_manager_deployment_initialized_event(
         &self,
-        #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] token_id: TokenId<Self::Api>,
         data: RemoteTokenManagerDeploymentInitializedEventData<Self::Api>,
     );
 
     #[event("standardized_token_deployed_event")]
     fn standardized_token_deployed_event(
         &self,
-        #[indexed] token_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] distributor: ManagedAddress,
         data: StandardizedTokenDeployedEventData<Self::Api>,
     );
@@ -229,14 +228,14 @@ pub trait EventsModule {
     #[event("token_sent_event")]
     fn token_sent_event(
         &self,
-        #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] token_id: TokenId<Self::Api>,
         data: TokenSentEventData<Self::Api>,
     );
 
     #[event("token_sent_with_data_event")]
     fn token_sent_with_data_event(
         &self,
-        #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] token_id: TokenId<Self::Api>,
         data: TokenSentWithDataEventData<Self::Api>,
     );
 

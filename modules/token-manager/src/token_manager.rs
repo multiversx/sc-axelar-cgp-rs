@@ -20,7 +20,7 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
         interchain_token_service: ManagedAddress,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         operator: ManagedAddress,
-        token_address: Option<EgldOrEsdtTokenIdentifier>,
+        token_identifier: Option<EgldOrEsdtTokenIdentifier>,
     ) {
         require!(
             !interchain_token_service.is_zero(),
@@ -32,8 +32,8 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
         self.token_id().set_if_empty(token_id);
         self.operator().set_if_empty(operator);
 
-        if token_address.is_some() {
-            self.token_address().set_if_empty(token_address.unwrap());
+        if token_identifier.is_some() {
+            self.token_identifier().set_if_empty(token_identifier.unwrap());
         }
     }
 
@@ -132,14 +132,12 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
         );
     }
 
-    // TODO: This also has an only_token function which can not be implemented on MultiversX
-
     fn require_correct_token(&self) -> BigUint {
         let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
-        let token_address = self.token_address().get();
+        let required_token_identifier = self.token_identifier().get();
 
-        require!(token_identifier == token_address, "Wrong token sent");
+        require!(token_identifier == required_token_identifier, "Wrong token sent");
 
         amount
     }
@@ -152,7 +150,7 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
     #[storage_mapper("operator")]
     fn operator(&self) -> SingleValueMapper<ManagedAddress>;
 
-    #[view(tokenAddress)]
-    #[storage_mapper("token_address")]
-    fn token_address(&self) -> SingleValueMapper<EgldOrEsdtTokenIdentifier>;
+    #[view(tokenIdentifier)]
+    #[storage_mapper("token_identifier")]
+    fn token_identifier(&self) -> SingleValueMapper<EgldOrEsdtTokenIdentifier>;
 }

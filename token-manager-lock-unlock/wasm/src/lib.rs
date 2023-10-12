@@ -29,7 +29,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         setFlowLimit => set_flow_limit
         tokenId => token_id
         operator => operator
-        tokenAddress => token_address
+        tokenIdentifier => token_identifier
         get_flow_out_amount => get_flow_out_amount
         get_flow_in_amount => get_flow_in_amount
         getFlowLimit => flow_limit

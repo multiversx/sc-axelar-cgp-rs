@@ -5,20 +5,21 @@ use multiversx_sc::codec::{EncodeError, NestedDecodeInput, TopDecodeInput, TopEn
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-pub const PREFIX_CUSTOM_TOKEN_ID: &[u8] = b"its-custom-token-id";
 pub const PREFIX_STANDARDIZED_TOKEN_ID: &[u8] = b"its-standardized-token-id";
+pub const PREFIX_CUSTOM_TOKEN_ID: &[u8] = b"its-custom-token-id";
 
-pub const SELECTOR_SEND_TOKEN: u32 = 1;
-pub const SELECTOR_SEND_TOKEN_WITH_DATA: u32 = 2;
+pub const SELECTOR_RECEIVE_TOKEN: u32 = 1;
+pub const SELECTOR_RECEIVE_TOKEN_WITH_DATA: u32 = 2;
 pub const SELECTOR_DEPLOY_TOKEN_MANAGER: u32 = 3;
 pub const SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN: u32 = 4;
 
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 
+// TODO: On Ethereum this has more types, decode this correctly for compatibility
 #[derive(TypeAbi, TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, Copy)]
 pub enum TokenManagerType {
-    LockUnlock,
     MintBurn,
+    LockUnlock,
 }
 
 #[derive(TypeAbi)]
@@ -102,7 +103,7 @@ pub struct Metadata<M: ManagedTypeApi> {
 #[derive(TypeAbi, TopDecode, NestedDecode)]
 pub struct DeployTokenManagerParams<M: ManagedTypeApi> {
     pub operator: ManagedAddress<M>,
-    pub token_address: EgldOrEsdtTokenIdentifier<M>,
+    pub token_identifier: EgldOrEsdtTokenIdentifier<M>,
 }
 
 #[derive(TypeAbi, TopDecode)]

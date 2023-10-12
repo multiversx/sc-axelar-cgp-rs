@@ -37,6 +37,7 @@ impl<M: ManagedTypeApi> ManagedBufferUtils<M> for ManagedBuffer<M> {
         return bytes;
     }
 
+    // TODO: Check for a better way to do this
     fn lower_case(&self) -> ManagedBuffer<M> {
         let bytes = self.load_512_bytes();
 
@@ -52,24 +53,13 @@ impl<M: ManagedTypeApi> ManagedBufferUtils<M> for ManagedBuffer<M> {
 
 #[multiversx_sc::contract]
 pub trait RemoteAddressValidatorContract {
-    // TODO: The InterchainTokenService also depends on this contract's address, the circular dependency should be fixed
     #[init]
     fn init(
         &self,
-        interchain_token_service_address: ManagedAddress,
         chain_name: ManagedBuffer,
         trusted_chain_names: MultiValueManagedVecCounted<ManagedBuffer>,
         trusted_addresses: MultiValueManagedVecCounted<ManagedBuffer>,
     ) {
-        require!(!interchain_token_service_address.is_zero(), "Zero address");
-
-        self.interchain_token_service_address()
-            .set_if_empty(interchain_token_service_address.clone());
-        self.interchain_token_service_address_hash().set(
-            self.crypto()
-                .keccak256(interchain_token_service_address.as_managed_buffer()),
-        );
-
         require!(chain_name.len() > 0, "Zero string length");
 
         self.chain_name().set_if_empty(chain_name);
@@ -119,10 +109,6 @@ pub trait RemoteAddressValidatorContract {
         let source_address_normalized = source_address.lower_case();
         let source_address_hash = self.crypto().keccak256(source_address_normalized);
 
-        if source_address_hash == self.interchain_token_service_address_hash().get() {
-            return true;
-        }
-
         return source_address_hash == self.remote_address_hashes(source_chain).get();
     }
 
@@ -130,9 +116,7 @@ pub trait RemoteAddressValidatorContract {
     fn get_remote_address(&self, chain_name: &ManagedBuffer) -> ManagedBuffer {
         let remote_addresses_mapper = self.remote_addresses(chain_name);
 
-        if remote_addresses_mapper.is_empty() {
-            return self.interchain_token_service_address().get().as_managed_buffer().clone();
-        }
+        require!(!remote_addresses_mapper.is_empty(), "Untrusted chain");
 
         remote_addresses_mapper.get()
     }
@@ -151,16 +135,6 @@ pub trait RemoteAddressValidatorContract {
     #[view(chainName)]
     #[storage_mapper("chain_name")]
     fn chain_name(&self) -> SingleValueMapper<ManagedBuffer>;
-
-    #[view]
-    #[storage_mapper("interchain_token_service_address")]
-    fn interchain_token_service_address(&self) -> SingleValueMapper<ManagedAddress>;
-
-    #[view]
-    #[storage_mapper("interchain_token_service_address_hash")]
-    fn interchain_token_service_address_hash(
-        &self,
-    ) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
     #[event("trusted_address_added_event")]
     fn trusted_address_added_event(
