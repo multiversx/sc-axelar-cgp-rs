@@ -1,16 +1,22 @@
 multiversx_sc::imports!();
 
-use crate::constants::{DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SELECTOR_RECEIVE_TOKEN_WITH_DATA, SendTokenPayload, TokenId, TokenManagerType};
+use crate::constants::{
+    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId,
+    TokenManagerType, SELECTOR_RECEIVE_TOKEN_WITH_DATA,
+};
 use crate::{events, proxy};
-use crate::proxy::executable_contract_proxy::ProxyTrait as ExecutableContractProxyTrait;
 use core::convert::TryFrom;
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:
     multiversx_sc_modules::pause::PauseModule + events::EventsModule + proxy::ProxyModule
 {
-    fn process_receive_token_payload(&self, command_id: ManagedBuffer, source_chain: ManagedBuffer, payload: ManagedBuffer) {
+    fn process_receive_token_payload(
+        &self,
+        command_id: ManagedBuffer,
+        source_chain: ManagedBuffer,
+        payload: ManagedBuffer,
+    ) {
         let express_caller = self.pop_express_receive_token(&payload, &command_id);
 
         // TODO: Switch this to abi decoding
@@ -48,17 +54,16 @@ pub trait ExecutableModule:
                 send_token_payload.data.clone().unwrap(),
             );
 
-            // TODO: This call can fail, which will leave the token in this contract. Add a callback here to revert this
-            self.executable_contract_proxy(destination_address)
-                .execute_with_interchain_token(
-                    source_chain,
-                    send_token_payload.source_address.unwrap(),
-                    send_token_payload.data.unwrap(),
-                    send_token_payload.token_id,
-                )
-                .with_egld_or_single_esdt_transfer((token_identifier, 0, amount))
-                .async_call()
-                .call_and_exit();
+            self.executable_contract_execute_with_interchain_token(
+                destination_address,
+                source_chain,
+                send_token_payload.source_address.unwrap(),
+                send_token_payload.data.unwrap(),
+                send_token_payload.token_id.clone(),
+                token_identifier,
+                amount,
+                command_id,
+            );
         } else {
             let amount = self.token_manager_give_token(
                 &send_token_payload.token_id,
@@ -102,12 +107,19 @@ pub trait ExecutableModule:
             operator = operator_raw.unwrap();
         }
 
-        let token_manager_address = self.deploy_token_manager(
-            &data.token_id,
-            TokenManagerType::MintBurn,
-            operator,
-            None,
-        );
+        // Allow retry of deploying standardized token
+        let token_manager_address;
+        let token_manager_address_mapper = self.token_manager_address(&data.token_id);
+        if token_manager_address_mapper.is_empty() {
+            token_manager_address = self.deploy_token_manager(
+                &data.token_id,
+                TokenManagerType::MintBurn,
+                operator,
+                None,
+            );
+        } else {
+            token_manager_address = token_manager_address_mapper.get();
+        }
 
         let distributor_raw = ManagedAddress::try_from(data.distributor);
         let distributor;
@@ -143,6 +155,13 @@ pub trait ExecutableModule:
         operator: ManagedAddress,
         token_identifier: Option<EgldOrEsdtTokenIdentifier>,
     ) -> ManagedAddress {
+        let token_manager_address_mapper = self.token_manager_address(token_id);
+
+        require!(
+            token_manager_address_mapper.is_empty(),
+            "Token manager already exists"
+        );
+
         let impl_address = self.get_implementation(token_manager_type);
 
         let mut arguments = ManagedArgBuffer::new();
@@ -152,7 +171,6 @@ pub trait ExecutableModule:
         arguments.push_arg(operator);
         arguments.push_arg(token_identifier);
 
-        // TODO: We should move this to a TokenManagerDeployer contract instead
         let (address, _) = self.send_raw().deploy_from_source_contract(
             self.blockchain().get_gas_left(),
             &BigUint::zero(),
@@ -165,12 +183,16 @@ pub trait ExecutableModule:
 
         self.token_manager_deployed_event(token_id, token_manager_type, arguments);
 
-        self.token_manager_address(token_id).set(address.clone());
+        token_manager_address_mapper.set(address.clone());
 
         address
     }
 
-    fn pop_express_receive_token(&self, payload: &ManagedBuffer, command_id: &ManagedBuffer) -> ManagedAddress {
+    fn pop_express_receive_token(
+        &self,
+        payload: &ManagedBuffer,
+        command_id: &ManagedBuffer,
+    ) -> ManagedAddress {
         let mut hash_data = ManagedBuffer::new();
 
         hash_data.append(payload);
@@ -178,7 +200,7 @@ pub trait ExecutableModule:
 
         let hash = self.crypto().keccak256(hash_data);
 
-        let express_receive_token_slot_mapper = self.express_receive_token_slot(hash);
+        let express_receive_token_slot_mapper = self.express_receive_token_slot(&hash);
 
         if express_receive_token_slot_mapper.is_empty() {
             return ManagedAddress::zero();
@@ -189,17 +211,15 @@ pub trait ExecutableModule:
 
     #[view]
     fn get_implementation(&self, token_manager_type: TokenManagerType) -> ManagedAddress {
+        // Only MintBurn and LockUnlock are supported, the others are kept for EVM compatibility
         match token_manager_type {
             TokenManagerType::MintBurn => self.implementation_mint_burn().get(),
+            TokenManagerType::MintBurnFrom => self.implementation_mint_burn().get(),
             TokenManagerType::LockUnlock => self.implementation_lock_unlock().get(),
+            TokenManagerType::LockUnlockFee => self.implementation_lock_unlock().get(),
+            TokenManagerType::LiquidityPool => self.implementation_lock_unlock().get(),
         }
     }
-
-    #[storage_mapper("express_receive_token_slot")]
-    fn express_receive_token_slot(
-        &self,
-        hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> SingleValueMapper<ManagedAddress>;
 
     #[storage_mapper("implementation_mint_burn")]
     fn implementation_mint_burn(&self) -> SingleValueMapper<ManagedAddress>;

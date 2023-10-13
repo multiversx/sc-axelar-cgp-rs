@@ -6,6 +6,7 @@ mod events;
 
 use crate::events::{AddGasData, AddNativeGasData, GasPaidForContractCallData, GasPaidForContractCallWithTokenData, NativeGasPaidForContractCallData, NativeGasPaidForContractCallWithTokenData, RefundedData};
 
+// TODO: Do we need all the `with_token` endpoints or the express endpoints?
 #[multiversx_sc::contract]
 pub trait GasService: events::Events {
     #[init]

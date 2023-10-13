@@ -14,6 +14,10 @@ export const TOKEN_SYMBOL: string = "WEGLD";
 export const TOKEN_ID: string = "WEGLD-123456";
 export const TOKEN_ID2: string = "OTHER-654321";
 
+export const CHAIN_NAME: string = 'MultiversX';
+export const OTHER_CHAIN_NAME: string = 'Ethereum';
+export const OTHER_CHAIN_ADDRESS: string = 'Ethereum-Address';
+
 export const generateSignature = (dataHash: string, signerPem = './alice.pem') => {
   const file = fs.readFileSync(signerPem).toString();
   const privateKey = UserSecretKey.fromPem(file);

@@ -1,7 +1,8 @@
 multiversx_sc::imports!();
 
-use crate::constants::{TokenId};
+use crate::constants::TokenId;
 use crate::events;
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 pub mod remote_address_validator_proxy {
     multiversx_sc::imports!();
@@ -74,7 +75,7 @@ pub mod token_manager_proxy {
     pub trait TokenManagerProxy {
         #[payable("*")]
         #[endpoint(takeToken)]
-        fn take_token(&self, sender: &ManagedAddress);
+        fn take_token(&self);
 
         #[endpoint(giveToken)]
         fn give_token(&self, destination_address: &ManagedAddress, amount: &BigUint) -> BigUint;
@@ -195,11 +196,10 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         &self,
         token_id: &TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
-        sender: &ManagedAddress,
         amount: BigUint,
     ) {
         self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
-            .take_token(sender)
+            .take_token()
             .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(
                 token_identifier,
                 0,
@@ -235,10 +235,76 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         mint_amount: BigUint,
         mint_to: ManagedAddress,
     ) {
-        // TODO: Need to add egld transfer here for ESDT issue fee
         self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
             .deploy_standardized_token(distributor, name, symbol, decimals, mint_amount, mint_to)
+            .with_egld_transfer(self.call_value().egld_value().clone_value())
             .execute_on_dest_context::<()>();
+    }
+
+    fn executable_contract_execute_with_interchain_token(
+        &self,
+        destination_address: ManagedAddress,
+        source_chain: ManagedBuffer,
+        source_address: ManagedBuffer,
+        data: ManagedBuffer,
+        token_id: TokenId<Self::Api>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        amount: BigUint,
+        command_id: ManagedBuffer,
+    ) {
+        self.executable_contract_proxy(destination_address)
+            .execute_with_interchain_token(
+                source_chain,
+                source_address,
+                data,
+                token_id.clone()
+            )
+            .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
+            .async_call()
+            .with_callback(self.callbacks().execute_with_token_callback(
+                command_id,
+                token_id,
+                token_identifier,
+                amount,
+            ))
+            .call_and_exit();
+    }
+
+    fn executable_contract_express_execute_with_interchain_token(
+        &self,
+        destination_address: ManagedAddress,
+        source_chain: ManagedBuffer,
+        source_address: ManagedBuffer,
+        data: ManagedBuffer,
+        token_id: TokenId<Self::Api>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        amount: BigUint,
+        caller: ManagedAddress,
+        command_id: ManagedBuffer,
+        express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) {
+        self.executable_contract_proxy(destination_address)
+            .express_execute_with_interchain_token(
+                source_chain,
+                source_address,
+                data,
+                token_id.clone(),
+            )
+            .with_egld_or_single_esdt_transfer((
+                token_identifier.clone(),
+                0,
+                amount.clone(),
+            ))
+            .async_call()
+            .with_callback(self.callbacks().exp_execute_with_token_callback(
+                caller,
+                command_id,
+                token_id,
+                token_identifier,
+                amount,
+                express_hash,
+            ))
+            .call_and_exit();
     }
 
     #[view]
@@ -297,6 +363,12 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_id: &TokenId<Self::Api>,
     ) -> SingleValueMapper<ManagedAddress>;
 
+    #[storage_mapper("express_receive_token_slot")]
+    fn express_receive_token_slot(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> SingleValueMapper<ManagedAddress>;
+
     #[proxy]
     fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway_proxy::Proxy<Self::Api>;
 
@@ -318,4 +390,72 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         &self,
         sc_address: ManagedAddress,
     ) -> executable_contract_proxy::Proxy<Self::Api>;
+
+    #[callback]
+    fn execute_with_token_callback(
+        &self,
+        command_id: ManagedBuffer,
+        token_id: TokenId<Self::Api>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        amount: BigUint,
+        #[call_result] result: ManagedAsyncCallResult<()>,
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(_) => {
+                self.token_received_with_data_success_event(
+                    command_id,
+                    token_id,
+                    token_identifier,
+                    amount,
+                );
+            }
+            ManagedAsyncCallResult::Err(_) => {
+                self.token_received_with_data_error_event(
+                    command_id,
+                    &token_id,
+                    &token_identifier,
+                    &amount,
+                );
+
+                self.token_manager_take_token(&token_id, token_identifier, amount);
+            }
+        }
+    }
+
+    #[callback]
+    fn exp_execute_with_token_callback(
+        &self,
+        caller: ManagedAddress,
+        command_id: ManagedBuffer,
+        token_id: TokenId<Self::Api>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        amount: BigUint,
+        express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[call_result] result: ManagedAsyncCallResult<()>,
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(_) => {
+                self.express_token_received_with_data_success_event(
+                    caller,
+                    command_id,
+                    token_id,
+                    token_identifier,
+                    amount,
+                );
+            }
+            ManagedAsyncCallResult::Err(_) => {
+                self.express_token_received_with_data_error_event(
+                    &caller,
+                    command_id,
+                    &token_id,
+                    &token_identifier,
+                    &amount,
+                );
+
+                self.send().direct(&caller, &token_identifier, 0, &amount);
+
+                self.express_receive_token_slot(&express_hash).clear();
+            }
+        }
+    }
 }

@@ -1065,6 +1065,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "operatable"
+version = "0.0.0"
+dependencies = [
+ "multiversx-sc",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1576,6 +1583,7 @@ version = "0.0.0"
 dependencies = [
  "flow-limit",
  "multiversx-sc",
+ "operatable",
 ]
 
 [[package]]
@@ -1584,6 +1592,7 @@ version = "0.0.0"
 dependencies = [
  "flow-limit",
  "multiversx-sc",
+ "operatable",
  "token-manager",
 ]
 

@@ -14,7 +14,7 @@ pub struct Metadata<M: ManagedTypeApi> {
 }
 
 #[multiversx_sc::module]
-pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
+pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit + operatable::Operatable {
     fn init_raw(
         &self,
         interchain_token_service: ManagedAddress,
@@ -30,7 +30,8 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
         self.interchain_token_service()
             .set_if_empty(interchain_token_service);
         self.token_id().set_if_empty(token_id);
-        self.operator().set_if_empty(operator);
+
+        self.set_operator(operator);
 
         if token_identifier.is_some() {
             self.token_identifier().set_if_empty(token_identifier.unwrap());
@@ -49,7 +50,7 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         metadata: ManagedBuffer,
-    ) -> (ManagedAddress, BigUint) {
+    ) -> BigUint {
         let amount = self.require_correct_token();
 
         let sender = self.blockchain().get_caller();
@@ -65,7 +66,7 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
 
         self.add_flow_out(&amount);
 
-        (sender, amount)
+        amount
     }
 
     fn call_contract_with_interchain_token_raw(
@@ -73,7 +74,7 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         data: ManagedBuffer,
-    ) -> (ManagedAddress, BigUint) {
+    ) -> BigUint {
         let amount = self.require_correct_token();
 
         let sender = self.blockchain().get_caller();
@@ -98,7 +99,7 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
 
         self.add_flow_out(&amount);
 
-        (sender, amount)
+        amount
     }
 
     fn give_token_endpoint(&self, amount: &BigUint) {
@@ -124,14 +125,6 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
         );
     }
 
-    // TODO: This comes from Operatable which also has other functions, check if they are needed
-    fn only_operator(&self) {
-        require!(
-            self.blockchain().get_caller() == self.operator().get(),
-            "Not operator"
-        );
-    }
-
     fn require_correct_token(&self) -> BigUint {
         let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
@@ -145,10 +138,6 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit {
     #[view(tokenId)]
     #[storage_mapper("token_id")]
     fn token_id(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
-
-    #[view]
-    #[storage_mapper("operator")]
-    fn operator(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[view(tokenIdentifier)]
     #[storage_mapper("token_identifier")]

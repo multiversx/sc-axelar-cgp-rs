@@ -7,10 +7,12 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 // If this needs updating, the TokenManagerMintBurn contract from which deployments are made can be upgraded
 const DEFAULT_ESDT_ISSUE_COST: u64 = 5000000000000000;
 
-// TODO: Add required for some functions to only be callable by the Gateway contract or operator address
 #[multiversx_sc::contract]
 pub trait TokenManagerMintBurnContract:
-    token_manager::TokenManager + token_manager::proxy::ProxyModule + flow_limit::FlowLimit
+    token_manager::TokenManager
+    + token_manager::proxy::ProxyModule
+    + flow_limit::FlowLimit
+    + operatable::Operatable
 {
     #[init]
     fn init(
@@ -25,7 +27,12 @@ pub trait TokenManagerMintBurnContract:
             "Invalid token address"
         );
 
-        self.init_raw(interchain_token_service, token_id, operator, token_identifier);
+        self.init_raw(
+            interchain_token_service,
+            token_id,
+            operator,
+            token_identifier,
+        );
     }
 
     #[payable("*")]
@@ -36,10 +43,10 @@ pub trait TokenManagerMintBurnContract:
         destination_address: ManagedBuffer,
         metadata: ManagedBuffer,
     ) {
-        let (sender, amount) =
+        let amount =
             self.interchain_transfer_raw(destination_chain, destination_address, metadata);
 
-        self.take_token_raw(&sender, &amount);
+        self.take_token_raw(&amount);
     }
 
     #[payable("*")]
@@ -50,13 +57,13 @@ pub trait TokenManagerMintBurnContract:
         destination_address: ManagedBuffer,
         data: ManagedBuffer,
     ) {
-        let (sender, amount) = self.call_contract_with_interchain_token_raw(
+        let amount = self.call_contract_with_interchain_token_raw(
             destination_chain,
             destination_address,
             data,
         );
 
-        self.take_token_raw(&sender, &amount);
+        self.take_token_raw(&amount);
     }
 
     #[endpoint(giveToken)]
@@ -68,10 +75,10 @@ pub trait TokenManagerMintBurnContract:
 
     #[payable("*")]
     #[endpoint(takeToken)]
-    fn take_token(&self, source_address: &ManagedAddress) -> BigUint {
+    fn take_token(&self) -> BigUint {
         let amount = self.take_token_endpoint();
 
-        self.take_token_raw(source_address, &amount)
+        self.take_token_raw(&amount)
     }
 
     #[payable("*")]
@@ -90,6 +97,13 @@ pub trait TokenManagerMintBurnContract:
             "Token address already exists"
         );
 
+        let caller = self.blockchain().get_caller();
+
+        require!(
+            caller == self.interchain_token_service().get() || caller == self.operator().get(),
+            "Not service or operator"
+        );
+
         let issue_cost = BigUint::from(DEFAULT_ESDT_ISSUE_COST);
 
         self.send()
@@ -102,14 +116,11 @@ pub trait TokenManagerMintBurnContract:
                 decimals as usize,
             )
             .async_call()
-            .with_callback(
-                self.callbacks()
-                    .deploy_token_callback(mint_amount, mint_to),
-            )
+            .with_callback(self.callbacks().deploy_token_callback(mint_amount, mint_to))
             .call_and_exit();
     }
 
-    fn take_token_raw(&self, _sender: &ManagedAddress, amount: &BigUint) -> BigUint {
+    fn take_token_raw(&self, amount: &BigUint) -> BigUint {
         self.send()
             .esdt_local_burn(&self.token_identifier().get().unwrap_esdt(), 0, amount);
 
@@ -120,8 +131,12 @@ pub trait TokenManagerMintBurnContract:
         self.send()
             .esdt_local_mint(&self.token_identifier().get().unwrap_esdt(), 0, amount);
 
-        self.send()
-            .direct(destination_address, &self.token_identifier().get(), 0, amount);
+        self.send().direct(
+            destination_address,
+            &self.token_identifier().get(),
+            0,
+            amount,
+        );
 
         amount.clone()
     }

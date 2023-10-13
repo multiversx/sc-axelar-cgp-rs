@@ -17,6 +17,9 @@ version = "0.43.4"
 [dependencies.flow-limit]
 path = "../modules/flow-limit"
 
+[dependencies.operatable]
+path = "../modules/operatable"
+
 [dependencies.token-manager]
 path = "../modules/token-manager"
 

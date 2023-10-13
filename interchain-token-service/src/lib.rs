@@ -1,20 +1,26 @@
 #![no_std]
 
+use core::convert::TryFrom;
+use core::ops::Deref;
+
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use multiversx_sc::codec::TopDecodeInput;
+
+use crate::constants::{
+    DeployStandardizedTokenAndManagerPayload, Metadata, SendTokenPayload, TokenId,
+    TokenManagerType, PREFIX_CUSTOM_TOKEN_ID, PREFIX_STANDARDIZED_TOKEN_ID,
+    SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN, SELECTOR_DEPLOY_TOKEN_MANAGER,
+    SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA,
+};
+use crate::proxy::gateway_proxy::ProxyTrait as GatewayProxyTrait;
+use crate::proxy::remote_address_validator_proxy::ProxyTrait as RemoteAddressValidatorProxyTrait;
+
 multiversx_sc::imports!();
 
 mod constants;
 mod events;
 mod executable;
 mod proxy;
-
-use crate::constants::{Metadata, SendTokenPayload, TokenManagerType, PREFIX_CUSTOM_TOKEN_ID, PREFIX_STANDARDIZED_TOKEN_ID, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN, SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA, DeployStandardizedTokenAndManagerPayload, TokenId};
-use crate::proxy::executable_contract_proxy::ProxyTrait as ExecutableContractProxyTrait;
-use crate::proxy::gateway_proxy::ProxyTrait as GatewayProxyTrait;
-use crate::proxy::remote_address_validator_proxy::ProxyTrait as RemoteAddressValidatorProxyTrait;
-use core::ops::Deref;
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use core::convert::TryFrom;
-use multiversx_sc::codec::TopDecodeInput;
 
 #[multiversx_sc::contract]
 pub trait InterchainTokenServiceContract:
@@ -23,45 +29,32 @@ pub trait InterchainTokenServiceContract:
     + events::EventsModule
     + multiversx_sc_modules::pause::PauseModule
 {
-    /// token_manager_implementations - this need to have exactly 2 implementations in the following order: Mint-burn, Lock-Unlock
-    // TODO: token_manager_implementations should be passed to a TokenManagerDeployer contract instead
     #[init]
     fn init(
         &self,
-        token_manager_deployer: ManagedAddress,
-        standardized_token_deployer: ManagedAddress,
         gateway: ManagedAddress,
         gas_service: ManagedAddress,
         remote_address_validator: ManagedAddress,
-        token_manager_implementations: MultiValueEncoded<ManagedAddress>, // TODO: The implementations should be held by the token manager deployer contract
+        token_manager_mint_burn: ManagedAddress,
+        token_manager_lock_unlock: ManagedAddress,
     ) {
         require!(
             !remote_address_validator.is_zero()
                 && !gas_service.is_zero()
-                && !token_manager_deployer.is_zero()
-                && !standardized_token_deployer.is_zero()
-                && !gateway.is_zero(),
+                && !gateway.is_zero()
+                && !token_manager_mint_burn.is_zero()
+                && !token_manager_lock_unlock.is_zero(),
             "Zero address"
         );
 
         self.gateway().set_if_empty(gateway);
+        self.gas_service().set_if_empty(gas_service);
         self.remote_address_validator()
             .set_if_empty(remote_address_validator);
-        self.gas_service().set_if_empty(gas_service);
-        self.token_manager_deployer()
-            .set_if_empty(token_manager_deployer);
-        self.standardized_token_deployer()
-            .set_if_empty(standardized_token_deployer);
-
-        require!(token_manager_implementations.len() == 2, "Length mismatch");
-
-        let mut token_manager_implementations_iter = token_manager_implementations.into_iter();
-
-        // TODO: Should we actually check the type of these contracts?
         self.implementation_mint_burn()
-            .set_if_empty(token_manager_implementations_iter.next().unwrap());
+            .set_if_empty(token_manager_mint_burn);
         self.implementation_lock_unlock()
-            .set_if_empty(token_manager_implementations_iter.next().unwrap());
+            .set_if_empty(token_manager_lock_unlock);
 
         let chain_name = self.remote_address_validator_chain_name();
         self.chain_name_hash()
@@ -147,7 +140,12 @@ pub trait InterchainTokenServiceContract:
 
         let token_id = self.get_custom_token_id(&deployer, &token_name);
 
-        self.deploy_token_manager(&token_id, token_manager_type, operator, Some(token_identifier));
+        self.deploy_token_manager(
+            &token_id,
+            token_manager_type,
+            operator,
+            Some(token_identifier),
+        );
 
         self.custom_token_id_claimed_event(token_id, deployer, token_name);
     }
@@ -182,7 +180,7 @@ pub trait InterchainTokenServiceContract:
         self.custom_token_id_claimed_event(token_id, deployer, token_name);
     }
 
-    // Needs to be payable because it can issue ESDT token through the TokenManager
+    // Needs to be payable because it issues ESDT token through the TokenManager
     #[payable("EGLD")]
     #[endpoint(deployAndRegisterStandardizedToken)]
     fn deploy_and_register_standardized_token(
@@ -200,7 +198,16 @@ pub trait InterchainTokenServiceContract:
 
         let token_id = self.get_custom_token_id(&sender, &salt);
 
-        self.deploy_token_manager(&token_id, TokenManagerType::MintBurn, self.blockchain().get_caller(), None);
+        // Allow retry of deploying standardized token
+        let token_manager_address_mapper = self.token_manager_address(&token_id);
+        if token_manager_address_mapper.is_empty() {
+            self.deploy_token_manager(
+                &token_id,
+                TokenManagerType::MintBurn,
+                self.blockchain().get_caller(),
+                None,
+            );
+        }
 
         self.token_manager_deploy_standardized_token(
             &token_id,
@@ -260,29 +267,29 @@ pub trait InterchainTokenServiceContract:
 
         let caller = self.blockchain().get_caller();
 
-        self.set_express_receive_token(&payload, &command_id, &caller);
+        let express_hash = self.set_express_receive_token(&payload, &command_id, &caller);
 
         let receive_token_payload: SendTokenPayload<Self::Api> =
             SendTokenPayload::<Self::Api>::top_decode(payload).unwrap();
 
         let token_identifier = self.get_token_identifier(&receive_token_payload.token_id);
 
-        let destination_address = ManagedAddress::try_from(receive_token_payload.destination_address).unwrap();
+        let destination_address =
+            ManagedAddress::try_from(receive_token_payload.destination_address).unwrap();
 
-        // TODO: This was changed to call the contract with tokens directly, and not send them before calling the
-        // endpoint like in the sol implementation
         if receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN_WITH_DATA) {
-            // TODO: Should we have a callback that unsets the express_receive_token?
-            self.executable_contract_proxy(destination_address)
-                .express_execute_with_interchain_token(
-                    source_chain,
-                    receive_token_payload.source_address.unwrap(),
-                    receive_token_payload.data.unwrap(),
-                    receive_token_payload.token_id,
-                )
-                .with_egld_or_single_esdt_transfer((token_identifier, 0, receive_token_payload.amount))
-                .async_call()
-                .call_and_exit();
+            self.executable_contract_express_execute_with_interchain_token(
+                destination_address,
+                source_chain,
+                receive_token_payload.source_address.unwrap(),
+                receive_token_payload.data.unwrap(),
+                receive_token_payload.token_id,
+                token_identifier,
+                receive_token_payload.amount,
+                caller,
+                command_id,
+                express_hash
+            );
         } else {
             require!(
                 receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN),
@@ -309,9 +316,7 @@ pub trait InterchainTokenServiceContract:
     ) {
         let (token_identifier, amount) = self.get_required_payment(&token_id);
 
-        let sender = self.blockchain().get_caller();
-
-        self.token_manager_take_token(&token_id, token_identifier, &sender, amount.clone());
+        self.token_manager_take_token(&token_id, token_identifier, amount.clone());
 
         // TODO: Check if this is correct and what this metadata actually is
         let metadata = Metadata::<Self::Api>::top_decode(metadata);
@@ -327,7 +332,7 @@ pub trait InterchainTokenServiceContract:
 
         self.transmit_send_token_raw(
             token_id,
-            sender,
+            self.blockchain().get_caller(),
             destination_chain,
             destination_address,
             amount,
@@ -346,13 +351,11 @@ pub trait InterchainTokenServiceContract:
     ) {
         let (token_identifier, amount) = self.get_required_payment(&token_id);
 
-        let sender = self.blockchain().get_caller();
-
-        self.token_manager_take_token(&token_id, token_identifier, &sender, amount.clone());
+        self.token_manager_take_token(&token_id, token_identifier, amount.clone());
 
         self.transmit_send_token_raw(
             token_id,
-            sender,
+            self.blockchain().get_caller(),
             destination_chain,
             destination_address,
             amount,
@@ -471,14 +474,12 @@ pub trait InterchainTokenServiceContract:
     }
 
     fn only_remote_service(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
-        let valid_sender: bool = self.remote_address_validator_proxy(self.remote_address_validator().get())
+        let valid_sender: bool = self
+            .remote_address_validator_proxy(self.remote_address_validator().get())
             .validate_sender(source_chain, source_address)
             .execute_on_dest_context();
 
-        require!(
-            valid_sender,
-            "Not remote service"
-        );
+        require!(valid_sender, "Not remote service");
     }
 
     fn only_token_manager(&self, token_id: &TokenId<Self::Api>) {
@@ -517,7 +518,9 @@ pub trait InterchainTokenServiceContract:
         require!(token_identifier.is_valid(), "Invalid token identifier");
 
         // TODO: This also has validation for token in sol contract, check if this works and checks that the token exists?
-        let _ = self.blockchain().is_esdt_paused(&token_identifier.clone().unwrap_esdt());
+        let _ = self
+            .blockchain()
+            .is_esdt_paused(&token_identifier.clone().unwrap_esdt());
 
         // TODO: In sol contract this returns the name and decimals of the token, but there is no way to do that on MultiversX
     }
@@ -622,7 +625,7 @@ pub trait InterchainTokenServiceContract:
                 destination_address: destination_address.clone(),
                 amount: amount.clone(),
                 source_address: Option::None,
-                data: Option::None
+                data: Option::None,
             };
 
             data.top_encode(&mut payload).unwrap();
@@ -668,7 +671,7 @@ pub trait InterchainTokenServiceContract:
         payload: &ManagedBuffer,
         command_id: &ManagedBuffer,
         express_caller: &ManagedAddress,
-    ) {
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut hash_data = ManagedBuffer::new();
 
         hash_data.append(payload);
@@ -676,7 +679,7 @@ pub trait InterchainTokenServiceContract:
 
         let hash = self.crypto().keccak256(hash_data);
 
-        let express_receive_token_slot_mapper = self.express_receive_token_slot(hash);
+        let express_receive_token_slot_mapper = self.express_receive_token_slot(&hash);
 
         require!(
             express_receive_token_slot_mapper.is_empty(),
@@ -686,14 +689,22 @@ pub trait InterchainTokenServiceContract:
         express_receive_token_slot_mapper.set(express_caller);
 
         self.express_receive_event(command_id, express_caller, payload);
+
+        hash
     }
 
-    fn get_required_payment(&self, token_id: &TokenId<Self::Api>) -> (EgldOrEsdtTokenIdentifier, BigUint) {
+    fn get_required_payment(
+        &self,
+        token_id: &TokenId<Self::Api>,
+    ) -> (EgldOrEsdtTokenIdentifier, BigUint) {
         let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
         let required_token_identifier = self.get_token_identifier(token_id);
 
-        require!(token_identifier == required_token_identifier, "Wrong token sent");
+        require!(
+            token_identifier == required_token_identifier,
+            "Wrong token sent"
+        );
 
         (token_identifier, amount)
     }
@@ -734,12 +745,6 @@ pub trait InterchainTokenServiceContract:
 
         self.crypto().keccak256(encoded)
     }
-
-    #[storage_mapper("token_manager_deployer")]
-    fn token_manager_deployer(&self) -> SingleValueMapper<ManagedAddress>;
-
-    #[storage_mapper("standardized_token_deployer")]
-    fn standardized_token_deployer(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[storage_mapper("chain_name_hash")]
     fn chain_name_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;

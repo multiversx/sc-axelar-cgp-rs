@@ -15,11 +15,14 @@ pub const SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN: u32 = 4;
 
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 
-// TODO: On Ethereum this has more types, decode this correctly for compatibility
+// Enum has same types as on EVM for compatibility
 #[derive(TypeAbi, TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, Copy)]
 pub enum TokenManagerType {
     MintBurn,
+    MintBurnFrom,
     LockUnlock,
+    LockUnlockFee,
+    LiquidityPool
 }
 
 #[derive(TypeAbi)]

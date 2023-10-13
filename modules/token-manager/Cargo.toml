@@ -13,3 +13,6 @@ version = "0.43.4"
 
 [dependencies.flow-limit]
 path = "../flow-limit"
+
+[dependencies.operatable]
+path = "../operatable"

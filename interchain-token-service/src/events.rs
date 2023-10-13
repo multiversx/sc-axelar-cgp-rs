@@ -256,4 +256,42 @@ pub trait EventsModule {
         #[indexed] destination_address: &ManagedAddress,
         data: TokenReceivedWithDataEventData<Self::Api>,
     );
+
+    #[event("token_received_with_data_success_event")]
+    fn token_received_with_data_success_event(
+        &self,
+        #[indexed] command_id: ManagedBuffer,
+        #[indexed] token_id: TokenId<Self::Api>,
+        #[indexed] token_identifier: EgldOrEsdtTokenIdentifier,
+        amount: BigUint,
+    );
+
+    #[event("token_received_with_data_error_event")]
+    fn token_received_with_data_error_event(
+        &self,
+        #[indexed] command_id: ManagedBuffer,
+        #[indexed] token_id: &TokenId<Self::Api>,
+        #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier,
+        amount: &BigUint,
+    );
+
+    #[event("express_token_received_with_data_success_event")]
+    fn express_token_received_with_data_success_event(
+        &self,
+        #[indexed] caller: ManagedAddress,
+        #[indexed] command_id: ManagedBuffer,
+        #[indexed] token_id: TokenId<Self::Api>,
+        #[indexed] token_identifier: EgldOrEsdtTokenIdentifier,
+        amount: BigUint,
+    );
+
+    #[event("express_token_received_with_data_error_event")]
+    fn express_token_received_with_data_error_event(
+        &self,
+        #[indexed] caller: &ManagedAddress,
+        #[indexed] command_id: ManagedBuffer,
+        #[indexed] token_id: &TokenId<Self::Api>,
+        #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier,
+        amount: &BigUint,
+    );
 }
