@@ -7,13 +7,14 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use multiversx_sc::codec::TopDecodeInput;
 
 use crate::constants::{
-    DeployStandardizedTokenAndManagerPayload, Metadata, SendTokenPayload, TokenId,
+    Metadata, SendTokenPayload, TokenId,
     TokenManagerType, PREFIX_CUSTOM_TOKEN_ID, PREFIX_STANDARDIZED_TOKEN_ID,
     SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN, SELECTOR_DEPLOY_TOKEN_MANAGER,
     SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA,
 };
 use crate::proxy::gateway_proxy::ProxyTrait as GatewayProxyTrait;
 use crate::proxy::remote_address_validator_proxy::ProxyTrait as RemoteAddressValidatorProxyTrait;
+use crate::proxy::CallbackProxy;
 
 multiversx_sc::imports!();
 
@@ -84,13 +85,12 @@ pub trait InterchainTokenServiceContract:
         token_id
     }
 
-    // TODO: Need to do an async call here and in the callback deploy the remote token manager
+    #[payable("EGLD")]
     #[endpoint(deployRemoteCanonicalToken)]
     fn deploy_remote_canonical_token(
         &self,
         token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
-        gas_value: BigUint,
     ) {
         self.require_not_paused();
 
@@ -101,25 +101,18 @@ pub trait InterchainTokenServiceContract:
             "Not canonical token manager"
         );
 
+        let gas_value = self.call_value().egld_value().clone_value();
+
         self.validate_token(&token_identifier);
 
-        // TODO: In sol these can be retrieved from the token contract, how can we retrieve them for MultiversX so this function can still be called by anyone?
-        // Should these be retrieved from the TokenManager?
-        let token_name = token_identifier.clone().into_name();
-        let token_symbol = token_identifier.into_name();
-        let token_decimals = 18;
-
-        self.deploy_remote_standardized_token(
-            token_id,
-            token_name,
-            token_symbol,
-            token_decimals,
-            ManagedBuffer::new(),
-            ManagedBuffer::new(),
-            BigUint::zero(),
-            ManagedBuffer::new(),
-            destination_chain,
-            gas_value,
+        self.esdt_get_token_properties(
+            token_identifier.clone(),
+            self.callbacks().deploy_remote_token_callback(
+                token_id,
+                token_identifier,
+                destination_chain,
+                gas_value,
+            ),
         );
     }
 
@@ -288,7 +281,7 @@ pub trait InterchainTokenServiceContract:
                 receive_token_payload.amount,
                 caller,
                 command_id,
-                express_hash
+                express_hash,
             );
         } else {
             require!(
@@ -454,7 +447,7 @@ pub trait InterchainTokenServiceContract:
 
         let mut payload = payload_raw.clone().into_nested_buffer();
 
-        // TODO: Use abi decoding here. Optimize to not decode w
+        // TODO: Use abi decoding here. Optimize to not decode this selector multiple times
         let selector = BigUint::dep_decode(&mut payload).unwrap();
 
         match selector.to_u64().unwrap() as u32 {
@@ -489,29 +482,6 @@ pub trait InterchainTokenServiceContract:
             caller == self.get_valid_token_manager_address(token_id),
             "Not token manager"
         );
-    }
-
-    fn call_contract(
-        &self,
-        destination_chain: &ManagedBuffer,
-        payload: &ManagedBuffer,
-        gas_value: &BigUint,
-    ) {
-        let destination_address =
-            self.remote_address_validator_get_remote_address(destination_chain);
-
-        // TODO: On MultiversX we can not send both EGLD and ESDT in the same transaction,
-        // see how to properly handle the gas here
-        if gas_value > &BigUint::zero() {
-            self.gas_service_pay_native_gas_for_contract_call(
-                destination_chain,
-                &destination_address,
-                payload,
-                gas_value,
-            );
-        }
-
-        self.gateway_call_contract(destination_chain, &destination_address, payload);
     }
 
     fn validate_token(&self, token_identifier: &EgldOrEsdtTokenIdentifier) {
@@ -549,52 +519,6 @@ pub trait InterchainTokenServiceContract:
             gas_value,
             token_manager_type,
             params,
-        );
-    }
-
-    fn deploy_remote_standardized_token(
-        &self,
-        token_id: TokenId<Self::Api>,
-        name: ManagedBuffer,
-        symbol: ManagedBuffer,
-        decimals: u8,
-        distributor: ManagedBuffer,
-        mint_to: ManagedBuffer,
-        mint_amount: BigUint,
-        operator: ManagedBuffer,
-        destination_chain: ManagedBuffer,
-        gas_value: BigUint,
-    ) {
-        let mut payload = ManagedBuffer::new();
-
-        let data = DeployStandardizedTokenAndManagerPayload {
-            selector: BigUint::from(SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN),
-            token_id: token_id.clone(),
-            name: name.clone(),
-            symbol: symbol.clone(),
-            decimals,
-            distributor: distributor.clone(),
-            mint_to: mint_to.clone(),
-            mint_amount: mint_amount.clone(),
-            operator: operator.clone(),
-        };
-
-        // TODO: Switch this to use abi encoding
-        let _ = data.top_encode(&mut payload);
-
-        self.call_contract(&destination_chain, &payload, &gas_value);
-
-        self.emit_remote_standardized_token_and_manager_deployment_initialized_event(
-            token_id,
-            name,
-            symbol,
-            decimals,
-            distributor,
-            mint_to,
-            mint_amount,
-            operator,
-            destination_chain,
-            gas_value,
         );
     }
 

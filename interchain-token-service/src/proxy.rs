@@ -1,7 +1,11 @@
 multiversx_sc::imports!();
 
-use crate::constants::TokenId;
+use crate::constants::{
+    DeployStandardizedTokenAndManagerPayload, TokenId,
+    SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
+};
 use crate::events;
+use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 pub mod remote_address_validator_proxy {
@@ -253,12 +257,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         command_id: ManagedBuffer,
     ) {
         self.executable_contract_proxy(destination_address)
-            .execute_with_interchain_token(
-                source_chain,
-                source_address,
-                data,
-                token_id.clone()
-            )
+            .execute_with_interchain_token(source_chain, source_address, data, token_id.clone())
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
             .async_call()
             .with_callback(self.callbacks().execute_with_token_callback(
@@ -290,11 +289,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                 data,
                 token_id.clone(),
             )
-            .with_egld_or_single_esdt_transfer((
-                token_identifier.clone(),
-                0,
-                amount.clone(),
-            ))
+            .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
             .async_call()
             .with_callback(self.callbacks().exp_execute_with_token_callback(
                 caller,
@@ -305,6 +300,95 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                 express_hash,
             ))
             .call_and_exit();
+    }
+
+    fn esdt_get_token_properties(
+        &self,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        callback: CallbackClosure<Self::Api>,
+    ) {
+        let esdt_system_sc_address =
+            ESDTSystemSmartContractProxy::<Self::Api>::new_proxy_obj().esdt_system_sc_address();
+
+        let mut contract_call = self.send().contract_call::<()>(
+            esdt_system_sc_address,
+            ManagedBuffer::from("getTokenProperties"),
+        );
+        contract_call.push_raw_argument(token_identifier.into_name());
+
+        contract_call
+            .async_call()
+            .with_callback(callback)
+            .call_and_exit();
+    }
+
+    fn deploy_remote_standardized_token(
+        &self,
+        token_id: TokenId<Self::Api>,
+        name: ManagedBuffer,
+        symbol: ManagedBuffer,
+        decimals: u8,
+        distributor: ManagedBuffer,
+        mint_to: ManagedBuffer,
+        mint_amount: BigUint,
+        operator: ManagedBuffer,
+        destination_chain: ManagedBuffer,
+        gas_value: BigUint,
+    ) {
+        let mut payload = ManagedBuffer::new();
+
+        let data = DeployStandardizedTokenAndManagerPayload {
+            selector: BigUint::from(SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN),
+            token_id: token_id.clone(),
+            name: name.clone(),
+            symbol: symbol.clone(),
+            decimals,
+            distributor: distributor.clone(),
+            mint_to: mint_to.clone(),
+            mint_amount: mint_amount.clone(),
+            operator: operator.clone(),
+        };
+
+        // TODO: Switch this to use abi encoding
+        let _ = data.top_encode(&mut payload);
+
+        self.call_contract(&destination_chain, &payload, &gas_value);
+
+        self.emit_remote_standardized_token_and_manager_deployment_initialized_event(
+            token_id,
+            name,
+            symbol,
+            decimals,
+            distributor,
+            mint_to,
+            mint_amount,
+            operator,
+            destination_chain,
+            gas_value,
+        );
+    }
+
+    fn call_contract(
+        &self,
+        destination_chain: &ManagedBuffer,
+        payload: &ManagedBuffer,
+        gas_value: &BigUint,
+    ) {
+        let destination_address =
+            self.remote_address_validator_get_remote_address(destination_chain);
+
+        // TODO: On MultiversX we can not send both EGLD and ESDT in the same transaction,
+        // see how to properly handle the gas here
+        if gas_value > &BigUint::zero() {
+            self.gas_service_pay_native_gas_for_contract_call(
+                destination_chain,
+                &destination_address,
+                payload,
+                gas_value,
+            );
+        }
+
+        self.gateway_call_contract(destination_chain, &destination_address, payload);
     }
 
     #[view]
@@ -398,7 +482,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
-        #[call_result] result: ManagedAsyncCallResult<()>,
+        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
     ) {
         match result {
             ManagedAsyncCallResult::Ok(_) => {
@@ -431,7 +515,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[call_result] result: ManagedAsyncCallResult<()>,
+        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
     ) {
         match result {
             ManagedAsyncCallResult::Ok(_) => {
@@ -456,6 +540,57 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
 
                 self.express_receive_token_slot(&express_hash).clear();
             }
+        }
+    }
+
+    #[callback]
+    fn deploy_remote_token_callback(
+        &self,
+        token_id: TokenId<Self::Api>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        destination_chain: ManagedBuffer,
+        gas_value: BigUint,
+        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(values) => {
+                let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
+
+                let token_type =
+                    EsdtTokenType::from(vec.get(1).deref().to_boxed_bytes().as_slice());
+
+                require!(token_type == EsdtTokenType::Fungible, "Invalid token type");
+
+                let token_name = vec.get(0).clone_value();
+                let token_identifier_name = token_identifier.into_name();
+                // Leave the symbol be the beginning of the indentifier before `-`
+                let token_symbol = token_identifier_name
+                    .copy_slice(0, token_identifier_name.len() - 7)
+                    .unwrap();
+                let decimals_buffer_ref = vec.get(5);
+                let decimals_buffer = decimals_buffer_ref.deref();
+                // num decimals is in format string NumDecimals-DECIMALS
+                // skip `NumDecimals-` part and convert to number
+                let token_decimals = decimals_buffer
+                    .copy_slice(12, decimals_buffer.len() - 12)
+                    .unwrap()
+                    .parse_as_u64()
+                    .unwrap();
+
+                self.deploy_remote_standardized_token(
+                    token_id,
+                    token_name,
+                    token_symbol,
+                    token_decimals as u8,
+                    ManagedBuffer::new(),
+                    ManagedBuffer::new(),
+                    BigUint::zero(),
+                    ManagedBuffer::new(),
+                    destination_chain,
+                    gas_value,
+                );
+            }
+            ManagedAsyncCallResult::Err(_) => {}
         }
     }
 }
