@@ -15,6 +15,7 @@ export const TOKEN_ID: string = "WEGLD-123456";
 export const TOKEN_ID2: string = "OTHER-654321";
 
 export const CHAIN_NAME: string = 'MultiversX';
+export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
 export const OTHER_CHAIN_NAME: string = 'Ethereum';
 export const OTHER_CHAIN_ADDRESS: string = 'Ethereum-Address';
 

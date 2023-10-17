@@ -4,11 +4,12 @@ import { SWorld, SContract, SWallet } from "xsuite";
 import { e } from "xsuite";
 import createKeccakHash from "keccak";
 import {
-  CHAIN_NAME,
+  CHAIN_NAME, CHAIN_NAME_HASH,
   MOCK_CONTRACT_ADDRESS_1, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME,
   TOKEN_ID,
-  TOKEN_ID2,
+  TOKEN_ID2
 } from './helpers';
+import { Buffer } from 'buffer';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -20,6 +21,7 @@ let tokenManagerLockUnlock: SContract;
 let its: SContract;
 let address: string;
 let collector: SWallet;
+let user: SWallet;
 
 beforeEach(async () => {
   world = await SWorld.start();
@@ -44,6 +46,7 @@ beforeEach(async () => {
       ])
     ]
   });
+  user = await world.createWallet();
 });
 
 afterEach(async () => {
@@ -60,8 +63,8 @@ const deployGatewayContract = async () => {
     ]
   }));
 
-  const pairs = await gateway.getAccountWithKvs();
-  assertAccount(pairs, {
+  const kvs = await gateway.getAccountWithKvs();
+  assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
@@ -79,8 +82,8 @@ const deployGasService = async () => {
     ]
   }));
 
-  const pairs = await gasService.getAccountWithKvs();
-  assertAccount(pairs, {
+  const kvs = await gasService.getAccountWithKvs();
+  assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
@@ -106,8 +109,8 @@ const deployRemoteAddressValidator = async() => {
 
   const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS.toLowerCase()).digest('hex');
 
-  const pairs = await remoteAddressValidator.getAccountWithKvs();
-  assertAccount(pairs, {
+  const kvs = await remoteAddressValidator.getAccountWithKvs();
+  assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
@@ -133,8 +136,8 @@ const deployTokenManagerMintBurn = async () => {
     ]
   }));
 
-  const pairs = await tokenManagerMintBurn.getAccountWithKvs();
-  assertAccount(pairs, {
+  const kvs = await tokenManagerMintBurn.getAccountWithKvs();
+  assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(deployer),
@@ -159,8 +162,8 @@ const deployTokenManagerLockUnlock = async () => {
     ]
   }));
 
-  const pairs = await tokenManagerLockUnlock.getAccountWithKvs();
-  assertAccount(pairs, {
+  const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(deployer),
@@ -185,10 +188,8 @@ const deployIts = async () => {
     ]
   }));
 
-  const chainNameHash = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
-
-  const pairs = await its.getAccountWithKvs();
-  assertAccount(pairs, {
+  const kvs = await its.getAccountWithKvs();
+  assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
@@ -197,16 +198,77 @@ const deployIts = async () => {
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(chainNameHash)),
+      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
     ],
   });
 }
 
-test("Deploy contracts", async () => {
+const deployContracts = async () => {
   await deployGatewayContract();
   await deployGasService();
   await deployRemoteAddressValidator();
   await deployTokenManagerMintBurn();
   await deployTokenManagerLockUnlock();
   await deployIts();
+};
+
+test("Register canonical token", async () => {
+  await deployContracts();
+
+  const result = await user.callContract({
+    callee: its,
+    funcName: "registerCanonicalToken",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str(TOKEN_ID)
+    ],
+  });
+
+  const prefixStandardized = createKeccakHash('keccak256').update('its-standardized-token-id').digest('hex');
+  const buffer = Buffer.concat([
+    Buffer.from(prefixStandardized, 'hex'),
+    Buffer.from(CHAIN_NAME_HASH, 'hex'),
+    Buffer.from(TOKEN_ID),
+  ])
+  const computedTokenId = createKeccakHash('keccak256').update(buffer).digest('hex');
+
+  assert(result.returnData[0] === computedTokenId);
+
+  const tokenManagerAddress = 'erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02';
+
+  const kvs = await its.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('gateway').Value(gateway),
+      e.kvs.Mapper('gas_service').Value(gasService),
+      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
+      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+
+      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(tokenManagerAddress)),
+    ],
+  });
+
+  const tokenManager = await world.newContract(tokenManagerAddress);
+  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  assertAccount(tokenManagerKvs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('operator').Value(its),
+    ],
+  });
+
+  // Assert that token manager is not of type mint/burn, which has this function
+  await user.callContract({
+    callee: tokenManager,
+    funcName: "deployStandardizedToken",
+    gasLimit: 10_000_000,
+    funcArgs: [],
+  }).assertFail({ code: 1, message: 'invalid function (not found)' });
 });
