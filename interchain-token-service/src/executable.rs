@@ -175,7 +175,7 @@ pub trait ExecutableModule:
             self.blockchain().get_gas_left(),
             &BigUint::zero(),
             &impl_address,
-            CodeMetadata::DEFAULT,
+            CodeMetadata::UPGRADEABLE,
             &arguments,
         );
 

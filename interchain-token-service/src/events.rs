@@ -88,7 +88,7 @@ pub trait EventsModule {
 
     fn emit_remote_token_manager_deployment_initialized(
         &self,
-        token_id: TokenId<Self::Api>,
+        token_id: &TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
         token_manager_type: TokenManagerType,
@@ -197,7 +197,7 @@ pub trait EventsModule {
     #[event("custom_token_id_claimed_event")]
     fn custom_token_id_claimed_event(
         &self,
-        #[indexed] token_id: TokenId<Self::Api>,
+        #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] deployer: ManagedAddress,
         data: ManagedBuffer,
     );
@@ -205,7 +205,7 @@ pub trait EventsModule {
     #[event("remote_token_manager_deployment_initialized_event")]
     fn remote_token_manager_deployment_initialized_event(
         &self,
-        #[indexed] token_id: TokenId<Self::Api>,
+        #[indexed] token_id: &TokenId<Self::Api>,
         data: RemoteTokenManagerDeploymentInitializedEventData<Self::Api>,
     );
 

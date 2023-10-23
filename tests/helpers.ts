@@ -12,12 +12,17 @@ export const BOB_ADDR = 'erd1spyavw0956vq68xj8y4tenjpq2wd5a9p2c6j8gsz7ztyrnpxrru
 
 export const TOKEN_SYMBOL: string = "WEGLD";
 export const TOKEN_ID: string = "WEGLD-123456";
+export const TOKEN_ID_CANONICAL: string = "699fcfca47501d1619d08531652f17d000332fbf7bab5f00d7d5746089dc1f43";
+export const TOKEN_ID_MANAGER_ADDRESS: string = "erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02";
+
 export const TOKEN_ID2: string = "OTHER-654321";
+export const TOKEN_ID2_CUSTOM: string = "1b5920d64a5c1797d482e549b4c39541f8bfe18c4d3b8c8979339f54115c200f";
+export const TOKEN_ID2_MANAGER_ADDRESS: string = "erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02";
 
 export const CHAIN_NAME: string = 'MultiversX';
 export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
 export const OTHER_CHAIN_NAME: string = 'Ethereum';
-export const OTHER_CHAIN_ADDRESS: string = 'Ethereum-Address';
+export const OTHER_CHAIN_TOKEN_ADDRESS: string = 'Ethereum-Address';
 
 export const generateSignature = (dataHash: string, signerPem = './alice.pem') => {
   const file = fs.readFileSync(signerPem).toString();

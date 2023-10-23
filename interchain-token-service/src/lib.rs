@@ -103,8 +103,6 @@ pub trait InterchainTokenServiceContract:
 
         let gas_value = self.call_value().egld_value().clone_value();
 
-        self.validate_token(&token_identifier);
-
         self.esdt_get_token_properties(
             token_identifier.clone(),
             self.callbacks().deploy_remote_token_callback(
@@ -122,7 +120,7 @@ pub trait InterchainTokenServiceContract:
         token_identifier: EgldOrEsdtTokenIdentifier,
         token_manager_type: TokenManagerType,
         operator: ManagedAddress,
-    ) {
+    ) -> TokenId<Self::Api> {
         self.require_not_paused();
 
         self.validate_token(&token_identifier);
@@ -140,9 +138,12 @@ pub trait InterchainTokenServiceContract:
             Some(token_identifier),
         );
 
-        self.custom_token_id_claimed_event(token_id, deployer, token_name);
+        self.custom_token_id_claimed_event(&token_id, deployer, token_name);
+
+        token_id
     }
 
+    #[payable("EGLD")]
     #[endpoint(deployRemoteCustomTokenManager)]
     fn deploy_remote_custom_token_manager(
         &self,
@@ -150,8 +151,7 @@ pub trait InterchainTokenServiceContract:
         destination_chain: ManagedBuffer,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
-        gas_value: BigUint,
-    ) {
+    ) -> TokenId<Self::Api> {
         self.require_not_paused();
 
         self.validate_token(&token_identifier);
@@ -162,15 +162,19 @@ pub trait InterchainTokenServiceContract:
 
         let token_id = self.get_custom_token_id(&deployer, &token_name);
 
+        let gas_value = self.call_value().egld_value().clone_value();
+
         self.deploy_remote_token_manager(
-            token_id.clone(),
+            &token_id,
             destination_chain,
             gas_value,
             token_manager_type,
             params,
         );
 
-        self.custom_token_id_claimed_event(token_id, deployer, token_name);
+        self.custom_token_id_claimed_event(&token_id, deployer, token_name);
+
+        token_id
     }
 
     // Needs to be payable because it issues ESDT token through the TokenManager
@@ -191,7 +195,7 @@ pub trait InterchainTokenServiceContract:
 
         let token_id = self.get_custom_token_id(&sender, &salt);
 
-        // Allow retry of deploying standardized token
+        // Allow retry of deploying standardized token through the token manager
         let token_manager_address_mapper = self.token_manager_address(&token_id);
         if token_manager_address_mapper.is_empty() {
             self.deploy_token_manager(
@@ -213,6 +217,7 @@ pub trait InterchainTokenServiceContract:
         );
     }
 
+    #[payable("EGLD")]
     #[endpoint(deployAndRegisterRemoteStandardizedToken)]
     fn deploy_and_register_remote_standardized_token(
         &self,
@@ -225,11 +230,12 @@ pub trait InterchainTokenServiceContract:
         mint_amount: BigUint,
         operator: ManagedBuffer,
         destination_chain: ManagedBuffer,
-        gas_value: BigUint,
     ) {
         self.require_not_paused();
 
         let token_id = self.get_custom_token_id(&self.blockchain().get_caller(), &salt);
+
+        let gas_value = self.call_value().egld_value().clone_value();
 
         self.deploy_remote_standardized_token(
             token_id,
@@ -283,19 +289,21 @@ pub trait InterchainTokenServiceContract:
                 command_id,
                 express_hash,
             );
-        } else {
-            require!(
-                receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN),
-                "Invalid express selector"
-            );
 
-            self.send().direct(
-                &destination_address,
-                &token_identifier,
-                0,
-                &receive_token_payload.amount,
-            );
+            return;
         }
+
+        require!(
+            receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN),
+            "Invalid express selector"
+        );
+
+        self.send().direct(
+            &destination_address,
+            &token_identifier,
+            0,
+            &receive_token_payload.amount,
+        );
     }
 
     #[payable("*")]
@@ -488,16 +496,13 @@ pub trait InterchainTokenServiceContract:
         require!(token_identifier.is_valid(), "Invalid token identifier");
 
         // TODO: This also has validation for token in sol contract, check if this works and checks that the token exists?
-        let _ = self
-            .blockchain()
-            .is_esdt_paused(&token_identifier.clone().unwrap_esdt());
-
-        // TODO: In sol contract this returns the name and decimals of the token, but there is no way to do that on MultiversX
+        // In sol contract this returns the name and decimals of the token, but there is no way to do that on MultiversX sync
+        // Should we require that a small amount of the token be sent to an endpoint to validate that it actually exists?
     }
 
     fn deploy_remote_token_manager(
         &self,
-        token_id: TokenId<Self::Api>,
+        token_id: &TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
         token_manager_type: TokenManagerType,

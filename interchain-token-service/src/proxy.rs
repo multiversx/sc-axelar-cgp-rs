@@ -88,11 +88,11 @@ pub mod token_manager_proxy {
         fn set_flow_limit(&self, flow_limit: &BigUint);
 
         // Endpoint only available on MintBurn TokenManager
-        #[payable("*")]
+        #[payable("EGLD")]
         #[endpoint(deployStandardizedToken)]
         fn deploy_standardized_token(
             &self,
-            _distributor: ManagedAddress, // TODO: For what is this used on Ethereum?
+            _distributor: ManagedAddress,
             name: ManagedBuffer,
             symbol: ManagedBuffer,
             decimals: u8,
@@ -242,6 +242,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
             .deploy_standardized_token(distributor, name, symbol, decimals, mint_amount, mint_to)
             .with_egld_transfer(self.call_value().egld_value().clone_value())
+            .with_gas_limit(100_000_000) // TODO: Check what value should be used here
             .execute_on_dest_context::<()>();
     }
 
@@ -377,8 +378,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         let destination_address =
             self.remote_address_validator_get_remote_address(destination_chain);
 
-        // TODO: On MultiversX we can not send both EGLD and ESDT in the same transaction,
-        // see how to properly handle the gas here
+        // TODO: see how to properly handle the gas here, since on MultiversX we can not send both EGLD and ESDT in the same transaction,
         if gas_value > &BigUint::zero() {
             self.gas_service_pay_native_gas_for_contract_call(
                 destination_chain,

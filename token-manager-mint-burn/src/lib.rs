@@ -81,7 +81,7 @@ pub trait TokenManagerMintBurnContract:
         self.take_token_raw(&amount)
     }
 
-    #[payable("*")]
+    #[payable("EGLD")]
     #[endpoint(deployStandardizedToken)]
     fn deploy_standardized_token(
         &self,
@@ -100,8 +100,8 @@ pub trait TokenManagerMintBurnContract:
         let caller = self.blockchain().get_caller();
 
         require!(
-            caller == self.interchain_token_service().get() || caller == self.operator().get(),
-            "Not service or operator"
+            caller == self.interchain_token_service().get(),
+            "Not service"
         );
 
         let issue_cost = BigUint::from(DEFAULT_ESDT_ISSUE_COST);
