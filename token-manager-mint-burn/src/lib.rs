@@ -115,6 +115,7 @@ pub trait TokenManagerMintBurnContract:
                 EsdtTokenType::Fungible,
                 decimals as usize,
             )
+            .with_gas_limit(50_000_000) // TODO: Check what value should be used here
             .async_call()
             .with_callback(self.callbacks().deploy_token_callback(mint_amount, mint_to))
             .call_and_exit();

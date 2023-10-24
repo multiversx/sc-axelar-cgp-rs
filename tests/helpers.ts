@@ -3,6 +3,7 @@ import { UserSecretKey } from "@multiversx/sdk-wallet/out"
 import { Address } from "@multiversx/sdk-core/out"
 import createKeccakHash from "keccak";
 import { e } from 'xsuite';
+import { Buffer } from 'buffer';
 
 export const MOCK_CONTRACT_ADDRESS_1: string = "erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax";
 export const MOCK_CONTRACT_ADDRESS_2: string = "erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh";
@@ -22,7 +23,7 @@ export const TOKEN_ID2_MANAGER_ADDRESS: string = "erd1qqqqqqqqqqqqqqqqzyg3zygqqq
 export const CHAIN_NAME: string = 'MultiversX';
 export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
 export const OTHER_CHAIN_NAME: string = 'Ethereum';
-export const OTHER_CHAIN_TOKEN_ADDRESS: string = 'Ethereum-Address';
+export const OTHER_CHAIN_ADDRESS: string = 'Ethereum-Address';
 
 export const generateSignature = (dataHash: string, signerPem = './alice.pem') => {
   const file = fs.readFileSync(signerPem).toString();
@@ -66,4 +67,18 @@ export const generateProof = (data: any): any => {
   );
 
   return { hash, proof };
+}
+export const getCommandIdHash = (commandId: string = 'commandId') => {
+  return createKeccakHash('keccak256').update(Buffer.from(commandId)).digest('hex');
+}
+
+export const computeStandardizedTokenId = (token = TOKEN_ID) => {
+  const prefixStandardized = createKeccakHash('keccak256').update('its-standardized-token-id').digest('hex');
+  const buffer = Buffer.concat([
+    Buffer.from(prefixStandardized, 'hex'),
+    Buffer.from(CHAIN_NAME_HASH, 'hex'),
+    Buffer.from(token),
+  ]);
+
+  return createKeccakHash('keccak256').update(buffer).digest('hex');
 }

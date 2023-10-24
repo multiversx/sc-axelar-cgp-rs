@@ -528,17 +528,18 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                 );
             }
             ManagedAsyncCallResult::Err(_) => {
-                self.express_token_received_with_data_error_event(
-                    &caller,
-                    command_id,
-                    &token_id,
-                    &token_identifier,
-                    &amount,
-                );
-
                 self.send().direct(&caller, &token_identifier, 0, &amount);
 
                 self.express_receive_token_slot(&express_hash).clear();
+
+                // TODO: This consumes too much gas, wait for Async v2 to be released and specify the callback gas manually
+                // self.express_token_received_with_data_error_event(
+                //     &caller,
+                //     command_id,
+                //     &token_id,
+                //     &token_identifier,
+                //     &amount,
+                // );
             }
         }
     }

@@ -1,0 +1,15 @@
+[package]
+name = "ping-ping-interchain"
+version = "0.0.0"
+authors = [ "you",]
+edition = "2018"
+publish = false
+
+[lib]
+path = "src/ping_pong.rs"
+
+[dependencies.multiversx-sc]
+version = "0.43.5"
+
+[dev-dependencies.multiversx-sc-scenario]
+version = "0.43.5"

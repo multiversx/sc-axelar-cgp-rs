@@ -1,15 +1,16 @@
-import { afterEach, beforeEach, test, assert } from "vitest";
-import { assertAccount } from "xsuite";
-import { SWorld, SContract, SWallet } from "xsuite";
-import { e } from "xsuite";
+import { afterEach, assert, beforeEach, test } from "vitest";
+import { assertAccount, e, SContract, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
   ALICE_ADDR,
-  BOB_ADDR, DEFAULT_ESDT_ISSUE_COST,
+  BOB_ADDR,
+  DEFAULT_ESDT_ISSUE_COST,
   generateProof,
   generateSignature,
+  getCommandIdHash,
   getOperatorsHash,
-  MOCK_CONTRACT_ADDRESS_2, TOKEN_ID, TOKEN_SYMBOL
+  MOCK_CONTRACT_ADDRESS_2,
+  TOKEN_ID
 } from './helpers';
 
 let world: SWorld;
@@ -82,10 +83,6 @@ const deployContract = async () => {
       e.kvs.Mapper("current_epoch").Value(e.U64(16)),
     ]
   });
-}
-
-const getCommandIdHash = (commandId: string = 'commandId') => {
-  return createKeccakHash('keccak256').update(Buffer.from(commandId)).digest('hex');
 }
 
 test("Execute invalid proof", async () => {

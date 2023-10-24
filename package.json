@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "build": "npm run build:gateway && npm run build:auth && npm run build:gas-service && npm run build:its && npm run build:remote-address-validator && npm run build:token-manager-mint-burn && npm run build:token-manager-lock-unlock",
+    "build": "npm run build:gateway && npm run build:auth && npm run build:gas-service && npm run build:its && npm run build:remote-address-validator && npm run build:token-manager-mint-burn && npm run build:token-manager-lock-unlock && npm run build:ping-pong",
     "build:cgp": "npm run build:gateway && npm run build:auth && npm run build:gas-service",
     "build:gateway": "cd gateway && mxpy contract build",
     "build:auth": "cd auth && mxpy contract build",
@@ -10,6 +10,7 @@
     "build:remote-address-validator": "cd remote-address-validator && mxpy contract build",
     "build:token-manager-mint-burn": "cd token-manager-mint-burn && mxpy contract build",
     "build:token-manager-lock-unlock": "cd token-manager-lock-unlock && mxpy contract build",
+    "build:ping-pong": "cd ping-pong-interchain && mxpy contract build",
     "test": "vitest run",
     "test:all": "npm run build && npm run test",
     "typecheck": "tsc --noEmit",
