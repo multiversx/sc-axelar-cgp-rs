@@ -1,6 +1,6 @@
 multiversx_sc::imports!();
 
-use crate::constants::{DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId, TokenManagerType, SELECTOR_RECEIVE_TOKEN_WITH_DATA, SELECTOR_RECEIVE_TOKEN};
+use crate::constants::{DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId, TokenManagerType, SELECTOR_RECEIVE_TOKEN};
 use crate::{events, proxy};
 use core::convert::TryFrom;
 

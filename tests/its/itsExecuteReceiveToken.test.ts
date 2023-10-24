@@ -80,7 +80,7 @@ afterEach(async () => {
 const mockGatewayCall = async (tokenId: string) => {
   const payload = e.Buffer(
     e.Tuple(
-      e.U(1),
+      e.U(1), // selector receive token
       e.Bytes(tokenId),
       e.Buffer(otherUser.toTopBytes()),
       e.U(1_000),
@@ -397,7 +397,7 @@ test("Execute receive token express caller", async () => {
   ]);
   const expressReceiveSlot = createKeccakHash('keccak256').update(data).digest('hex');
 
-  // Mock express call
+  // Mock otherUser as express caller
   await its.setAccount({
     ...(await its.getAccountWithKvs()),
     kvs: [
@@ -427,7 +427,7 @@ test("Execute receive token express caller", async () => {
     ],
   });
 
-  // Tokens should be minted for otherUser and token manager should have flow set
+  // Tokens should be minted for otherUser
   const otherUserKvs = await otherUser.getAccountWithKvs();
   assertAccount(otherUserKvs, {
     balance: BigInt('10000000000000000'),
@@ -461,6 +461,7 @@ test("Execute receive token express caller", async () => {
     ],
   });
 
+  // Nothing changed for token manager
   const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0,
@@ -506,7 +507,7 @@ test("Execute errors", async () => {
   );
   const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
 
-  // Mock contract call approaved by gateway
+  // Mock contract call approved by gateway
   let data = Buffer.concat([
     Buffer.from("commandId"),
     Buffer.from(OTHER_CHAIN_NAME),

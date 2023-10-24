@@ -494,6 +494,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                 );
             }
             ManagedAsyncCallResult::Err(_) => {
+                // TODO: This doesn't seem to work currently, maybe because it uses too much gas? Wait for Async v2 and see if that fixes this if specifying the callback gas manually
                 self.token_received_with_data_error_event(
                     command_id,
                     &token_id,
@@ -502,6 +503,11 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                 );
 
                 self.token_manager_take_token(&token_id, token_identifier, amount);
+
+                // TODO: Sending tokens directly to the token manager works, but this is not a good approach...
+                // let token_manager = self.get_valid_token_manager_address(&token_id);
+                //
+                // self.send().direct(&token_manager, &token_identifier, 0, &amount);
             }
         }
     }
@@ -532,7 +538,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
 
                 self.express_receive_token_slot(&express_hash).clear();
 
-                // TODO: This consumes too much gas, wait for Async v2 to be released and specify the callback gas manually
+                // TODO: This doesn't seem to work currently, maybe because it uses too much gas? Wait for Async v2 and see if that fixes this if specifying the callback gas manually
                 // self.express_token_received_with_data_error_event(
                 //     &caller,
                 //     command_id,
