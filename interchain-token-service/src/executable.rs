@@ -1,9 +1,6 @@
 multiversx_sc::imports!();
 
-use crate::constants::{
-    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId,
-    TokenManagerType, SELECTOR_RECEIVE_TOKEN_WITH_DATA,
-};
+use crate::constants::{DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId, TokenManagerType, SELECTOR_RECEIVE_TOKEN_WITH_DATA, SELECTOR_RECEIVE_TOKEN};
 use crate::{events, proxy};
 use core::convert::TryFrom;
 
@@ -35,36 +32,7 @@ pub trait ExecutableModule:
             return;
         }
 
-        if send_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN_WITH_DATA) {
-            // Here we give the tokens to this contract and then call the executable contract with the tokens
-            let amount = self.token_manager_give_token(
-                &send_token_payload.token_id,
-                &self.blockchain().get_sc_address(),
-                &send_token_payload.amount,
-            );
-
-            let token_identifier = self.get_token_identifier(&send_token_payload.token_id);
-
-            self.emit_received_token_with_data_event(
-                &send_token_payload.token_id,
-                &source_chain,
-                &destination_address,
-                amount.clone(),
-                send_token_payload.source_address.clone().unwrap(),
-                send_token_payload.data.clone().unwrap(),
-            );
-
-            self.executable_contract_execute_with_interchain_token(
-                destination_address,
-                source_chain,
-                send_token_payload.source_address.unwrap(),
-                send_token_payload.data.unwrap(),
-                send_token_payload.token_id.clone(),
-                token_identifier,
-                amount,
-                command_id,
-            );
-        } else {
+        if send_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN) {
             let amount = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -77,7 +45,38 @@ pub trait ExecutableModule:
                 destination_address,
                 amount,
             );
+
+            return;
         }
+
+        // Here we give the tokens to this contract and then call the executable contract with the tokens
+        let amount = self.token_manager_give_token(
+            &send_token_payload.token_id,
+            &self.blockchain().get_sc_address(),
+            &send_token_payload.amount,
+        );
+
+        let token_identifier = self.get_token_identifier(&send_token_payload.token_id);
+
+        self.emit_received_token_with_data_event(
+            &send_token_payload.token_id,
+            &source_chain,
+            &destination_address,
+            amount.clone(),
+            send_token_payload.source_address.clone().unwrap(),
+            send_token_payload.data.clone().unwrap(),
+        );
+
+        self.executable_contract_execute_with_interchain_token(
+            destination_address,
+            source_chain,
+            send_token_payload.source_address.unwrap(),
+            send_token_payload.data.unwrap(),
+            send_token_payload.token_id.clone(),
+            token_identifier,
+            amount,
+            command_id,
+        );
     }
 
     fn process_deploy_token_manager_payload(&self, payload: ManagedBuffer) {

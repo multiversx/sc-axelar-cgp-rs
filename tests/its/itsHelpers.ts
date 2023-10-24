@@ -2,7 +2,7 @@ import { assertAccount, e, SContract, SWallet } from 'xsuite';
 import {
   CHAIN_NAME,
   CHAIN_NAME_HASH,
-  MOCK_CONTRACT_ADDRESS_1,
+  MOCK_CONTRACT_ADDRESS_1, OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2
@@ -69,11 +69,11 @@ export const deployRemoteAddressValidator = async (deployer: SWallet) => {
       e.Str(OTHER_CHAIN_NAME),
 
       e.U32(1),
-      e.Str(OTHER_CHAIN_NAME)
+      e.Str(OTHER_CHAIN_ADDRESS)
     ]
   }));
 
-  const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_NAME.toLowerCase()).digest('hex');
+  const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS.toLowerCase()).digest('hex');
 
   const kvs = await remoteAddressValidator.getAccountWithKvs();
   assertAccount(kvs, {
@@ -82,7 +82,7 @@ export const deployRemoteAddressValidator = async (deployer: SWallet) => {
       e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
 
       e.kvs.Mapper('remote_address_hashes', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(otherChainAddressHash)),
-      e.kvs.Mapper('remote_addresses', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_NAME)),
+      e.kvs.Mapper('remote_addresses', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
     ],
   });
 }
