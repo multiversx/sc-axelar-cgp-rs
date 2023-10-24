@@ -11,7 +11,6 @@ export const MOCK_CONTRACT_ADDRESS_2: string = "erd1qqqqqqqqqqqqqpgq7ykazrzd905z
 export const ALICE_ADDR = 'erd1qyu5wthldzr8wx5c9ucg8kjagg0jfs53s8nr3zpz3hypefsdd8ssycr6th';
 export const BOB_ADDR = 'erd1spyavw0956vq68xj8y4tenjpq2wd5a9p2c6j8gsz7ztyrnpxrruqzu66jx';
 
-export const TOKEN_SYMBOL: string = "WEGLD";
 export const TOKEN_ID: string = "WEGLD-123456";
 export const TOKEN_ID_CANONICAL: string = "699fcfca47501d1619d08531652f17d000332fbf7bab5f00d7d5746089dc1f43";
 export const TOKEN_ID_MANAGER_ADDRESS: string = "erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02";
@@ -70,15 +69,4 @@ export const generateProof = (data: any): any => {
 }
 export const getCommandIdHash = (commandId: string = 'commandId') => {
   return createKeccakHash('keccak256').update(Buffer.from(commandId)).digest('hex');
-}
-
-export const computeStandardizedTokenId = (token = TOKEN_ID) => {
-  const prefixStandardized = createKeccakHash('keccak256').update('its-standardized-token-id').digest('hex');
-  const buffer = Buffer.concat([
-    Buffer.from(prefixStandardized, 'hex'),
-    Buffer.from(CHAIN_NAME_HASH, 'hex'),
-    Buffer.from(token),
-  ]);
-
-  return createKeccakHash('keccak256').update(buffer).digest('hex');
 }
