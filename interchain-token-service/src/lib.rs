@@ -4,7 +4,7 @@ use core::convert::TryFrom;
 use core::ops::Deref;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use multiversx_sc::codec::TopDecodeInput;
+use multiversx_sc::codec::{EncodeError, TopDecodeInput};
 
 use crate::constants::{
     Metadata, SendTokenPayload, TokenId,
@@ -315,21 +315,9 @@ pub trait InterchainTokenServiceContract:
         destination_address: ManagedBuffer,
         metadata: ManagedBuffer,
     ) {
-        let (token_identifier, amount) = self.get_required_payment(&token_id);
+        let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
         self.token_manager_take_token(&token_id, token_identifier, amount.clone());
-
-        // TODO: Check if this is correct and what this metadata actually is
-        let metadata = Metadata::<Self::Api>::top_decode(metadata);
-        let raw_metadata: Metadata<Self::Api>;
-        if metadata.is_err() {
-            raw_metadata = Metadata::<Self::Api> {
-                version: 0,
-                metadata: ManagedBuffer::new(),
-            };
-        } else {
-            raw_metadata = metadata.unwrap();
-        }
 
         self.transmit_send_token_raw(
             token_id,
@@ -337,7 +325,7 @@ pub trait InterchainTokenServiceContract:
             destination_chain,
             destination_address,
             amount,
-            raw_metadata,
+            metadata,
         );
     }
 
@@ -350,9 +338,18 @@ pub trait InterchainTokenServiceContract:
         destination_address: ManagedBuffer,
         data: ManagedBuffer,
     ) {
-        let (token_identifier, amount) = self.get_required_payment(&token_id);
+        let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
         self.token_manager_take_token(&token_id, token_identifier, amount.clone());
+
+        let mut raw_metadata = ManagedBuffer::new();
+
+        let result: Result<(), EncodeError> = Metadata {
+            version: 0,
+            metadata: data,
+        }.top_encode(&mut raw_metadata);
+
+        require!(result.is_ok(), "Failed to encode metadata");
 
         self.transmit_send_token_raw(
             token_id,
@@ -360,10 +357,7 @@ pub trait InterchainTokenServiceContract:
             destination_chain,
             destination_address,
             amount,
-            Metadata {
-                version: 0,
-                metadata: data,
-            },
+            raw_metadata,
         );
     }
 
@@ -382,25 +376,13 @@ pub trait InterchainTokenServiceContract:
         self.require_not_paused();
         self.only_token_manager(&token_id);
 
-        // TODO: Check if this is correct and what this metadata actually is
-        let metadata = Metadata::<Self::Api>::top_decode(metadata);
-        let raw_metadata: Metadata<Self::Api>;
-        if metadata.is_err() {
-            raw_metadata = Metadata::<Self::Api> {
-                version: 0,
-                metadata: ManagedBuffer::new(),
-            };
-        } else {
-            raw_metadata = metadata.unwrap();
-        }
-
         self.transmit_send_token_raw(
             token_id,
             source_address,
             destination_chain,
             destination_address,
             amount,
-            raw_metadata,
+            metadata,
         );
     }
 
@@ -527,10 +509,25 @@ pub trait InterchainTokenServiceContract:
         );
     }
 
-    fn decode_metadata(&self, raw_metadata: Metadata<Self::Api>) -> (u32, ManagedBuffer) {
+    fn decode_metadata(&self, raw_metadata: ManagedBuffer) -> (u32, ManagedBuffer, bool) {
+        // TODO: Check if this is correct and what this metadata actually is
+        let metadata = Metadata::<Self::Api>::top_decode(raw_metadata);
+        let raw_metadata: Metadata<Self::Api>;
+        let is_err;
+        if metadata.is_err() {
+            raw_metadata = Metadata::<Self::Api> {
+                version: 0,
+                metadata: ManagedBuffer::new(),
+            };
+            is_err = true;
+        } else {
+            raw_metadata = metadata.unwrap();
+            is_err = false;
+        }
+
         // TODO: This does some Assembly logic specific to sol, what should we actually do here?
         // Currently we use the MultiversX encoding/decoding and a custom struct for this
-        (raw_metadata.version, raw_metadata.metadata)
+        (raw_metadata.version, raw_metadata.metadata, is_err)
     }
 
     fn transmit_send_token_raw(
@@ -540,13 +537,15 @@ pub trait InterchainTokenServiceContract:
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         amount: BigUint,
-        raw_metadata: Metadata<Self::Api>,
+        raw_metadata: ManagedBuffer,
     ) {
         let mut payload = ManagedBuffer::new();
 
+        let (version, metadata, is_err) = self.decode_metadata(raw_metadata);
+
         // TODO: Not sure what this metadata contains exactly and how to decode it
         // This check was changed here because of different encoding/decoding
-        if raw_metadata.metadata.len() == 0 {
+        if is_err {
             // TODO: Change this to abi encoding
             let data = SendTokenPayload {
                 selector: BigUint::from(SELECTOR_RECEIVE_TOKEN),
@@ -567,7 +566,6 @@ pub trait InterchainTokenServiceContract:
             return;
         }
 
-        let (version, metadata) = self.decode_metadata(raw_metadata);
         require!(version == 0, "Invalid metadata version");
 
         // TODO: Change this to abi encoding
@@ -620,22 +618,6 @@ pub trait InterchainTokenServiceContract:
         self.express_receive_event(command_id, express_caller, payload);
 
         hash
-    }
-
-    fn get_required_payment(
-        &self,
-        token_id: &TokenId<Self::Api>,
-    ) -> (EgldOrEsdtTokenIdentifier, BigUint) {
-        let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
-
-        let required_token_identifier = self.get_token_identifier(token_id);
-
-        require!(
-            token_identifier == required_token_identifier,
-            "Wrong token sent"
-        );
-
-        (token_identifier, amount)
     }
 
     #[view]

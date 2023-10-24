@@ -544,6 +544,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         }
     }
 
+    // TODO: Check if this doesn't use too much gas and works properly
     #[callback]
     fn deploy_remote_token_callback(
         &self,
