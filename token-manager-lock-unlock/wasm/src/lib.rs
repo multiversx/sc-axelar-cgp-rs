@@ -10,7 +10,9 @@
 // Total number of exported functions:  17
 
 #![no_std]
-#![allow(internal_features)]
+
+// Configuration that works with rustc < 1.73.0.
+// TODO: Recommended rustc version: 1.73.0 or newer.
 #![feature(lang_items)]
 
 multiversx_sc_wasm_adapter::allocator!();
@@ -30,9 +32,9 @@ multiversx_sc_wasm_adapter::endpoints! {
         get_flow_out_amount => get_flow_out_amount
         get_flow_in_amount => get_flow_in_amount
         getFlowLimit => flow_limit
-        transfer_operatorship => transfer_operatorship
-        propose_operatorship => propose_operatorship
-        accept_operatorship => accept_operatorship
+        transferOperatorship => transfer_operatorship
+        proposeOperatorship => propose_operatorship
+        acceptOperatorship => accept_operatorship
         operator => operator
         proposed_operator => proposed_operator
     )

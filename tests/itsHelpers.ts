@@ -5,7 +5,7 @@ import {
   MOCK_CONTRACT_ADDRESS_1, OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
-  TOKEN_ID2
+  TOKEN_ID2, TOKEN_ID_CANONICAL
 } from './helpers';
 import createKeccakHash from "keccak";
 import { Buffer } from 'buffer';
@@ -87,16 +87,16 @@ export const deployRemoteAddressValidator = async (deployer: SWallet) => {
   });
 }
 
-export const deployTokenManagerMintBurn = async (deployer: SWallet, operator: SWallet | SContract = deployer) => {
-  const mockTokenId = createKeccakHash('keccak256').update('mockTokenId').digest('hex');
+export const deployTokenManagerMintBurn = async (deployer: SWallet, operator: SWallet | SContract = deployer, its: SWallet | SContract = operator, token: string | null = null) => {
+  const tokenId = computeStandardizedTokenId(token || TOKEN_ID);
 
   ({ contract: tokenManagerMintBurn, address } = await deployer.deployContract({
     code: "file:token-manager-mint-burn/output/token-manager-mint-burn.wasm",
     codeMetadata: ["upgradeable"],
     gasLimit: 100_000_000,
     codeArgs: [
-      operator, // its mock
-      e.Bytes(mockTokenId),
+      its, // its mock
+      e.Bytes(tokenId),
       operator, // operator mock
       e.Option(null),
     ]
@@ -106,8 +106,8 @@ export const deployTokenManagerMintBurn = async (deployer: SWallet, operator: SW
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(operator),
-      e.kvs.Mapper('token_id').Value(e.Bytes(mockTokenId)),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('token_id').Value(e.Bytes(tokenId)),
       e.kvs.Mapper('operator').Value(operator),
     ],
   });

@@ -4,14 +4,14 @@ multiversx_sc::imports!();
 
 #[multiversx_sc::module]
 pub trait Operatable {
-    #[endpoint]
+    #[endpoint(transferOperatorship)]
     fn transfer_operatorship(&self, operator: ManagedAddress) {
         self.only_operator();
 
         self.set_operator(operator);
     }
 
-    #[endpoint]
+    #[endpoint(proposeOperatorship)]
     fn propose_operatorship(&self, operator: ManagedAddress) {
         self.only_operator();
 
@@ -20,12 +20,13 @@ pub trait Operatable {
         self.proposed_operator().set(operator);
     }
 
-    #[endpoint]
+    #[endpoint(acceptOperatorship)]
     fn accept_operatorship(&self) {
         let caller = self.blockchain().get_caller();
 
         require!(
-            caller == self.proposed_operator().take(),
+            !self.proposed_operator().is_empty()
+                && caller == self.proposed_operator().take(),
             "Not proposed operator"
         );
 
