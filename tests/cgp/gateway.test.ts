@@ -7,7 +7,7 @@ import {
   MOCK_CONTRACT_ADDRESS_1,
   TOKEN_ID,
   TOKEN_ID2,
-} from './helpers';
+} from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;

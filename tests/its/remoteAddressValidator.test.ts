@@ -2,7 +2,7 @@ import { afterEach, assert, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import { CHAIN_NAME, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
-import { deployRemoteAddressValidator, remoteAddressValidator } from './itsHelpers';
+import { deployRemoteAddressValidator, remoteAddressValidator } from '../itsHelpers';
 
 let world: SWorld;
 let deployer: SWallet;

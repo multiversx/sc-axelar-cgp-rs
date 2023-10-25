@@ -6,7 +6,7 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2
-} from '../helpers';
+} from './helpers';
 import createKeccakHash from "keccak";
 import { Buffer } from 'buffer';
 
@@ -113,18 +113,18 @@ export const deployTokenManagerMintBurn = async (deployer: SWallet, operator: SW
   });
 }
 
-export const deployTokenManagerLockUnlock = async (deployer: SWallet) => {
-  const mockTokenId = createKeccakHash('keccak256').update('mockTokenId').digest('hex');
+export const deployTokenManagerLockUnlock = async (deployer: SWallet, token = 'MOCK', its: SWallet | SContract = deployer, operator: SWallet = deployer) => {
+  const tokenId = computeStandardizedTokenId(token);
 
   ({ contract: tokenManagerLockUnlock, address } = await deployer.deployContract({
     code: "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
     codeMetadata: ["upgradeable"],
     gasLimit: 100_000_000,
     codeArgs: [
-      deployer, // its mock
-      e.Bytes(mockTokenId),
-      deployer, // operator mock
-      e.Option(e.Str('MOCK-098765')),
+      its,
+      e.Bytes(tokenId),
+      operator,
+      e.Option(e.Str(token)),
     ]
   }));
 
@@ -132,10 +132,10 @@ export const deployTokenManagerLockUnlock = async (deployer: SWallet) => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(deployer),
-      e.kvs.Mapper('token_id').Value(e.Bytes(mockTokenId)),
-      e.kvs.Mapper('operator').Value(deployer),
-      e.kvs.Mapper('token_identifier').Value(e.Str('MOCK-098765')),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('token_id').Value(e.Bytes(tokenId)),
+      e.kvs.Mapper('operator').Value(operator),
+      e.kvs.Mapper('token_identifier').Value(e.Str(token)),
     ],
   });
 }

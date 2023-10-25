@@ -21,7 +21,7 @@ import {
   remoteAddressValidator,
   tokenManagerLockUnlock,
   tokenManagerMintBurn
-} from './itsHelpers';
+} from '../itsHelpers';
 
 let world: SWorld;
 let deployer: SWallet;

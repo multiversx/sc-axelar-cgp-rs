@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
-import { ALICE_ADDR, BOB_ADDR, getOperatorsHash, MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2 } from './helpers';
+import { ALICE_ADDR, BOB_ADDR, getOperatorsHash, MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2 } from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;

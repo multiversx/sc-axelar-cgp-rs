@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SContract, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
-import { CHAIN_NAME_HASH, TOKEN_ID, TOKEN_ID2, TOKEN_ID_CANONICAL, TOKEN_ID_MANAGER_ADDRESS } from './helpers';
+import { CHAIN_NAME_HASH, TOKEN_ID, TOKEN_ID2, TOKEN_ID_CANONICAL, TOKEN_ID_MANAGER_ADDRESS } from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;

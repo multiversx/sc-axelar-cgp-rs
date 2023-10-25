@@ -11,7 +11,7 @@ import {
   getOperatorsHash,
   MOCK_CONTRACT_ADDRESS_2,
   TOKEN_ID
-} from './helpers';
+} from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;

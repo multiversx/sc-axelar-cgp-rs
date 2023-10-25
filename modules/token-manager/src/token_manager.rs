@@ -53,6 +53,8 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit + operatable:
     ) -> BigUint {
         let amount = self.require_correct_token();
 
+        self.add_flow_out(&amount);
+
         let sender = self.blockchain().get_caller();
 
         self.interchain_token_service_transmit_send_token(
@@ -64,8 +66,6 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit + operatable:
             metadata,
         );
 
-        self.add_flow_out(&amount);
-
         amount
     }
 
@@ -76,6 +76,8 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit + operatable:
         data: ManagedBuffer,
     ) -> BigUint {
         let amount = self.require_correct_token();
+
+        self.add_flow_out(&amount);
 
         let sender = self.blockchain().get_caller();
 
@@ -96,8 +98,6 @@ pub trait TokenManager: proxy::ProxyModule + flow_limit::FlowLimit + operatable:
             &amount,
             payload,
         );
-
-        self.add_flow_out(&amount);
 
         amount
     }
