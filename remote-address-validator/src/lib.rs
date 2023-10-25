@@ -5,49 +5,21 @@ multiversx_sc::imports!();
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use core::ops::Deref;
 
-#[macro_export]
-macro_rules! sc_panic_self {
-    ($api: ty, $msg:tt, $($arg:expr),+ $(,)?) => {{
-        let mut ___buffer___ =
-            multiversx_sc::types::ManagedBufferCachedBuilder::<$api>::new_from_slice(&[]);
-        multiversx_sc::derive::format_receiver_args!(___buffer___, $msg, $($arg),+);
-        multiversx_sc::contract_base::ErrorHelper::<$api>::signal_error_with_message(___buffer___.into_managed_buffer());
-    }};
-    ($api: ty, $msg:expr $(,)?) => {
-        multiversx_sc::contract_base::ErrorHelper::<$api>::signal_error_with_message($msg)
-    };
+pub trait ManagedBufferLowercase<M: ManagedTypeApi> {
+    fn lowercase(&self) -> ManagedBuffer<M>;
 }
 
-pub trait ManagedBufferUtils<M: ManagedTypeApi> {
-    fn load_512_bytes(&self) -> [u8; 512];
+impl<M: ManagedTypeApi> ManagedBufferLowercase<M> for ManagedBuffer<M> {
+    fn lowercase(&self) -> ManagedBuffer<M> {
+        let mut output = ManagedBuffer::<M>::new();
 
-    fn lower_case(&self) -> ManagedBuffer<M>;
-}
+        self.for_each_batch::<32, _>(|batch| {
+            for byte in batch {
+                output.append_bytes(&[byte.to_ascii_lowercase()]);
+            }
+        });
 
-impl<M: ManagedTypeApi> ManagedBufferUtils<M> for ManagedBuffer<M> {
-    fn load_512_bytes(&self) -> [u8; 512] {
-        if (self.len() as usize) > 512 {
-            sc_panic_self!(M, "ManagedBuffer is too big");
-        }
-
-        let mut bytes: [u8; 512] = [0; 512];
-
-        self.load_to_byte_array(&mut bytes);
-
-        return bytes;
-    }
-
-    // TODO: Check for a better way to do this
-    fn lower_case(&self) -> ManagedBuffer<M> {
-        let bytes = self.load_512_bytes();
-
-        let mut o = ManagedBuffer::<M>::new();
-
-        for i in 0..self.len() {
-            o.append_bytes(&[bytes[i].to_ascii_lowercase()]);
-        }
-
-        return o;
+        output
     }
 }
 
@@ -83,7 +55,7 @@ pub trait RemoteAddressValidatorContract {
         );
 
         self.remote_address_hashes(source_chain)
-            .set(self.crypto().keccak256(source_address.lower_case()));
+            .set(self.crypto().keccak256(source_address.lowercase()));
         self.remote_addresses(&source_chain).set(source_address.clone());
 
         self.trusted_address_added_event(source_chain, source_address);
@@ -106,8 +78,12 @@ pub trait RemoteAddressValidatorContract {
 
     #[view(validateSender)]
     fn validate_sender(&self, source_chain: &ManagedBuffer, source_address: ManagedBuffer) -> bool {
-        let source_address_normalized = source_address.lower_case();
+        let source_address_normalized = source_address.lowercase();
         let source_address_hash = self.crypto().keccak256(source_address_normalized);
+
+        if self.remote_address_hashes(source_chain).is_empty() {
+            return false;
+        }
 
         return source_address_hash == self.remote_address_hashes(source_chain).get();
     }
