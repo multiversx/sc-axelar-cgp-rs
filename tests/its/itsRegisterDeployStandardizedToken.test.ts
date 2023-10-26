@@ -86,7 +86,7 @@ test.skip("Deploy and register standardized token", async () => {
   await user.callContract({
     callee: its,
     funcName: "deployAndRegisterStandardizedToken",
-    gasLimit: 500_000_000,
+    gasLimit: 600_000_000,
     value: BigInt('5000000000000000'),
     funcArgs: [
       e.Str('SALT'),

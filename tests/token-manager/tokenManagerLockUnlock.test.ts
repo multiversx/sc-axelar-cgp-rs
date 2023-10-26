@@ -587,7 +587,7 @@ test("Take token", async () => {
     esdts: [{ id: TOKEN_ID, amount: 1_000 }]
   });
 
-  // Tokens were sent from contract to otherUser
+  // Tokens remain in contract
   const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
@@ -623,7 +623,7 @@ test("Take token flow limit", async () => {
     esdts: [{ id: TOKEN_ID, amount: 500 }]
   });
 
-  // Tokens were sent from contract to otherUser
+  // Tokens remain in contract
   let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,

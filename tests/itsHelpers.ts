@@ -87,7 +87,7 @@ export const deployRemoteAddressValidator = async (deployer: SWallet) => {
   });
 }
 
-export const deployTokenManagerMintBurn = async (deployer: SWallet, operator: SWallet | SContract = deployer, its: SWallet | SContract = operator, token: string | null = null) => {
+export const deployTokenManagerMintBurn = async (deployer: SWallet, operator: SWallet | SContract = deployer, its: SWallet | SContract = operator, token: string | null = null, burnRole: boolean = true) => {
   const tokenId = computeStandardizedTokenId(token || TOKEN_ID);
 
   ({ contract: tokenManagerMintBurn, address } = await deployer.deployContract({
@@ -95,10 +95,10 @@ export const deployTokenManagerMintBurn = async (deployer: SWallet, operator: SW
     codeMetadata: ["upgradeable"],
     gasLimit: 100_000_000,
     codeArgs: [
-      its, // its mock
+      its,
       e.Bytes(tokenId),
-      operator, // operator mock
-      e.Option(null),
+      operator,
+      e.Option(token ? e.Str(token) : null),
     ]
   }));
 
@@ -109,8 +109,26 @@ export const deployTokenManagerMintBurn = async (deployer: SWallet, operator: SW
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('token_id').Value(e.Bytes(tokenId)),
       e.kvs.Mapper('operator').Value(operator),
+
+      ...(token ? [e.kvs.Mapper('token_identifier').Value(e.Str(token))] : []),
     ],
   });
+
+  // Set mint/burn roles if token is set
+  if (token && burnRole) {
+    await tokenManagerMintBurn.setAccount({
+      ...(await tokenManagerMintBurn.getAccount()),
+      balance: 0n,
+      kvs: [
+        e.kvs.Mapper('interchain_token_service').Value(its),
+        e.kvs.Mapper('token_id').Value(e.Bytes(tokenId)),
+        e.kvs.Mapper('operator').Value(operator),
+        e.kvs.Mapper('token_identifier').Value(e.Str(token)),
+
+        e.kvs.Esdts([{ id: token, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint' ]}]),
+      ],
+    });
+  }
 }
 
 export const deployTokenManagerLockUnlock = async (deployer: SWallet, token = 'MOCK', its: SWallet | SContract = deployer, operator: SWallet = deployer) => {
