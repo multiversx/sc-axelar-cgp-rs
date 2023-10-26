@@ -2,6 +2,10 @@
   "code": "file:gateway/output/gateway.wasm",
   "codeAuth": "file:auth/output/auth.wasm",
   "codeGasReceiver": "file:gas-service/output/gas-service.wasm",
+  "codeRemoteAddressValidator": "file:remote-address-validator/output/remote-address-validator.wasm",
+  "codeTokenManagerMintBurn": "file:token-manager-mint-burn/output/token-manager-mint-burn.wasm",
+  "codeTokenManagerLockUnlock": "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
+  "codeIts": "file:interchain-token-service/output/interchain-token-service.wasm",
   "address": {
     "devnet": "erd1qqqqqqqqqqqqqpgqsvzyz88e8v8j6x3wquatxuztnxjwnw92kkls6rdtzx",
     "testnet": "",
@@ -14,6 +18,26 @@
   },
   "addressGasService": {
     "devnet": "erd1qqqqqqqqqqqqqpgqzp2whhz9rqvy9zjgfv8z2twz6xd7rnwqkklsng70lg",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressRemoteAddressValidator": {
+    "devnet": "erd1qqqqqqqqqqqqqpgq6c6z80p5macv0vy3yleyf62g6c7fs9kdkkls3j8p3a",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressTokenManagerMintBurn": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqmn2s0gp68qhkrw6yjzvsdh60kdc08mylkklszqrymh",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressTokenManagerLockUnlock": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqhwzjgzdkvyfpgwwef3fxv96xpgzfpgj6kklsk36yjf",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressIts": {
+    "devnet": "erd1qqqqqqqqqqqqqpgq3x02c63t322u8nr6va5we9h62axydgrrkklsj6djxa",
     "testnet": "",
     "mainnet": ""
   }

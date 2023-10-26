@@ -5,15 +5,9 @@ import { World } from 'xsuite/world';
 import data from './data.json';
 import { e } from 'xsuite/data';
 import createKeccakHash from 'keccak';
-import {
-    ALICE_ADDR,
-    BOB_ADDR,
-    generateProof,
-    generateSignature,
-    getOperatorsHash,
-    MOCK_CONTRACT_ADDRESS_2
-} from '../tests/helpers';
+import { ALICE_ADDR, BOB_ADDR, generateProof, generateSignature, MOCK_CONTRACT_ADDRESS_2 } from '../tests/helpers';
 import { executeGateway } from './generateProofRaw';
+import { setupITSCommands } from './its';
 
 const world = World.new({
     proxyUrl: envChain.publicProxyUrl(),
@@ -23,7 +17,9 @@ const world = World.new({
 
 export const loadWallet = () => world.newWalletFromFile('wallet.json');
 
-const program = new Command();
+export const program = new Command();
+
+setupITSCommands(program);
 
 program.command('deploy').action(async () => {
     const wallet = await loadWallet();
