@@ -33,7 +33,7 @@ beforeEach(async () => {
     balance: 10_000_000_000n,
   });
   user = await world.createWallet({
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -143,7 +143,7 @@ test("Interchain transfer", async () => {
 
   const userKvs = await user.getAccountWithKvs();
   assertAccount(userKvs, {
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -192,7 +192,7 @@ test("Interchain transfer with data", async () => {
 
   const userKvs = await user.getAccountWithKvs();
   assertAccount(userKvs, {
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -344,7 +344,7 @@ test("Call contract with interchain token", async () => {
 
   const userKvs = await user.getAccountWithKvs();
   assertAccount(userKvs, {
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -659,7 +659,7 @@ test("Take token", async () => {
 
   const userKvs = await user.getAccountWithKvs();
   assertAccount(userKvs, {
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -756,7 +756,7 @@ test("Take token flow limit", async () => {
 
   const userKvs = await user.getAccountWithKvs();
   assertAccount(userKvs, {
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -826,7 +826,7 @@ test("Deploy standardized token", async () => {
     callee: tokenManagerMintBurn,
     funcName: "deployStandardizedToken",
     gasLimit: 200_000_000,
-    value: BigInt('5000000000000000'),
+    value: BigInt('50000000000000000'),
     funcArgs: [
       user,
       e.Str('Token Name'),

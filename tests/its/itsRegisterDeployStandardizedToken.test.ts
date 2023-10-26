@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
-import { CHAIN_NAME_HASH, TOKEN_ID, TOKEN_ID2 } from '../helpers';
+import { CHAIN_NAME_HASH, TOKEN_ID, TOKEN_ID2, TOKEN_ID_MANAGER_ADDRESS } from '../helpers';
 import {
+  computeCustomTokenId,
   deployContracts,
   deployTokenManagerMintBurn,
   gasService,
@@ -41,7 +42,7 @@ beforeEach(async () => {
     ]
   });
   user = await world.createWallet({
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -63,15 +64,27 @@ afterEach(async () => {
   await world.terminate();
 });
 
-// TODO: Check why an error Tx failed: 10 - failed transfer (insufficient funds) is raised here
-// It might be because issuing ESDT tokens doesn't work for the underlying simulnet
-// Everything seems fine until the call to `issue_and_set_all_roles` in the token-manager-mint-burn happens
-test.skip("Deploy and register standardized token", async () => {
+test("Deploy and register standardized token only deploy token manager", async () => {
   await user.callContract({
     callee: its,
     funcName: "deployAndRegisterStandardizedToken",
-    gasLimit: 600_000_000,
-    value: BigInt('5000000000000000'),
+    gasLimit: 100_000_000,
+    value: BigInt('50000000000000000'),
+    funcArgs: [
+      e.Str('SALT'),
+      e.Str('Token Name'),
+      e.Str('TOKEN-SYMBOL'),
+      e.U8(18),
+      e.U(1_000_000),
+      user,
+    ],
+  }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
+
+  await user.callContract({
+    callee: its,
+    funcName: "deployAndRegisterStandardizedToken",
+    gasLimit: 100_000_000,
+    value: 0,
     funcArgs: [
       e.Str('SALT'),
       e.Str('Token Name'),
@@ -81,12 +94,30 @@ test.skip("Deploy and register standardized token", async () => {
       user,
     ],
   });
+
+  const customTokenId = computeCustomTokenId(user, 'SALT');
+
+  const kvs = await its.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('gateway').Value(gateway),
+      e.kvs.Mapper('gas_service').Value(gasService),
+      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
+      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+
+      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(customTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+    ],
+  });
 });
 
 test("Deploy and register standardized token only issue esdt", async () => {
   await deployTokenManagerMintBurn(deployer, its);
 
-  const customTokenId = 'd6e2313ee1ab6b70e952156eb974c0ffc2dd3b2ac214d289e57429f0d1c6080b';
+  const customTokenId = computeCustomTokenId(user, 'SALT');
 
   // Mock token manager already deployed as not being canonical so contract deployment is not tried again
   await its.setAccount({
@@ -107,8 +138,8 @@ test("Deploy and register standardized token only issue esdt", async () => {
   await user.callContract({
     callee: its,
     funcName: "deployAndRegisterStandardizedToken",
-    gasLimit: 600_000_000,
-    value: BigInt('5000000000000000'),
+    gasLimit: 300_000_000,
+    value: BigInt('50000000000000000'),
     funcArgs: [
       e.Str('SALT'),
       e.Str('Token Name'),

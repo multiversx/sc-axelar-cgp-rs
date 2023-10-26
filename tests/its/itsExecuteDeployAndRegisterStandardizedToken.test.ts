@@ -53,7 +53,7 @@ beforeEach(async () => {
     ]
   });
   user = await world.createWallet({
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -125,7 +125,7 @@ test.skip("Execute deploy and register standardized token", async () => {
     callee: its,
     funcName: "execute",
     gasLimit: 600_000_000,
-    value: BigInt('5000000000000000'),
+    value: BigInt('50000000000000000'),
     funcArgs: [
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
@@ -186,7 +186,7 @@ test("Execute deploy and register standardized token only issue esdt", async () 
     callee: its,
     funcName: "execute",
     gasLimit: 600_000_000,
-    value: BigInt('5000000000000000'),
+    value: BigInt('50000000000000000'),
     funcArgs: [
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),

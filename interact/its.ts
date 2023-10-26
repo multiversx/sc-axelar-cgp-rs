@@ -118,6 +118,24 @@ export const setupITSCommands = (program: Command) => {
     console.log('Result:', result);
   });
 
+  program.command('upgradeTokenManagerMintBurn').action(async () => {
+    const wallet = await loadWallet();
+
+    const result = await wallet.upgradeContract({
+      callee: envChain.select(data.addressTokenManagerMintBurn),
+      code: data.codeTokenManagerMintBurn,
+      codeMetadata: ["upgradeable"],
+      gasLimit: 100_000_000,
+      codeArgs: [
+        wallet,
+        e.Bytes('699fcfca47501d1619d08531652f17d000332fbf7bab5f00d7d5746089dc1f43'),
+        wallet,
+        e.Option(null),
+      ]
+    });
+    console.log('Result:', result);
+  });
+
   program.command('itsRegisterCanonicalToken')
     .argument('tokenIdentifier')
     .action(async (tokenIdentifier) => {
@@ -134,7 +152,7 @@ export const setupITSCommands = (program: Command) => {
 
       const tokenId = Buffer.from(d.Bytes(32).topDecode(result.returnData[0])).toString('hex');
 
-      console.log(`Registered canonical token: ${tokenIdentifier} with id ${tokenId}`);
+      console.log(`Registered canonical token: ${ tokenIdentifier } with id ${ tokenId }`);
     });
 
   program.command('itsDeployRemoteCanonicalToken')
@@ -151,6 +169,51 @@ export const setupITSCommands = (program: Command) => {
           e.Bytes(tokenId),
           e.Str(otherChainName),
         ],
+      });
+
+      console.log(`Result`, result);
+    });
+
+  program.command('itsDeployAndRegisterStandardizedToken').action(async () => {
+    const wallet = await loadWallet();
+
+    const result = await wallet.callContract({
+      callee: envChain.select(data.addressIts),
+      funcName: "deployAndRegisterStandardizedToken",
+      gasLimit: 300_000_000,
+      value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost
+      funcArgs: [
+        e.Str('SALT'),
+        e.Str('ITSToken'),
+        e.Str('ITST'),
+        e.U8(6),
+        e.U(1_000_000),
+        wallet,
+      ],
+    });
+
+    console.log(`Result`, result);
+  });
+
+  program.command('itsInterchainTransfer')
+    .argument('tokenId')
+    .argument('tokenIdentifier')
+    .argument('amount')
+    .action(async (tokenId, tokenIdentifier, amount) => {
+      const wallet = await loadWallet();
+
+      const result = await wallet.callContract({
+        callee: envChain.select(data.addressIts),
+        funcName: "interchainTransfer",
+        gasLimit: 20_000_000,
+        value: tokenIdentifier === 'EGLD' ? BigInt(amount) : 0,
+        funcArgs: [
+          e.Bytes(tokenId),
+          e.Str(otherChainName),
+          e.Str(otherChainAddress),
+          e.Buffer(''), // No metadata, uses default
+        ],
+        esdts: (tokenIdentifier !== 'EGLD' ? [{ id: tokenIdentifier, amount: BigInt(amount) }] : [])
       });
 
       console.log(`Result`, result);

@@ -457,7 +457,6 @@ test("Interchain transfer", async () => {
     callee: its,
     funcName: "interchainTransfer",
     gasLimit: 20_000_000,
-    value: 1_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
       e.Str(OTHER_CHAIN_NAME),

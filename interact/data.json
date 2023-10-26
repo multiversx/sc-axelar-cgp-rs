@@ -50,6 +50,10 @@
       "ASH-4ce444": {
         "tokenId": "22a0fb6f62885ecedd2af9617c755536dd8732bf0b639c5afb6107b99834ce7c",
         "tokenManager": "erd1qqqqqqqqqqqqqpgqjsw3wxrrhkkpg87w67vfem7sraatx6wlkklsjw88pq"
+      },
+      "ITST-639729": {
+        "tokenId": "025122eee38523627bcd58de9f5d481ac0c03cd299992e05e963da330cea7c8a",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgq68vzueu22erq5rkrll50c3kmjegs8vmqkklsvln28w"
       }
     },
     "testnet": {},

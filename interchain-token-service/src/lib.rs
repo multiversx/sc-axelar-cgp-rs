@@ -7,10 +7,9 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use multiversx_sc::codec::{EncodeError, TopDecodeInput};
 
 use crate::constants::{
-    Metadata, SendTokenPayload, TokenId,
-    TokenManagerType, PREFIX_CUSTOM_TOKEN_ID, PREFIX_STANDARDIZED_TOKEN_ID,
-    SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN, SELECTOR_DEPLOY_TOKEN_MANAGER,
-    SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA,
+    Metadata, SendTokenPayload, TokenId, TokenManagerType, PREFIX_CUSTOM_TOKEN_ID,
+    PREFIX_STANDARDIZED_TOKEN_ID, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
+    SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA,
 };
 use crate::proxy::gateway_proxy::ProxyTrait as GatewayProxyTrait;
 use crate::proxy::CallbackProxy;
@@ -129,7 +128,7 @@ pub trait InterchainTokenServiceContract:
                 token_identifier,
                 destination_chain,
                 gas_value,
-                self.blockchain().get_caller()
+                self.blockchain().get_caller(),
             ),
         );
     }
@@ -215,15 +214,24 @@ pub trait InterchainTokenServiceContract:
 
         let token_id = self.get_custom_token_id(&sender, &salt);
 
-        // Allow retry of deploying standardized token through the token manager
+        // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
+        // This is because we can not deploy token manager and call it to deploy the token in the same transaction
+        // TODO: Check if it is fine like this
         let token_manager_address_mapper = self.token_manager_address(&token_id);
         if token_manager_address_mapper.is_empty() {
+            require!(
+                self.call_value().egld_value().deref() == &BigUint::zero(),
+                "Can not send EGLD payment if not issuing ESDT"
+            );
+
             self.deploy_token_manager(
                 &token_id,
                 TokenManagerType::MintBurn,
                 self.blockchain().get_caller(),
                 None,
             );
+
+            return;
         }
 
         self.token_manager_deploy_standardized_token(
@@ -367,7 +375,8 @@ pub trait InterchainTokenServiceContract:
         let result: Result<(), EncodeError> = Metadata {
             version: 0,
             metadata: data,
-        }.top_encode(&mut raw_metadata);
+        }
+        .top_encode(&mut raw_metadata);
 
         require!(result.is_ok(), "Failed to encode metadata");
 

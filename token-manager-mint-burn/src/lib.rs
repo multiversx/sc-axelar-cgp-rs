@@ -5,7 +5,7 @@ multiversx_sc::imports!();
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 // If this needs updating, the TokenManagerMintBurn contract from which deployments are made can be upgraded
-const DEFAULT_ESDT_ISSUE_COST: u64 = 5000000000000000;
+const DEFAULT_ESDT_ISSUE_COST: u64 = 50000000000000000; // 0.05 EGLD
 
 #[multiversx_sc::contract]
 pub trait TokenManagerMintBurnContract:
@@ -165,6 +165,7 @@ pub trait TokenManagerMintBurnContract:
                 self.standardized_token_deployment_failed_event();
 
                 // Leave issue cost egld payment in contract for use when retrying deployStandardizedToken
+                // TODO: Check if it is fine like this
             }
         }
     }
