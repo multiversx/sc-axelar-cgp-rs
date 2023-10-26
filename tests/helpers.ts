@@ -16,8 +16,9 @@ export const TOKEN_ID_CANONICAL: string = "699fcfca47501d1619d08531652f17d000332
 export const TOKEN_ID_MANAGER_ADDRESS: string = "erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02";
 
 export const TOKEN_ID2: string = "OTHER-654321";
-export const TOKEN_ID2_CUSTOM: string = "1b5920d64a5c1797d482e549b4c39541f8bfe18c4d3b8c8979339f54115c200f";
 export const TOKEN_ID2_MANAGER_ADDRESS: string = "erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02";
+
+export const TOKEN_ID2_MOCK: string = "1b5920d64a5c1797d482e549b4c39541f8bfe18c4d3b8c8979339f54115c20ff";
 
 export const CHAIN_NAME: string = 'MultiversX';
 export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');

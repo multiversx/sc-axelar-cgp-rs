@@ -40,5 +40,19 @@
     "devnet": "erd1qqqqqqqqqqqqqpgq3x02c63t322u8nr6va5we9h62axydgrrkklsj6djxa",
     "testnet": "",
     "mainnet": ""
+  },
+  "knownTokens": {
+    "devnet": {
+      "EGLD": {
+        "tokenId": "ce8c950fb8dd7e684c483d9948240b8e8c02b1df5130e91de33e83ae0a9a8623",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqrj2ttna5536myxy8r2njulvjjx4wgyqykklsuzan8m"
+      },
+      "ASH-4ce444": {
+        "tokenId": "22a0fb6f62885ecedd2af9617c755536dd8732bf0b639c5afb6107b99834ce7c",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqjsw3wxrrhkkpg87w67vfem7sraatx6wlkklsjw88pq"
+      }
+    },
+    "testnet": {},
+    "mainnet": {}
   }
 }

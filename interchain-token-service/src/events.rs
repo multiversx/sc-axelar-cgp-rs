@@ -4,6 +4,13 @@ multiversx_sc::derive_imports!();
 use crate::constants::{TokenId, TokenManagerType};
 
 #[derive(TypeAbi, TopEncode)]
+pub struct TokenManagerDeployedEventData<M: ManagedTypeApi> {
+    token_manager_type: TokenManagerType,
+    contract_address: ManagedAddress<M>,
+    arguments: ManagedArgBuffer<M>,
+}
+
+#[derive(TypeAbi, TopEncode)]
 pub struct RemoteStandardizedTokenAndManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
     name: ManagedBuffer<M>,
     symbol: ManagedBuffer<M>,
@@ -58,6 +65,23 @@ pub struct TokenReceivedWithDataEventData<M: ManagedTypeApi> {
 
 #[multiversx_sc::module]
 pub trait EventsModule {
+    fn emit_token_manager_deployed_event(
+        &self,
+        token_id: &TokenId<Self::Api>,
+        token_manager_type: TokenManagerType,
+        contract_address: ManagedAddress,
+        arguments: ManagedArgBuffer<Self::Api>,
+    ) {
+        self.token_manager_deployed_event(
+            token_id,
+            TokenManagerDeployedEventData {
+                token_manager_type,
+                contract_address,
+                arguments,
+            },
+        );
+    }
+
     fn emit_remote_standardized_token_and_manager_deployment_initialized_event(
         &self,
         token_id: TokenId<Self::Api>,
@@ -183,8 +207,7 @@ pub trait EventsModule {
     fn token_manager_deployed_event(
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
-        #[indexed] token_manager_type: TokenManagerType,
-        data: ManagedArgBuffer<Self::Api>,
+        data: TokenManagerDeployedEventData<Self::Api>,
     );
 
     #[event("remote_standardized_token_and_manager_deployment_initialized_event")]

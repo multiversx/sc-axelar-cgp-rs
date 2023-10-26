@@ -6,8 +6,8 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID2_CUSTOM,
   TOKEN_ID2_MANAGER_ADDRESS,
+  TOKEN_ID2_MOCK,
   TOKEN_ID_CANONICAL,
   TOKEN_ID_MANAGER_ADDRESS
 } from '../helpers';
@@ -15,7 +15,6 @@ import {
   computeCustomTokenId,
   computeStandardizedTokenId,
   deployContracts,
-  deployTokenManagerMintBurn,
   gasService,
   gateway,
   its,
@@ -174,7 +173,7 @@ test("Deploy remote canonical token", async () => {
   await user.callContract({
     callee: its,
     funcName: "deployRemoteCanonicalToken",
-    gasLimit: 50_000_000,
+    gasLimit: 150_000_000,
     value: 100_000_000n,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -196,17 +195,68 @@ test("Deploy remote canonical token", async () => {
 
       e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
 
-      // TODO: Check how to actually test the async call to the ESDT system contract here
+      // This seems to work fine on devnet
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
         e.Str('deploy_remote_token_callback'),
-        e.Bytes('0000000400000020'),
+        e.Bytes('0000000500000020'),
         e.Bytes(TOKEN_ID_CANONICAL),
         e.Str(TOKEN_ID),
         e.Str(OTHER_CHAIN_NAME),
         e.U(100_000_000n),
+        e.Buffer(user.toTopBytes()),
       )),
     ],
   });
+});
+
+test("Deploy remote canonical token EGLD", async () => {
+  // Register canonical token first
+  const result = await user.callContract({
+    callee: its,
+    funcName: "registerCanonicalToken",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str('EGLD')
+    ],
+  });
+
+  await user.callContract({
+    callee: its,
+    funcName: "deployRemoteCanonicalToken",
+    gasLimit: 150_000_000,
+    value: 100_000_000n,
+    funcArgs: [
+      e.Bytes(result.returnData[0]),
+      e.Str(OTHER_CHAIN_NAME),
+    ],
+  });
+
+  const kvs = await its.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0,
+    kvs: [
+      e.kvs.Mapper('gateway').Value(gateway),
+      e.kvs.Mapper('gas_service').Value(gasService),
+      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
+      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+
+      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(result.returnData[0])).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+    ],
+  });
+
+  // Assert gas was paid for cross chain call
+  const gasServiceKvs = await gasService.getAccountWithKvs();
+  assertAccount(gasServiceKvs, {
+    balance: 100_000_000n,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+    ],
+  });
+
+  // There are events emitted for the Gateway contract, but there is no way to test those currently...
 });
 
 test("Deploy remote canonical token errors", async () => {
@@ -378,7 +428,7 @@ test("Deploy remote custom token manager", async () => {
     ],
   });
 
-  assert(result.returnData[0] === TOKEN_ID2_CUSTOM);
+  assert(result.returnData[0] === computeCustomTokenId(user));
 
   // Nothing changes for its keys
   let kvs = await its.getAccountWithKvs();
@@ -647,7 +697,7 @@ test("Set flow limit errors", async () => {
     funcArgs: [
       e.U32(2),
       e.Bytes(TOKEN_ID_CANONICAL),
-      e.Bytes(TOKEN_ID2_CUSTOM),
+      e.Bytes(TOKEN_ID2_MOCK),
 
       e.U32(2),
       e.U(99),

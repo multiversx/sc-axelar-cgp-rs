@@ -1,10 +1,12 @@
-import { e } from 'xsuite/data';
+import { d, e } from 'xsuite/data';
 // @ts-ignore
 import data from './data.json';
 import { loadWallet } from './index';
 import { Command } from 'commander';
 import { Wallet } from 'xsuite';
 import { envChain } from 'xsuite/interact';
+import { its } from '../tests/itsHelpers';
+import { TOKEN_ID } from '../tests/helpers';
 
 const chainName = 'multiversx-devnet';
 const otherChainName = 'ethereum-2';
@@ -96,4 +98,61 @@ export const setupITSCommands = (program: Command) => {
     console.log('Deployed Token Manager Lock Unlock Contract:', resultTokenManagerLockUnlock.address);
     console.log('Deployed Interchain Token Service Contract:', resultIts.address);
   });
+
+  program.command('upgradeIts').action(async () => {
+    const wallet = await loadWallet();
+
+    const result = await wallet.upgradeContract({
+      callee: envChain.select(data.addressIts),
+      code: data.codeIts,
+      codeMetadata: ["upgradeable"],
+      gasLimit: 300_000_000,
+      codeArgs: [
+        e.Addr(envChain.select(data.address)),
+        e.Addr(envChain.select(data.addressGasService)),
+        e.Addr(envChain.select(data.addressRemoteAddressValidator)),
+        e.Addr(envChain.select(data.addressTokenManagerMintBurn)),
+        e.Addr(envChain.select(data.addressTokenManagerLockUnlock)),
+      ]
+    });
+    console.log('Result:', result);
+  });
+
+  program.command('itsRegisterCanonicalToken')
+    .argument('tokenIdentifier')
+    .action(async (tokenIdentifier) => {
+      const wallet = await loadWallet();
+
+      const result = await wallet.callContract({
+        callee: envChain.select(data.addressIts),
+        funcName: "registerCanonicalToken",
+        gasLimit: 20_000_000,
+        funcArgs: [
+          e.Str(tokenIdentifier)
+        ],
+      });
+
+      const tokenId = Buffer.from(d.Bytes(32).topDecode(result.returnData[0])).toString('hex');
+
+      console.log(`Registered canonical token: ${tokenIdentifier} with id ${tokenId}`);
+    });
+
+  program.command('itsDeployRemoteCanonicalToken')
+    .argument('tokenId')
+    .action(async (tokenId) => {
+      const wallet = await loadWallet();
+
+      const result = await wallet.callContract({
+        callee: envChain.select(data.addressIts),
+        funcName: "deployRemoteCanonicalToken",
+        gasLimit: 150_000_000,
+        value: BigInt('10000000000000000'), // 0.01 EGLD, to pay for cross chain gas
+        funcArgs: [
+          e.Bytes(tokenId),
+          e.Str(otherChainName),
+        ],
+      });
+
+      console.log(`Result`, result);
+    });
 }

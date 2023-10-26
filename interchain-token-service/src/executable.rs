@@ -180,7 +180,7 @@ pub trait ExecutableModule:
 
         require!(!address.is_zero(), "Token manager deployment failed");
 
-        self.token_manager_deployed_event(token_id, token_manager_type, arguments);
+        self.emit_token_manager_deployed_event(token_id, token_manager_type, address.clone(), arguments);
 
         token_manager_address_mapper.set(address.clone());
 

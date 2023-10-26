@@ -1,19 +1,7 @@
-import { afterEach, assert, beforeEach, test } from "vitest";
+import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
+import { CHAIN_NAME_HASH, TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
-  CHAIN_NAME_HASH,
-  OTHER_CHAIN_ADDRESS,
-  OTHER_CHAIN_NAME,
-  TOKEN_ID,
-  TOKEN_ID2,
-  TOKEN_ID2_CUSTOM,
-  TOKEN_ID2_MANAGER_ADDRESS,
-  TOKEN_ID_CANONICAL,
-  TOKEN_ID_MANAGER_ADDRESS
-} from '../helpers';
-import {
-  computeCustomTokenId,
-  computeStandardizedTokenId,
   deployContracts,
   deployTokenManagerMintBurn,
   gasService,
@@ -28,7 +16,6 @@ let world: SWorld;
 let deployer: SWallet;
 let collector: SWallet;
 let user: SWallet;
-let otherUser: SWallet;
 
 beforeEach(async () => {
   world = await SWorld.start();
@@ -67,9 +54,6 @@ beforeEach(async () => {
         }
       ])
     ]
-  });
-  otherUser = await world.createWallet({
-    balance: BigInt('10000000000000000'),
   });
 
   await deployContracts(deployer, collector);

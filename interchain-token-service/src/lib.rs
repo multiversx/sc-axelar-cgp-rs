@@ -104,6 +104,24 @@ pub trait InterchainTokenServiceContract:
 
         let gas_value = self.call_value().egld_value().clone_value();
 
+        // We can only fetch token properties from esdt contract if it is not EGLD not
+        if token_identifier.is_egld() {
+            self.deploy_remote_standardized_token(
+                token_id,
+                token_identifier.clone().into_name(),
+                token_identifier.into_name(),
+                18, // EGLD token has 18 decimals
+                ManagedBuffer::new(),
+                ManagedBuffer::new(),
+                BigUint::zero(),
+                ManagedBuffer::new(),
+                destination_chain,
+                gas_value,
+            );
+
+            return;
+        }
+
         self.esdt_get_token_properties(
             token_identifier.clone(),
             self.callbacks().deploy_remote_token_callback(
@@ -111,6 +129,7 @@ pub trait InterchainTokenServiceContract:
                 token_identifier,
                 destination_chain,
                 gas_value,
+                self.blockchain().get_caller()
             ),
         );
     }

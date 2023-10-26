@@ -2,20 +2,23 @@ import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
-  CHAIN_NAME_HASH, getCommandIdHash, MOCK_CONTRACT_ADDRESS_1, OTHER_CHAIN_ADDRESS,
+  CHAIN_NAME_HASH,
+  MOCK_CONTRACT_ADDRESS_1,
+  OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
-  TOKEN_ID2, TOKEN_ID2_CUSTOM, TOKEN_ID2_MANAGER_ADDRESS,
-  TOKEN_ID_CANONICAL,
+  TOKEN_ID2,
   TOKEN_ID_MANAGER_ADDRESS
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
   computeCustomTokenId,
-  deployContracts, deployPingPongInterchain,
+  deployContracts,
+  deployPingPongInterchain,
   gasService,
   gateway,
-  its, mockGatewayCall, pingPong,
+  its,
+  pingPong,
   remoteAddressValidator,
   tokenManagerLockUnlock,
   tokenManagerMintBurn

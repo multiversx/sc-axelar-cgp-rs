@@ -129,3 +129,26 @@ pub struct DeployStandardizedTokenAndManagerPayload<M: ManagedTypeApi> {
     pub mint_amount: BigUint<M>,
     pub operator: ManagedBuffer<M>,
 }
+
+pub trait ManagedBufferAscii<M: ManagedTypeApi> {
+    fn ascii_to_u8(&self) -> u8;
+}
+
+impl<M: ManagedTypeApi> ManagedBufferAscii<M> for ManagedBuffer<M> {
+    fn ascii_to_u8(&self) -> u8 {
+        let mut result: u8 = 0;
+
+        self.for_each_batch::<32, _>(|batch| {
+            for &byte in batch {
+                if byte == 0 {
+                    break;
+                }
+
+                result *= 10;
+                result += (byte as char).to_digit(16).unwrap() as u8;
+            }
+        });
+
+        result
+    }
+}

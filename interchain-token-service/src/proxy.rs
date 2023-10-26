@@ -1,9 +1,6 @@
 multiversx_sc::imports!();
 
-use crate::constants::{
-    DeployStandardizedTokenAndManagerPayload, TokenId,
-    SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
-};
+use crate::constants::{DeployStandardizedTokenAndManagerPayload, TokenId, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN, ManagedBufferAscii};
 use crate::events;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
@@ -538,19 +535,18 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
 
                 self.express_receive_token_slot(&express_hash).clear();
 
-                // TODO: This doesn't seem to work currently, maybe because it uses too much gas? Wait for Async v2 and see if that fixes this if specifying the callback gas manually
-                // self.express_token_received_with_data_error_event(
-                //     &caller,
-                //     command_id,
-                //     &token_id,
-                //     &token_identifier,
-                //     &amount,
-                // );
+                self.express_token_received_with_data_error_event(
+                    &caller,
+                    command_id,
+                    &token_id,
+                    &token_identifier,
+                    &amount,
+                );
             }
         }
     }
 
-    // TODO: Check if this doesn't use too much gas and works properly
+    // This seems to work fine on Devnet
     #[callback]
     fn deploy_remote_token_callback(
         &self,
@@ -558,38 +554,43 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_identifier: EgldOrEsdtTokenIdentifier,
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
+        caller: ManagedAddress,
         #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
     ) {
         match result {
             ManagedAsyncCallResult::Ok(values) => {
                 let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
 
-                let token_type =
-                    EsdtTokenType::from(vec.get(1).deref().to_boxed_bytes().as_slice());
-
-                require!(token_type == EsdtTokenType::Fungible, "Invalid token type");
-
                 let token_name = vec.get(0).clone_value();
+                let token_type: ManagedRef<ManagedBuffer> = vec.get(1);
+                let decimals_buffer_ref = vec.get(5);
+
+                if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
+                    // Send back payed cross chain gas value to initial caller if token is non fungible
+                    self.send().direct_non_zero_egld(&caller, &gas_value);
+
+                    return;
+                }
+
+                let decimals_buffer = decimals_buffer_ref.deref();
+                // num decimals is in format string NumDecimals-DECIMALS
+                // skip `NumDecimals-` part and convert to number
+                let token_decimals_buf: ManagedBuffer = decimals_buffer
+                    .copy_slice(12, decimals_buffer.len() - 12)
+                    .unwrap();
+                let token_decimals = token_decimals_buf.ascii_to_u8();
+
                 let token_identifier_name = token_identifier.into_name();
                 // Leave the symbol be the beginning of the indentifier before `-`
                 let token_symbol = token_identifier_name
                     .copy_slice(0, token_identifier_name.len() - 7)
-                    .unwrap();
-                let decimals_buffer_ref = vec.get(5);
-                let decimals_buffer = decimals_buffer_ref.deref();
-                // num decimals is in format string NumDecimals-DECIMALS
-                // skip `NumDecimals-` part and convert to number
-                let token_decimals = decimals_buffer
-                    .copy_slice(12, decimals_buffer.len() - 12)
-                    .unwrap()
-                    .parse_as_u64()
                     .unwrap();
 
                 self.deploy_remote_standardized_token(
                     token_id,
                     token_name,
                     token_symbol,
-                    token_decimals as u8,
+                    token_decimals,
                     ManagedBuffer::new(),
                     ManagedBuffer::new(),
                     BigUint::zero(),
@@ -598,7 +599,10 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                     gas_value,
                 );
             }
-            ManagedAsyncCallResult::Err(_) => {}
+            ManagedAsyncCallResult::Err(_) => {
+                // Send back payed gas value to initial caller
+                self.send().direct_non_zero_egld(&caller, &gas_value);
+            }
         }
     }
 }
