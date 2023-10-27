@@ -236,7 +236,7 @@ test.skip("Execute receive token with data contract error", async () => {
     balance: 1_000,
   });
 
-  const payload = await mockGatewayCall(computedTokenId, 'error');
+  const payload = await mockGatewayCall(computedTokenId);
 
   await user.callContract({
     callee: its,

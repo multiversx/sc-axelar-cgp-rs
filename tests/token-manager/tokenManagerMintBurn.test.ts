@@ -845,7 +845,7 @@ test("Deploy standardized token", async () => {
       e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
       e.kvs.Mapper('operator').Value(deployer),
 
-      // TODO: Check how to actually test the async call to the ESDT system contract here
+      // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
         e.Str('deploy_token_callback'),
         e.Bytes('00000002'),

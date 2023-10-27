@@ -88,7 +88,7 @@ pub trait TokenManagerMintBurnContract:
     #[endpoint(deployStandardizedToken)]
     fn deploy_standardized_token(
         &self,
-        _distributor: ManagedAddress, // TODO: Should we set this address as ESDT token owner?
+        _distributor: ManagedAddress, // TODO: What should we use this for? In Sui it is also not used
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
@@ -118,7 +118,6 @@ pub trait TokenManagerMintBurnContract:
                 EsdtTokenType::Fungible,
                 decimals as usize,
             )
-            .with_gas_limit(120_000_000) // TODO: Check what value should be used here
             .async_call()
             .with_callback(self.callbacks().deploy_token_callback(mint_amount, mint_to))
             .call_and_exit();
@@ -162,10 +161,11 @@ pub trait TokenManagerMintBurnContract:
             ManagedAsyncCallResult::Ok(token_id_raw) => {
                 let token_identifier = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
 
-                self.standardized_token_deployed(&token_identifier);
+                self.standardized_token_deployed_event(&token_identifier);
 
                 self.token_identifier().set(token_identifier);
 
+                // TODO: It seems that this callback can run BEFORE the ESDTRoleLocalMint is set for this address, but this is fixed in rc/v1.6.0
                 if mint_amount > 0 && mint_to != ManagedAddress::zero() {
                     self.give_token_raw(&mint_to, &mint_amount);
                 }
@@ -174,7 +174,6 @@ pub trait TokenManagerMintBurnContract:
                 self.standardized_token_deployment_failed_event();
 
                 // Leave issue cost egld payment in contract for use when retrying deployStandardizedToken
-                // TODO: Check if it is fine like this
             }
         }
     }
@@ -182,6 +181,6 @@ pub trait TokenManagerMintBurnContract:
     #[event("standardized_token_deployment_failed_event")]
     fn standardized_token_deployment_failed_event(&self);
 
-    #[event("standardized_token_deployed")]
-    fn standardized_token_deployed(&self, #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier);
+    #[event("standardized_token_deployed_event")]
+    fn standardized_token_deployed_event(&self, #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier);
 }

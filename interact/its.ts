@@ -200,10 +200,10 @@ export const setupITSCommands = (program: Command) => {
     const result = await wallet.callContract({
       callee: envChain.select(data.addressIts),
       funcName: "deployAndRegisterStandardizedToken",
-      gasLimit: 300_000_000,
+      gasLimit: 150_000_000,
       value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost
       funcArgs: [
-        e.Str('SALT2'),
+        e.Str('SALT7'),
         e.Str('ITSToken'),
         e.Str('ITST'),
         e.U8(6),
@@ -282,7 +282,7 @@ export const setupITSCommands = (program: Command) => {
     const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
 
     const executeData = e.Tuple(
-      e.List(e.Str('mockCommandId-1')),
+      e.List(e.Str('mockCommandId-2')),
       e.List(e.Str('approveContractCall')),
       e.List(
         e.Buffer(
@@ -322,7 +322,82 @@ export const setupITSCommands = (program: Command) => {
       funcName: "execute",
       gasLimit: 200_000_000,
       funcArgs: [
-        e.Str('mockCommandId-1'),
+        e.Str('mockCommandId-2'),
+        e.Str(otherChainName),
+        e.Str(otherChainAddress),
+        payload,
+      ],
+    });
+
+    console.log(`Result`, result);
+  });
+
+  const executeDeployAndRegisterPayload = (wallet: Wallet) => {
+    return e.Buffer(
+      e.Tuple(
+        e.U(4), // selector deploy and register standardized token
+        e.Bytes(Buffer.from('bbee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb', 'hex')),
+        e.Str('TokenName'),
+        e.Str('SYMBOL'),
+        e.U8(6),
+        e.Buffer(wallet.toTopBytes()),
+        e.Buffer(wallet.toTopBytes()),
+        e.U(1_000_000),
+        e.Buffer(e.Addr(envChain.select(data.addressPingPongInterchain)).toTopBytes()),
+      ).toTopBytes()
+    );
+  }
+
+  program.command('itsApproveExecuteDeployAndRegisterStandardizedToken').action(async () => {
+    const wallet = await loadWallet();
+
+    const payload = executeDeployAndRegisterPayload(wallet);
+
+    const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
+
+    const executeData = e.Tuple(
+      e.List(e.Str('mockCommandId-8')),
+      e.List(e.Str('approveContractCall')),
+      e.List(
+        e.Buffer(
+          e.Tuple(
+            e.Str(otherChainName),
+            e.Str(otherChainAddress),
+            e.Addr(envChain.select(data.addressIts)),
+            e.Buffer(Buffer.from(payloadHash, 'hex'),),
+            e.Str('sourceTxHash'),
+            e.U(123) // source event index
+          ).toTopBytes()
+        )
+      )
+    );
+
+    const { proof } = generateProof(executeData);
+
+    const result = await wallet.callContract({
+      callee: envChain.select(data.address),
+      gasLimit: 15_000_000,
+      funcName: 'execute',
+      funcArgs: [
+        executeData,
+        proof
+      ]
+    });
+    console.log('Result:', result);
+  });
+
+  program.command('itsExecuteDeployAndRegisterStandardizedToken').action(async () => {
+    const wallet = await loadWallet();
+
+    const payload = executeDeployAndRegisterPayload(wallet);
+
+    const result = await wallet.callContract({
+      callee: envChain.select(data.addressIts),
+      funcName: "execute",
+      gasLimit: 150_000_000,
+      value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost
+      funcArgs: [
+        e.Str('mockCommandId-8'),
         e.Str(otherChainName),
         e.Str(otherChainAddress),
         payload,

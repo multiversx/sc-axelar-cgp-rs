@@ -52,7 +52,6 @@ program.command('deploy').action(async () => {
         gasLimit: 100_000_000,
         codeArgs: [
             e.Addr(resultAuth.address),
-            e.Addr(MOCK_CONTRACT_ADDRESS_2)
         ]
     });
     console.log('Result:', result);
@@ -92,7 +91,6 @@ program.command('upgrade').action(async () => {
         gasLimit: 100_000_000,
         codeArgs: [
             envChain.select(data.addressAuth),
-            e.Addr(MOCK_CONTRACT_ADDRESS_2)
         ]
     });
     console.log('Result:', result);

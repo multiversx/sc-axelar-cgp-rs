@@ -292,7 +292,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
             .deploy_standardized_token(distributor, name, symbol, decimals, mint_amount, mint_to)
             .with_egld_transfer(self.call_value().egld_value().clone_value())
-            .with_gas_limit(200_000_000) // TODO: Check what value should be used here
+            .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
             .execute_on_dest_context::<()>();
     }
 

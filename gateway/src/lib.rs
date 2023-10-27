@@ -77,7 +77,7 @@ pub trait Gateway:
 
     #[endpoint(execute)]
     fn execute(&self, data: ManagedBuffer, proof: ManagedBuffer) {
-        // TODO: Should we add a PREFIX before the data here?
+        // TODO: Should we add a PREFIX for MultiversX before the data here?
         let message_hash = self.crypto().keccak256(&data);
 
         let mut allow_operatorship_transfer: bool = self.auth_validate_proof(&message_hash, &proof);
