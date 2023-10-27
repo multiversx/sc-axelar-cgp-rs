@@ -1,9 +1,10 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-use multiversx_sc::codec::{EncodeError, NestedDecodeInput, TopDecodeInput, TopEncodeOutput};
+use multiversx_sc::codec::{EncodeError, NestedDecodeInput, NestedEncodeOutput, TopDecodeInput, TopEncodeOutput};
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use crate::abi::{encode, Token};
 
 pub const PREFIX_STANDARDIZED_TOKEN_ID: &[u8] = b"its-standardized-token-id";
 pub const PREFIX_CUSTOM_TOKEN_ID: &[u8] = b"its-custom-token-id";
@@ -73,6 +74,8 @@ impl<M: ManagedTypeApi> TopDecode for SendTokenPayload<M> {
     }
 }
 
+
+
 impl<M: ManagedTypeApi> TopEncode for SendTokenPayload<M> {
     fn top_encode<O>(&self, output_raw: O) -> Result<(), EncodeError>
         where
@@ -81,10 +84,24 @@ impl<M: ManagedTypeApi> TopEncode for SendTokenPayload<M> {
         // TODO: Check if this encoding works properly
         let mut output = output_raw.start_nested_encode();
 
-        self.selector.dep_encode(&mut output)?;
-        self.token_id.dep_encode(&mut output)?;
-        self.destination_address.dep_encode(&mut output)?;
-        self.amount.dep_encode(&mut output)?;
+        // self.selector.dep_encode(&mut output)?;
+        // self.token_id.dep_encode(&mut output)?;
+        // self.destination_address.dep_encode(&mut output)?;
+        // self.amount.dep_encode(&mut output)?;
+
+        let result = encode(&[
+            Token::Uint(self.selector.clone()),
+            Token::FixedBytes(self.token_id.clone()),
+            Token::Bytes(self.destination_address.clone()),
+            Token::Uint(self.amount.clone()),
+        ]);
+
+        result.for_each_batch::<32, _>(|batch| {
+            output.write(batch);
+        });
+
+        // payload = abi.encode(SELECTOR_RECEIVE_TOKEN, tokenId, destinationAddress, amount);
+        // abi.encode(uint256, bytes32, bytes, uint256)
 
         if self.source_address.is_some() && self.data.is_some() {
             self.source_address.dep_encode(&mut output)?;

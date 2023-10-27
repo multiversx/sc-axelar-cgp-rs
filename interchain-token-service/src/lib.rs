@@ -20,6 +20,7 @@ mod events;
 mod executable;
 mod proxy;
 mod remote;
+mod abi;
 
 #[multiversx_sc::contract]
 pub trait InterchainTokenServiceContract:
