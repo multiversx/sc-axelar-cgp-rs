@@ -304,6 +304,14 @@ pub trait InterchainTokenServiceContract:
         let destination_address =
             ManagedAddress::try_from(receive_token_payload.destination_address).unwrap();
 
+        let (sent_token_identifier, sent_amount) = self.call_value().egld_or_single_fungible_esdt();
+
+        require!(
+            sent_token_identifier == token_identifier
+                && sent_amount == receive_token_payload.amount,
+            "Wrong token or amount sent"
+        );
+
         if receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN_WITH_DATA) {
             self.executable_contract_express_execute_with_interchain_token(
                 destination_address,

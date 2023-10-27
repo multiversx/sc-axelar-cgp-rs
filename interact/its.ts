@@ -1,12 +1,13 @@
 import { d, e } from 'xsuite/data';
 // @ts-ignore
 import data from './data.json';
-import { loadWallet } from './index';
+import { loadWallet, program } from './index';
 import { Command } from 'commander';
 import { Wallet } from 'xsuite';
 import { envChain } from 'xsuite/interact';
-import { its } from '../tests/itsHelpers';
-import { TOKEN_ID } from '../tests/helpers';
+import { generateProof, MOCK_CONTRACT_ADDRESS_2 } from '../tests/helpers';
+import createKeccakHash from 'keccak';
+import { Buffer } from 'buffer';
 
 const chainName = 'multiversx-devnet';
 const otherChainName = 'ethereum-2';
@@ -118,6 +119,25 @@ export const setupITSCommands = (program: Command) => {
     console.log('Result:', result);
   });
 
+  program.command('deployPingPongInterchain').action(async () => {
+    const wallet = await loadWallet();
+
+    const result = await wallet.deployContract({
+      code: data.codePingPongInterchain,
+      codeMetadata: ["upgradeable"],
+      gasLimit: 100_000_000,
+      codeArgs: [
+        e.Addr(envChain.select(data.addressIts)),
+        e.U(BigInt('10000000000000000')), // 0.01 EGLD
+        e.U64(3600), // deadline after 1 hour
+        e.Option(null),
+      ]
+    });
+    console.log('Result:', result);
+
+    console.log('Deployed Ping Pong Interchain Contract:', result.address);
+  });
+
   program.command('upgradeTokenManagerMintBurn').action(async () => {
     const wallet = await loadWallet();
 
@@ -183,7 +203,7 @@ export const setupITSCommands = (program: Command) => {
       gasLimit: 300_000_000,
       value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost
       funcArgs: [
-        e.Str('SALT'),
+        e.Str('SALT2'),
         e.Str('ITSToken'),
         e.Str('ITST'),
         e.U8(6),
@@ -218,4 +238,97 @@ export const setupITSCommands = (program: Command) => {
 
       console.log(`Result`, result);
     });
+
+  const executePingPongPayload = (wallet: Wallet) => {
+    return e.Buffer(
+      e.Tuple(
+        e.U(2), // selector receive token with data
+        e.Bytes(envChain.select<any>(data.knownTokens)['EGLD']['tokenId']),
+        e.Buffer(e.Addr(envChain.select(data.addressPingPongInterchain)).toTopBytes()), // destination address
+        e.U(BigInt('10000000000000000')),
+        e.Buffer(wallet.toTopBytes()), // source address (in this case address for ping)
+        e.Buffer(
+          e.Str("ping").toTopBytes() // data passed to contract
+        )
+      ).toTopBytes()
+    );
+  };
+
+  program.command('itsExpressReceiveToken').action(async () => {
+    const wallet = await loadWallet();
+
+    const payload = executePingPongPayload(wallet);
+
+    const result = await wallet.callContract({
+      callee: envChain.select(data.addressIts),
+      funcName: "expressReceiveToken",
+      gasLimit: 100_000_000,
+      value: BigInt('10000000000000000'),
+      funcArgs: [
+        payload,
+        e.Str('mockCommandId2'),
+        e.Str(otherChainName),
+      ],
+    });
+
+    console.log(`Result`, result);
+  });
+
+  program.command('itsApproveExecuteReceiveTokenWithData').action(async () => {
+    const wallet = await loadWallet();
+
+    const payload = executePingPongPayload(wallet);
+
+    const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
+
+    const executeData = e.Tuple(
+      e.List(e.Str('mockCommandId-1')),
+      e.List(e.Str('approveContractCall')),
+      e.List(
+        e.Buffer(
+          e.Tuple(
+            e.Str(otherChainName),
+            e.Str(otherChainAddress),
+            e.Addr(envChain.select(data.addressIts)),
+            e.Buffer(Buffer.from(payloadHash, 'hex'),),
+            e.Str('sourceTxHash'),
+            e.U(123) // source event index
+          ).toTopBytes()
+        )
+      )
+    );
+
+    const { proof } = generateProof(executeData);
+
+    const result = await wallet.callContract({
+      callee: envChain.select(data.address),
+      gasLimit: 15_000_000,
+      funcName: 'execute',
+      funcArgs: [
+        executeData,
+        proof
+      ]
+    });
+    console.log('Result:', result);
+  });
+
+  program.command('itsExecuteReceiveTokenWithData').action(async () => {
+    const wallet = await loadWallet();
+
+    const payload = executePingPongPayload(wallet);
+
+    const result = await wallet.callContract({
+      callee: envChain.select(data.addressIts),
+      funcName: "execute",
+      gasLimit: 200_000_000,
+      funcArgs: [
+        e.Str('mockCommandId-1'),
+        e.Str(otherChainName),
+        e.Str(otherChainAddress),
+        payload,
+      ],
+    });
+
+    console.log(`Result`, result);
+  });
 }

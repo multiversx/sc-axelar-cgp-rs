@@ -231,9 +231,7 @@ test("Express receive token with data", async () => {
   });
 });
 
-// TODO: This doesn't seem to work currently, maybe because the callback uses too much gas?
-// Maybe wait for Async v2 and see if that fixes this since the callback gas can be manually specified
-test.skip("Express receive token with data error", async () => {
+test("Express receive token with data error", async () => {
   await deployPingPongInterchain(deployer);
 
   await user.callContract({
@@ -302,6 +300,7 @@ test.skip("Express receive token with data error", async () => {
     ],
   });
 
+  // Assert user still has initial balance
   const userKvs = await user.getAccountWithKvs();
   assertAccount(userKvs, {
     balance: BigInt('10000000000000000'),
@@ -352,7 +351,27 @@ test("Express receive token errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
     ],
+    esdts: [{ id: TOKEN_ID, amount: 100_000 }]
   }).assertFail({ code: 4, message: 'Invalid express selector' });
+
+  await user.callContract({
+    callee: its,
+    funcName: "expressReceiveToken",
+    gasLimit: 20_000_000,
+    value: 100_000,
+    funcArgs: [
+      e.Bytes(
+        e.Tuple(
+          e.U(1),
+          e.Bytes(TOKEN_ID_CANONICAL),
+          e.Buffer(otherUser.toTopBytes()),
+          e.U(100_000),
+        ).toTopBytes()
+      ),
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+    ],
+  }).assertFail({ code: 4, message: 'Wrong token or amount sent' });
 
   await user.callContract({
     callee: its,
@@ -371,7 +390,7 @@ test("Express receive token errors", async () => {
       e.Str(OTHER_CHAIN_NAME),
     ],
     esdts: [{ id: TOKEN_ID, amount: 99_999 }]
-  }).assertFail({ code: 10, message: 'insufficient funds' });
+  }).assertFail({ code: 4, message: 'Wrong token or amount sent' });
 
   // Can not call twice for same call
   await user.callContract({

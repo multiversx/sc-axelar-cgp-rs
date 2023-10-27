@@ -6,6 +6,7 @@
   "codeTokenManagerMintBurn": "file:token-manager-mint-burn/output/token-manager-mint-burn.wasm",
   "codeTokenManagerLockUnlock": "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
   "codeIts": "file:interchain-token-service/output/interchain-token-service.wasm",
+  "codePingPongInterchain": "file:ping-pong-interchain/output/ping-ping-interchain.wasm",
   "address": {
     "devnet": "erd1qqqqqqqqqqqqqpgqsvzyz88e8v8j6x3wquatxuztnxjwnw92kkls6rdtzx",
     "testnet": "",
@@ -38,6 +39,11 @@
   },
   "addressIts": {
     "devnet": "erd1qqqqqqqqqqqqqpgq3x02c63t322u8nr6va5we9h62axydgrrkklsj6djxa",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressPingPongInterchain": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqkv0qr4cqq2uv3yvcs68t9gezsc3x4sthkklsun73vg",
     "testnet": "",
     "mainnet": ""
   },

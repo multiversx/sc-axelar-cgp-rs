@@ -212,7 +212,7 @@ test("Execute receive token with data", async () => {
   });
 });
 
-// TODO: This doesn't seem to work currently, the callback is not executed properly. Find out why
+// This works correctly on Devnet but doesn't work in tests for some reason
 test.skip("Execute receive token with data error", async () => {
   await deployPingPongInterchain(deployer);
 
