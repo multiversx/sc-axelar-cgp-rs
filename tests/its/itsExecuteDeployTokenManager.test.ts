@@ -164,7 +164,36 @@ test("Execute deploy token manager", async () => {
   });
 });
 
-test("Execute deploy token manager error", async () => {
+test("Execute deploy token manager errors", async () => {
+  // Invalid other address from other chain
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str('SomeOtherAddress'),
+      e.Buffer(
+        e.Tuple(e.U(3)).toTopBytes()
+      ),
+    ],
+  }).assertFail({ code: 4, message: 'Not remote service' });
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      e.Buffer(
+        e.Tuple(e.U(3)).toTopBytes()
+      ),
+    ],
+  }).assertFail({ code: 4, message: 'Not approved by gateway' });
+
   await user.callContract({
     callee: its,
     funcName: "registerCanonicalToken",

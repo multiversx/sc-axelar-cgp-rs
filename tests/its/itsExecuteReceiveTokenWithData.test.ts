@@ -212,8 +212,8 @@ test("Execute receive token with data", async () => {
   });
 });
 
-// This works correctly on Devnet but doesn't work in tests for some reason
-test.skip("Execute receive token with data error", async () => {
+// TODO: This works correctly on Devnet but doesn't work in tests for some reason
+test.skip("Execute receive token with data contract error", async () => {
   await deployPingPongInterchain(deployer);
 
   await user.callContract({
@@ -236,7 +236,7 @@ test.skip("Execute receive token with data error", async () => {
     balance: 1_000,
   });
 
-  const payload = await mockGatewayCall(computedTokenId, 'sth');
+  const payload = await mockGatewayCall(computedTokenId, 'error');
 
   await user.callContract({
     callee: its,
@@ -252,7 +252,7 @@ test.skip("Execute receive token with data error", async () => {
 
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
-    balance: 0,
+    balance: 0n,
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
@@ -279,7 +279,6 @@ test.skip("Execute receive token with data error", async () => {
     ],
   });
 
-  // Assert token manager still has the tokens
   const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 1_000,
@@ -291,7 +290,7 @@ test.skip("Execute receive token with data error", async () => {
     ],
   });
 
-  // Gateway contract call approved key was removed
+  // Gateway contract call approaved key was removed
   const gatewayKvs = await gateway.getAccountWithKvs();
   assertAccount(gatewayKvs, {
     kvs: [
@@ -403,4 +402,35 @@ test("Execute receive token with data express caller", async () => {
       e.kvs.Mapper('operator').Value(its),
     ],
   });
+});
+
+test("Execute receive token with data errors", async () => {
+  // Invalid other address from other chain
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str('SomeOtherAddress'),
+      e.Buffer(
+        e.Tuple(e.U(2)).toTopBytes()
+      ),
+    ],
+  }).assertFail({ code: 4, message: 'Not remote service' });
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      e.Buffer(
+        e.Tuple(e.U(2)).toTopBytes()
+      ),
+    ],
+  }).assertFail({ code: 4, message: 'Not approved by gateway' });
 });

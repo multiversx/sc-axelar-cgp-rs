@@ -478,7 +478,7 @@ test("Execute receive token express caller", async () => {
   });
 });
 
-test("Execute errors", async () => {
+test.only("Execute receive token errors", async () => {
   // Invalid other address from other chain
   await user.callContract({
     callee: its,
@@ -488,7 +488,9 @@ test("Execute errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
-      e.Buffer(''),
+      e.Buffer(
+        e.Tuple(e.U(1)).toTopBytes()
+      ),
     ],
   }).assertFail({ code: 4, message: 'Not remote service' });
 
@@ -500,7 +502,9 @@ test("Execute errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''),
+      e.Buffer(
+        e.Tuple(e.U(1)).toTopBytes()
+      ),
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 

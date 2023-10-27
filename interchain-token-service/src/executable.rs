@@ -1,8 +1,13 @@
 multiversx_sc::imports!();
 
-use crate::constants::{DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId, TokenManagerType, SELECTOR_RECEIVE_TOKEN};
+use crate::constants::{
+    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId,
+    TokenManagerType, SELECTOR_RECEIVE_TOKEN,
+};
 use crate::{events, proxy};
 use core::convert::TryFrom;
+use core::ops::Deref;
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:
@@ -23,7 +28,7 @@ pub trait ExecutableModule:
             ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
 
         if !express_caller.is_zero() {
-            let _ = self.token_manager_give_token(
+            self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &express_caller,
                 &send_token_payload.amount,
@@ -33,7 +38,7 @@ pub trait ExecutableModule:
         }
 
         if send_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN) {
-            let amount = self.token_manager_give_token(
+            let (_, amount) = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
                 &send_token_payload.amount,
@@ -50,13 +55,11 @@ pub trait ExecutableModule:
         }
 
         // Here we give the tokens to this contract and then call the executable contract with the tokens
-        let amount = self.token_manager_give_token(
+        let (token_identifier, amount) = self.token_manager_give_token(
             &send_token_payload.token_id,
             &self.blockchain().get_sc_address(),
             &send_token_payload.amount,
         );
-
-        let token_identifier = self.get_token_identifier(&send_token_payload.token_id);
 
         self.emit_received_token_with_data_event(
             &send_token_payload.token_id,
@@ -92,7 +95,14 @@ pub trait ExecutableModule:
         );
     }
 
-    fn process_deploy_standardized_token_and_manager_payload(&self, payload: ManagedBuffer) {
+    fn process_deploy_standardized_token_and_manager_payload(
+        &self,
+        command_id: ManagedBuffer,
+        source_chain: ManagedBuffer,
+        source_address: ManagedBuffer,
+        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        payload: ManagedBuffer,
+    ) {
         // TODO: Decode using abi decoding
         let data =
             DeployStandardizedTokenAndManagerPayload::<Self::Api>::top_decode(payload).unwrap();
@@ -106,19 +116,31 @@ pub trait ExecutableModule:
             operator = operator_raw.unwrap();
         }
 
-        // Allow retry of deploying standardized token
-        let token_manager_address;
+        // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
+        // This is because we can not deploy token manager and call it to deploy the token in the same transaction
         let token_manager_address_mapper = self.token_manager_address(&data.token_id);
         if token_manager_address_mapper.is_empty() {
-            token_manager_address = self.deploy_token_manager(
-                &data.token_id,
-                TokenManagerType::MintBurn,
-                operator,
-                None,
+            require!(
+                self.call_value().egld_value().deref() == &BigUint::zero(),
+                "Can not send EGLD payment if not issuing ESDT"
             );
-        } else {
-            token_manager_address = token_manager_address_mapper.get();
+
+            // Only check that the call is valid, since this needs to be called twice with the same parameters
+            let valid = self.gateway_is_contract_call_approved(
+                &command_id,
+                &source_chain,
+                &source_address,
+                &payload_hash,
+            );
+
+            require!(valid, "Not approved by gateway");
+
+            self.deploy_token_manager(&data.token_id, TokenManagerType::MintBurn, operator, None);
+
+            return;
         }
+
+        let token_manager_address = token_manager_address_mapper.get();
 
         let distributor_raw = ManagedAddress::try_from(data.distributor);
         let distributor;
@@ -135,6 +157,16 @@ pub trait ExecutableModule:
         } else {
             mint_to = mint_to_raw.unwrap();
         }
+
+        // The second time this is called, the call will be validated
+        let valid = self.gateway_validate_contract_call(
+            &command_id,
+            &source_chain,
+            &source_address,
+            &payload_hash,
+        );
+
+        require!(valid, "Not approved by gateway");
 
         self.token_manager_deploy_standardized_token(
             &data.token_id,
@@ -180,7 +212,12 @@ pub trait ExecutableModule:
 
         require!(!address.is_zero(), "Token manager deployment failed");
 
-        self.emit_token_manager_deployed_event(token_id, token_manager_type, address.clone(), arguments);
+        self.emit_token_manager_deployed_event(
+            token_id,
+            token_manager_type,
+            address.clone(),
+            arguments,
+        );
 
         token_manager_address_mapper.set(address.clone());
 

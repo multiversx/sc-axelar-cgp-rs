@@ -1,6 +1,9 @@
 multiversx_sc::imports!();
 
-use crate::constants::{DeployStandardizedTokenAndManagerPayload, TokenId, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN, ManagedBufferAscii};
+use crate::constants::{
+    DeployStandardizedTokenAndManagerPayload, ManagedBufferAscii, TokenId,
+    SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
+};
 use crate::events;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
@@ -66,6 +69,16 @@ pub mod gateway_proxy {
 
         #[view(isCommandExecuted)]
         fn is_command_executed(&self, command_id: &ManagedBuffer) -> bool;
+
+        #[view(isContractCallApproved)]
+        fn is_contract_call_approved(
+            &self,
+            command_id: &ManagedBuffer,
+            source_chain: &ManagedBuffer,
+            source_address: &ManagedBuffer,
+            contract_address: &ManagedAddress,
+            payload_hash: &ManagedBuffer,
+        ) -> bool;
     }
 }
 
@@ -79,7 +92,11 @@ pub mod token_manager_proxy {
         fn take_token(&self);
 
         #[endpoint(giveToken)]
-        fn give_token(&self, destination_address: &ManagedAddress, amount: &BigUint) -> BigUint;
+        fn give_token(
+            &self,
+            destination_address: &ManagedAddress,
+            amount: &BigUint,
+        ) -> MultiValue2<EgldOrEsdtTokenIdentifier, BigUint>;
 
         #[endpoint(setFlowLimit)]
         fn set_flow_limit(&self, flow_limit: &BigUint);
@@ -193,6 +210,41 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
             .execute_on_dest_context::<bool>()
     }
 
+    fn gateway_validate_contract_call(
+        &self,
+        command_id: &ManagedBuffer,
+        source_chain: &ManagedBuffer,
+        source_address: &ManagedBuffer,
+        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> bool {
+        self.gateway_proxy(self.gateway().get())
+            .validate_contract_call(
+                command_id,
+                source_chain,
+                source_address,
+                payload_hash.as_managed_buffer(),
+            )
+            .execute_on_dest_context::<bool>()
+    }
+
+    fn gateway_is_contract_call_approved(
+        &self,
+        command_id: &ManagedBuffer,
+        source_chain: &ManagedBuffer,
+        source_address: &ManagedBuffer,
+        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> bool {
+        self.gateway_proxy(self.gateway().get())
+            .is_contract_call_approved(
+                command_id,
+                source_chain,
+                source_address,
+                &self.blockchain().get_sc_address(),
+                payload_hash.as_managed_buffer(),
+            )
+            .execute_on_dest_context::<bool>()
+    }
+
     fn token_manager_take_token(
         &self,
         token_id: &TokenId<Self::Api>,
@@ -220,10 +272,11 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_id: &TokenId<Self::Api>,
         destination_address: &ManagedAddress,
         amount: &BigUint,
-    ) -> BigUint {
+    ) -> (EgldOrEsdtTokenIdentifier, BigUint) {
         self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
             .give_token(destination_address, amount)
-            .execute_on_dest_context()
+            .execute_on_dest_context::<MultiValue2<EgldOrEsdtTokenIdentifier, BigUint>>()
+            .into_tuple()
     }
 
     fn token_manager_deploy_standardized_token(

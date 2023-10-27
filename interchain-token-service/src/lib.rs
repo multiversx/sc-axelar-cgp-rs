@@ -11,7 +11,6 @@ use crate::constants::{
     PREFIX_STANDARDIZED_TOKEN_ID, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
     SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA,
 };
-use crate::proxy::gateway_proxy::ProxyTrait as GatewayProxyTrait;
 use crate::proxy::CallbackProxy;
 
 multiversx_sc::imports!();
@@ -216,7 +215,6 @@ pub trait InterchainTokenServiceContract:
 
         // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
         // This is because we can not deploy token manager and call it to deploy the token in the same transaction
-        // TODO: Check if it is fine like this
         let token_manager_address_mapper = self.token_manager_address(&token_id);
         if token_manager_address_mapper.is_empty() {
             require!(
@@ -460,24 +458,38 @@ pub trait InterchainTokenServiceContract:
 
         let payload_hash = self.crypto().keccak256(&payload_raw);
 
-        let valid = self
-            .gateway_proxy(self.gateway().get())
-            .validate_contract_call(
-                &command_id,
-                &source_chain,
-                &source_address,
-                payload_hash.as_managed_buffer(),
-            )
-            .execute_on_dest_context::<bool>();
-
-        require!(valid, "Not approved by gateway");
-
         let mut payload = payload_raw.clone().into_nested_buffer();
 
         // TODO: Use abi decoding here. Optimize to not decode this selector multiple times
-        let selector = BigUint::dep_decode(&mut payload).unwrap();
+        let selector = BigUint::dep_decode(&mut payload).unwrap().to_u64().unwrap() as u32;
 
-        match selector.to_u64().unwrap() as u32 {
+        match selector {
+            SELECTOR_RECEIVE_TOKEN
+            | SELECTOR_RECEIVE_TOKEN_WITH_DATA
+            | SELECTOR_DEPLOY_TOKEN_MANAGER => {
+                require!(
+                    self.call_value().egld_value().deref() == &BigUint::zero(),
+                    "Can not send EGLD payment if not issuing ESDT"
+                );
+
+                let valid = self.gateway_validate_contract_call(
+                    &command_id,
+                    &source_chain,
+                    &source_address,
+                    &payload_hash,
+                );
+
+                require!(valid, "Not approved by gateway");
+            }
+            SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN => {
+                // This is checked inside process_deploy_standardized_token_and_manager_payload function
+            }
+            _ => {
+                sc_panic!("Selector unknown");
+            }
+        }
+
+        match selector {
             SELECTOR_RECEIVE_TOKEN | SELECTOR_RECEIVE_TOKEN_WITH_DATA => {
                 self.process_receive_token_payload(command_id, source_chain, payload_raw);
             }
@@ -485,7 +497,13 @@ pub trait InterchainTokenServiceContract:
                 self.process_deploy_token_manager_payload(payload_raw);
             }
             SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN => {
-                self.process_deploy_standardized_token_and_manager_payload(payload_raw);
+                self.process_deploy_standardized_token_and_manager_payload(
+                    command_id,
+                    source_chain,
+                    source_address,
+                    payload_hash,
+                    payload_raw,
+                );
             }
             _ => {
                 sc_panic!("Selector unknown");

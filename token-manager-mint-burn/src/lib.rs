@@ -43,8 +43,7 @@ pub trait TokenManagerMintBurnContract:
         destination_address: ManagedBuffer,
         metadata: ManagedBuffer,
     ) {
-        let amount =
-            self.interchain_transfer_raw(destination_chain, destination_address, metadata);
+        let amount = self.interchain_transfer_raw(destination_chain, destination_address, metadata);
 
         self.take_token_raw(&amount);
     }
@@ -67,10 +66,14 @@ pub trait TokenManagerMintBurnContract:
     }
 
     #[endpoint(giveToken)]
-    fn give_token(&self, destination_address: &ManagedAddress, amount: BigUint) -> BigUint {
+    fn give_token(
+        &self,
+        destination_address: &ManagedAddress,
+        amount: BigUint,
+    ) -> MultiValue2<EgldOrEsdtTokenIdentifier, BigUint> {
         self.give_token_endpoint(&amount);
 
-        self.give_token_raw(destination_address, &amount)
+        self.give_token_raw(destination_address, &amount).into()
     }
 
     #[payable("*")]
@@ -128,9 +131,15 @@ pub trait TokenManagerMintBurnContract:
         amount.clone()
     }
 
-    fn give_token_raw(&self, destination_address: &ManagedAddress, amount: &BigUint) -> BigUint {
+    fn give_token_raw(
+        &self,
+        destination_address: &ManagedAddress,
+        amount: &BigUint,
+    ) -> (EgldOrEsdtTokenIdentifier, BigUint) {
+        let token_identifier = self.token_identifier().get();
+
         self.send()
-            .esdt_local_mint(&self.token_identifier().get().unwrap_esdt(), 0, amount);
+            .esdt_local_mint(&token_identifier.clone().unwrap_esdt(), 0, amount);
 
         self.send().direct(
             destination_address,
@@ -139,7 +148,7 @@ pub trait TokenManagerMintBurnContract:
             amount,
         );
 
-        amount.clone()
+        (token_identifier, amount.clone())
     }
 
     #[callback]

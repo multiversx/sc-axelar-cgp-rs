@@ -61,10 +61,10 @@ pub trait TokenManagerLockUnlockContract:
     }
 
     #[endpoint(giveToken)]
-    fn give_token(&self, destination_address: &ManagedAddress, amount: BigUint) -> BigUint {
+    fn give_token(&self, destination_address: &ManagedAddress, amount: BigUint) -> MultiValue2<EgldOrEsdtTokenIdentifier, BigUint> {
         self.give_token_endpoint(&amount);
 
-        self.give_token_raw(destination_address, &amount)
+        self.give_token_raw(destination_address, &amount).into()
     }
 
     #[payable("*")]
@@ -77,14 +77,16 @@ pub trait TokenManagerLockUnlockContract:
         amount
     }
 
-    fn give_token_raw(&self, destination_address: &ManagedAddress, amount: &BigUint) -> BigUint {
+    fn give_token_raw(&self, destination_address: &ManagedAddress, amount: &BigUint) -> (EgldOrEsdtTokenIdentifier, BigUint) {
+        let token_identifier = self.token_identifier().get();
+
         self.send().direct(
             destination_address,
-            &self.token_identifier().get(),
+            &token_identifier,
             0,
             amount,
         );
 
-        amount.clone()
+        (token_identifier, amount.clone())
     }
 }

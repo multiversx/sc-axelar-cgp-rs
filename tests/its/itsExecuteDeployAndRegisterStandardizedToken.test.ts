@@ -75,11 +75,11 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
+const mockGatewayCall = async () => {
   const payload = e.Buffer(
     e.Tuple(
       e.U(4), // selector deploy and register standardized token
-      e.Bytes(tokenId),
+      e.Bytes(TOKEN_ID_CANONICAL),
       e.Str('TokenName'),
       e.Str('SYMBOL'),
       e.U8(18),
@@ -112,20 +112,29 @@ const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
     ]
   });
 
-  return payload;
+  return { payload, dataHash };
 }
 
-// TODO: Check why an error Tx failed: 10 - failed transfer (insufficient funds) is raised here
-// It might be because issuing ESDT tokens doesn't work for the underlying simulnet
-// Everything seems fine until the call to `issue_and_set_all_roles` in the token-manager-mint-burn happens
-test.skip("Execute deploy and register standardized token", async () => {
-  const payload = await mockGatewayCall();
+test("Execute deploy and register standardized token only deploy token manager", async () => {
+  const { payload, dataHash } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
     funcName: "execute",
-    gasLimit: 600_000_000,
+    gasLimit: 100_000_000,
     value: BigInt('50000000000000000'),
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 100_000_000,
     funcArgs: [
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
@@ -146,23 +155,23 @@ test.skip("Execute deploy and register standardized token", async () => {
 
       e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID)).Value(TOKEN_ID_MANAGER_ADDRESS),
+      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
     ],
   });
 
-  // Gateway contract call approaved key was removed
+  // Gateway contract call approved key was NOT removed
   const gatewayKvs = await gateway.getAccountWithKvs();
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+
+      e.kvs.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
     ]
   });
 });
 
 test("Execute deploy and register standardized token only issue esdt", async () => {
   await deployTokenManagerMintBurn(deployer, its);
-
-  const customTokenId = 'd6e2313ee1ab6b70e952156eb974c0ffc2dd3b2ac214d289e57429f0d1c6080b';
 
   // Mock token manager already deployed as not being canonical so contract deployment is not tried again
   await its.setAccount({
@@ -176,11 +185,11 @@ test("Execute deploy and register standardized token only issue esdt", async () 
 
       e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(customTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerMintBurn),
     ],
   });
 
-  const payload = await mockGatewayCall(customTokenId);
+  const { payload } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
@@ -207,15 +216,58 @@ test("Execute deploy and register standardized token only issue esdt", async () 
 
       e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(customTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerMintBurn),
     ],
   });
 
-  // Gateway contract call approaved key was removed
+  // Gateway contract call approved key was removed
   const gatewayKvs = await gateway.getAccountWithKvs();
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
     ]
   });
+});
+
+test("Execute receive token with data errors", async () => {
+  // Invalid other address from other chain
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str('SomeOtherAddress'),
+      e.Buffer(
+        e.Tuple(e.U(4)).toTopBytes()
+      ),
+    ],
+  }).assertFail({ code: 4, message: 'Not remote service' });
+
+  const payload = e.Buffer(
+    e.Tuple(
+      e.U(4), // selector deploy and register standardized token
+      e.Bytes(TOKEN_ID_CANONICAL),
+      e.Str('TokenName'),
+      e.Str('SYMBOL'),
+      e.U8(18),
+      e.Buffer(user.toTopBytes()),
+      e.Buffer(user.toTopBytes()),
+      e.U(1_000_000),
+      e.Buffer(its.toTopBytes()),
+    ).toTopBytes()
+  );
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload
+    ],
+  }).assertFail({ code: 4, message: 'Not approved by gateway' });
 });
