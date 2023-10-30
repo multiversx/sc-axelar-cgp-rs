@@ -1,8 +1,8 @@
 multiversx_sc::imports!();
 
 use crate::constants::{
-    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId,
-    TokenManagerType, SELECTOR_RECEIVE_TOKEN,
+    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerParams, DeployTokenManagerPayload,
+    SendTokenPayload, TokenId, TokenManagerType, SELECTOR_RECEIVE_TOKEN,
 };
 use crate::{events, proxy};
 use core::convert::TryFrom;
@@ -87,11 +87,15 @@ pub trait ExecutableModule:
         let deploy_token_manager_payload =
             DeployTokenManagerPayload::<Self::Api>::top_decode(payload).unwrap();
 
+        let params =
+            DeployTokenManagerParams::<Self::Api>::top_decode(deploy_token_manager_payload.params)
+                .unwrap();
+
         self.deploy_token_manager(
             &deploy_token_manager_payload.token_id,
             deploy_token_manager_payload.token_manager_type,
-            deploy_token_manager_payload.params.operator,
-            Some(deploy_token_manager_payload.params.token_identifier),
+            params.operator,
+            Some(params.token_identifier),
         );
     }
 
@@ -253,7 +257,6 @@ pub trait ExecutableModule:
             TokenManagerType::MintBurnFrom => self.implementation_mint_burn().get(),
             TokenManagerType::LockUnlock => self.implementation_lock_unlock().get(),
             TokenManagerType::LockUnlockFee => self.implementation_lock_unlock().get(),
-            TokenManagerType::LiquidityPool => self.implementation_lock_unlock().get(),
         }
     }
 

@@ -80,9 +80,11 @@ const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
       e.U(3), // selector deploy token manager
       e.Bytes(tokenId),
       e.U8(0), // Mint/Burn
-      e.Tuple(
-        its,
-        e.Str(TOKEN_ID),
+      e.Buffer(
+        e.Tuple(
+          its,
+          e.Str(TOKEN_ID),
+        ).toTopBytes(),
       )
     ).toTopBytes()
   );

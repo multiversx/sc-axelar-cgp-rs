@@ -7,6 +7,7 @@ use crate::constants::{
 use crate::events;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use crate::abi::AbiEncode;
 
 pub mod remote_address_validator_proxy {
     multiversx_sc::imports!();
@@ -386,8 +387,6 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
     ) {
-        let mut payload = ManagedBuffer::new();
-
         let data = DeployStandardizedTokenAndManagerPayload {
             selector: BigUint::from(SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN),
             token_id: token_id.clone(),
@@ -400,8 +399,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
             operator: operator.clone(),
         };
 
-        // TODO: Switch this to use abi encoding
-        let _ = data.top_encode(&mut payload);
+        let payload = data.abi_encode();
 
         self.call_contract(&destination_chain, &payload, &gas_value);
 

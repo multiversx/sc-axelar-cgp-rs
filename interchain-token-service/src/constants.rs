@@ -4,7 +4,7 @@ multiversx_sc::derive_imports!();
 use multiversx_sc::codec::{EncodeError, NestedDecodeInput, NestedEncodeOutput, TopDecodeInput, TopEncodeOutput};
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use crate::abi::{encode, Token};
+use crate::abi::{abi_encode, AbiEncode, Token};
 
 pub const PREFIX_STANDARDIZED_TOKEN_ID: &[u8] = b"its-standardized-token-id";
 pub const PREFIX_CUSTOM_TOKEN_ID: &[u8] = b"its-custom-token-id";
@@ -23,7 +23,17 @@ pub enum TokenManagerType {
     MintBurnFrom,
     LockUnlock,
     LockUnlockFee,
-    LiquidityPool
+}
+
+impl TokenManagerType {
+    fn to_u8(&self) -> u8 {
+        match self {
+            TokenManagerType::MintBurn => 0,
+            TokenManagerType::MintBurnFrom => 1,
+            TokenManagerType::LockUnlock => 2,
+            TokenManagerType::LockUnlockFee => 3,
+        }
+    }
 }
 
 #[derive(TypeAbi)]
@@ -75,42 +85,25 @@ impl<M: ManagedTypeApi> TopDecode for SendTokenPayload<M> {
 }
 
 
-
-impl<M: ManagedTypeApi> TopEncode for SendTokenPayload<M> {
-    fn top_encode<O>(&self, output_raw: O) -> Result<(), EncodeError>
-        where
-            O: TopEncodeOutput,
-    {
-        // TODO: Check if this encoding works properly
-        let mut output = output_raw.start_nested_encode();
-
-        // self.selector.dep_encode(&mut output)?;
-        // self.token_id.dep_encode(&mut output)?;
-        // self.destination_address.dep_encode(&mut output)?;
-        // self.amount.dep_encode(&mut output)?;
-
-        let result = encode(&[
-            Token::Uint(self.selector.clone()),
-            Token::FixedBytes(self.token_id.clone()),
-            Token::Bytes(self.destination_address.clone()),
-            Token::Uint(self.amount.clone()),
-        ]);
-
-        result.for_each_batch::<32, _>(|batch| {
-            output.write(batch);
-        });
-
-        // payload = abi.encode(SELECTOR_RECEIVE_TOKEN, tokenId, destinationAddress, amount);
-        // abi.encode(uint256, bytes32, bytes, uint256)
-
-        if self.source_address.is_some() && self.data.is_some() {
-            self.source_address.dep_encode(&mut output)?;
-            self.data.dep_encode(&mut output)?;
+impl<M: ManagedTypeApi> AbiEncode<M> for SendTokenPayload<M> {
+    fn abi_encode(self) -> ManagedBuffer<M> {
+        if self.source_address.is_none() || self.data.is_none() {
+            return abi_encode(&[
+                Token::Uint256(self.selector),
+                Token::Bytes32(self.token_id),
+                Token::Bytes(self.destination_address),
+                Token::Uint256(self.amount),
+            ]);
         }
 
-        output_raw.finalize_nested_encode(output);
-
-        Result::Ok(())
+        return abi_encode(&[
+            Token::Uint256(self.selector),
+            Token::Bytes32(self.token_id),
+            Token::Bytes(self.destination_address),
+            Token::Uint256(self.amount),
+            Token::Bytes(self.source_address.unwrap()),
+            Token::Bytes(self.data.unwrap()),
+        ]);
     }
 }
 
@@ -120,7 +113,7 @@ pub struct Metadata<M: ManagedTypeApi> {
     pub metadata: ManagedBuffer<M>,
 }
 
-#[derive(TypeAbi, TopDecode, NestedDecode)]
+#[derive(TypeAbi, TopDecode)]
 pub struct DeployTokenManagerParams<M: ManagedTypeApi> {
     pub operator: ManagedAddress<M>,
     pub token_identifier: EgldOrEsdtTokenIdentifier<M>,
@@ -131,10 +124,21 @@ pub struct DeployTokenManagerPayload<M: ManagedTypeApi> {
     pub selector: BigUint<M>,
     pub token_id: TokenId<M>,
     pub token_manager_type: TokenManagerType,
-    pub params: DeployTokenManagerParams<M>,
+    pub params: ManagedBuffer<M>,
 }
 
-#[derive(TypeAbi, TopDecode, TopEncode)]
+impl<M: ManagedTypeApi> AbiEncode<M> for DeployTokenManagerPayload<M> {
+    fn abi_encode(self) -> ManagedBuffer<M> {
+        return abi_encode(&[
+            Token::Uint256(self.selector),
+            Token::Bytes32(self.token_id),
+            Token::Uint8(self.token_manager_type.to_u8()),
+            Token::Bytes(self.params),
+        ]);
+    }
+}
+
+#[derive(TypeAbi, TopDecode)]
 pub struct DeployStandardizedTokenAndManagerPayload<M: ManagedTypeApi> {
     pub selector: BigUint<M>,
     pub token_id: TokenId<M>,
@@ -145,6 +149,22 @@ pub struct DeployStandardizedTokenAndManagerPayload<M: ManagedTypeApi> {
     pub mint_to: ManagedBuffer<M>,
     pub mint_amount: BigUint<M>,
     pub operator: ManagedBuffer<M>,
+}
+
+impl<M: ManagedTypeApi> AbiEncode<M> for DeployStandardizedTokenAndManagerPayload<M> {
+    fn abi_encode(self) -> ManagedBuffer<M> {
+        return abi_encode(&[
+            Token::Uint256(self.selector),
+            Token::Bytes32(self.token_id),
+            Token::String(self.name),
+            Token::String(self.symbol),
+            Token::Uint8(self.decimals),
+            Token::Bytes(self.distributor),
+            Token::Bytes(self.mint_to),
+            Token::Uint256(self.mint_amount),
+            Token::Bytes(self.operator),
+        ]);
+    }
 }
 
 pub trait ManagedBufferAscii<M: ManagedTypeApi> {
