@@ -1,10 +1,8 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-use multiversx_sc::codec::{EncodeError, NestedDecodeInput, NestedEncodeOutput, TopDecodeInput, TopEncodeOutput};
-
+use crate::abi::{abi_decode, abi_encode, AbiDecode, AbiEncode, ParamType, Token};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use crate::abi::{abi_encode, AbiEncode, Token};
 
 pub const PREFIX_STANDARDIZED_TOKEN_ID: &[u8] = b"its-standardized-token-id";
 pub const PREFIX_CUSTOM_TOKEN_ID: &[u8] = b"its-custom-token-id";
@@ -36,7 +34,7 @@ impl TokenManagerType {
     }
 }
 
-#[derive(TypeAbi)]
+#[derive(TypeAbi, Debug)]
 pub struct SendTokenPayload<M: ManagedTypeApi> {
     pub selector: BigUint<M>,
     pub token_id: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
@@ -46,44 +44,54 @@ pub struct SendTokenPayload<M: ManagedTypeApi> {
     pub data: Option<ManagedBuffer<M>>,
 }
 
-impl<M: ManagedTypeApi> TopDecode for SendTokenPayload<M> {
-    fn top_decode<I>(input: I) -> Result<Self, DecodeError>
-        where
-            I: TopDecodeInput,
-    {
-        let mut input = input.into_nested_buffer();
+impl<M: ManagedTypeApi> AbiDecode<M> for SendTokenPayload<M> {
+    fn abi_decode(payload: ManagedBuffer<M>) -> Self {
+        let mut result = ArrayVec::<Token<M>, 4>::new();
+        abi_decode(
+            &[
+                ParamType::Uint256,
+                ParamType::Bytes32,
+                ParamType::Bytes,
+                ParamType::Uint256,
+            ],
+            &payload,
+            &mut result,
+            0,
+        );
 
-        // TODO: In solidity this uses ABI encode/decode, check if this is correct
-        let selector = BigUint::dep_decode(&mut input)?;
-        let token_id = ManagedByteArray::<M, KECCAK256_RESULT_LEN>::dep_decode(&mut input)?;
-        let destination_address = ManagedBuffer::dep_decode(&mut input)?;
-        let amount = BigUint::dep_decode(&mut input)?;
+        let amount = result.pop().unwrap().into_biguint();
+        let destination_address = result.pop().unwrap().into_managed_buffer();
+        let token_id = result.pop().unwrap().into_managed_byte_array();
+        let selector = result.pop().unwrap().into_biguint();
 
-        if input.is_depleted() {
-            return Result::Ok(SendTokenPayload {
-                selector,
-                token_id,
-                destination_address,
-                amount,
-                source_address: None,
-                data: None,
-            });
+        let mut source_address = None;
+        let mut data = None;
+        if selector == BigUint::from(SELECTOR_RECEIVE_TOKEN_WITH_DATA) {
+            let mut result = ArrayVec::<Token<M>, 2>::new();
+            abi_decode(
+                &[
+                    ParamType::Bytes,
+                    ParamType::Bytes
+                ],
+                &payload,
+                &mut result,
+                4,
+            );
+
+            data = Some(result.pop().unwrap().into_managed_buffer());
+            source_address = Some(result.pop().unwrap().into_managed_buffer());
         }
 
-        let source_address = ManagedBuffer::<M>::dep_decode(&mut input)?;
-        let data = ManagedBuffer::<M>::dep_decode(&mut input)?;
-
-        Result::Ok(SendTokenPayload {
+        SendTokenPayload {
             selector,
             token_id,
             destination_address,
             amount,
-            source_address: Some(source_address),
-            data: Some(data),
-        })
+            source_address,
+            data,
+        }
     }
 }
-
 
 impl<M: ManagedTypeApi> AbiEncode<M> for SendTokenPayload<M> {
     fn abi_encode(self) -> ManagedBuffer<M> {

@@ -6,6 +6,7 @@ use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use multiversx_sc::codec::{EncodeError, TopDecodeInput};
 
+use crate::abi::{decode_param, AbiDecode, ParamType};
 use crate::constants::{
     Metadata, SendTokenPayload, TokenId, TokenManagerType, PREFIX_CUSTOM_TOKEN_ID,
     PREFIX_STANDARDIZED_TOKEN_ID, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
@@ -15,12 +16,12 @@ use crate::proxy::CallbackProxy;
 
 multiversx_sc::imports!();
 
+mod abi;
 mod constants;
 mod events;
 mod executable;
 mod proxy;
 mod remote;
-mod abi;
 
 #[multiversx_sc::contract]
 pub trait InterchainTokenServiceContract:
@@ -296,7 +297,7 @@ pub trait InterchainTokenServiceContract:
         let express_hash = self.set_express_receive_token(&payload, &command_id, &caller);
 
         let receive_token_payload: SendTokenPayload<Self::Api> =
-            SendTokenPayload::<Self::Api>::top_decode(payload).unwrap();
+            SendTokenPayload::<Self::Api>::abi_decode(payload);
 
         let token_identifier = self.get_token_identifier(&receive_token_payload.token_id);
 
@@ -452,17 +453,19 @@ pub trait InterchainTokenServiceContract:
         command_id: ManagedBuffer,
         source_chain: ManagedBuffer,
         source_address: ManagedBuffer,
-        payload_raw: ManagedBuffer,
+        payload: ManagedBuffer,
     ) {
         self.require_not_paused();
         self.only_remote_service(&source_chain, &source_address);
 
-        let payload_hash = self.crypto().keccak256(&payload_raw);
+        let payload_hash = self.crypto().keccak256(&payload);
 
-        let mut payload = payload_raw.clone().into_nested_buffer();
-
-        // TODO: Use abi decoding here. Optimize to not decode this selector multiple times
-        let selector = BigUint::dep_decode(&mut payload).unwrap().to_u64().unwrap() as u32;
+        // TODO: Use abi decoding here. Optimize to not decode this selector multiple times?
+        let selector = decode_param(&ParamType::Uint256, &payload, 0)
+            .token
+            .into_biguint()
+            .to_u64()
+            .unwrap() as u32;
 
         match selector {
             SELECTOR_RECEIVE_TOKEN
@@ -492,10 +495,10 @@ pub trait InterchainTokenServiceContract:
 
         match selector {
             SELECTOR_RECEIVE_TOKEN | SELECTOR_RECEIVE_TOKEN_WITH_DATA => {
-                self.process_receive_token_payload(command_id, source_chain, payload_raw);
+                self.process_receive_token_payload(command_id, source_chain, payload);
             }
             SELECTOR_DEPLOY_TOKEN_MANAGER => {
-                self.process_deploy_token_manager_payload(payload_raw);
+                self.process_deploy_token_manager_payload(payload);
             }
             SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN => {
                 self.process_deploy_standardized_token_and_manager_payload(
@@ -503,7 +506,7 @@ pub trait InterchainTokenServiceContract:
                     source_chain,
                     source_address,
                     payload_hash,
-                    payload_raw,
+                    payload,
                 );
             }
             _ => {

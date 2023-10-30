@@ -22,6 +22,7 @@ import {
   tokenManagerLockUnlock,
   tokenManagerMintBurn
 } from '../itsHelpers';
+import { AbiCoder } from 'ethers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -80,15 +81,17 @@ afterEach(async () => {
 });
 
 const mockGatewayCall = async (tokenId: string) => {
-  const payload = e.Buffer(
-    e.Tuple(
-      e.U(1), // selector receive token
-      e.Bytes(tokenId),
-      e.Buffer(otherUser.toTopBytes()),
-      e.U(1_000),
-    ).toTopBytes()
-  );
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
+  const payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'bytes', 'uint256'],
+    [
+      1, // selector receive token
+      Buffer.from(tokenId, 'hex'),
+      Buffer.from(otherUser.toTopBytes()),
+      1_000,
+    ]
+  ).substring(2);
+
+  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([
@@ -394,7 +397,7 @@ test("Execute receive token express caller", async () => {
   let payload = await mockGatewayCall(computedTokenId);
 
   const data = Buffer.concat([
-    Buffer.from(payload.toTopHex(), 'hex'),
+    Buffer.from(payload, 'hex'),
     Buffer.from('commandId'),
   ]);
   const expressReceiveSlot = createKeccakHash('keccak256').update(data).digest('hex');
@@ -478,7 +481,14 @@ test("Execute receive token express caller", async () => {
   });
 });
 
-test.only("Execute receive token errors", async () => {
+test("Execute receive token errors", async () => {
+  let payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256'],
+    [
+      1, // selector receive token
+    ]
+  ).substring(2);
+
   // Invalid other address from other chain
   await user.callContract({
     callee: its,
@@ -488,9 +498,7 @@ test.only("Execute receive token errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
-      e.Buffer(
-        e.Tuple(e.U(1)).toTopBytes()
-      ),
+      payload,
     ],
   }).assertFail({ code: 4, message: 'Not remote service' });
 
@@ -502,16 +510,17 @@ test.only("Execute receive token errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(
-        e.Tuple(e.U(1)).toTopBytes()
-      ),
+      payload,
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
-  const payload = e.Buffer(
-    e.Tuple(e.U(5)).toTopBytes()
-  );
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
+  payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256'],
+    [
+      5, // selector unknown
+    ]
+  ).substring(2);
+  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([

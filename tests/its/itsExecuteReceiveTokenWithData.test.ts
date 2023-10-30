@@ -23,6 +23,7 @@ import {
   tokenManagerLockUnlock,
   tokenManagerMintBurn
 } from '../itsHelpers';
+import { AbiCoder } from 'ethers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -81,19 +82,18 @@ afterEach(async () => {
 });
 
 const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
-  const payload = e.Buffer(
-    e.Tuple(
-      e.U(2), // selector receive token with data
-      e.Bytes(tokenId),
-      e.Buffer(pingPong.toTopBytes()), // destination address
-      e.U(1_000),
-      e.Buffer(otherUser.toTopBytes()), // source address (in this case address for ping)
-      e.Buffer(
-        e.Str(fnc).toTopBytes() // data passed to contract, in this case the function as a string
-      )
-    ).toTopBytes()
-  );
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
+  const payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'bytes', 'uint256', 'bytes', 'bytes'],
+    [
+      2, // selector receive token with data
+      Buffer.from(tokenId, 'hex'),
+      Buffer.from(pingPong.toTopBytes()),
+      1_000,
+      Buffer.from(otherUser.toTopBytes()),
+      Buffer.from(e.Str(fnc).toTopBytes()) // data passed to contract, in this case the function as a string)
+    ]
+  ).substring(2);
+  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([
@@ -325,7 +325,7 @@ test("Execute receive token with data express caller", async () => {
   let payload = await mockGatewayCall(computedTokenId);
 
   const data = Buffer.concat([
-    Buffer.from(payload.toTopHex(), 'hex'),
+    Buffer.from(payload, 'hex'),
     Buffer.from('commandId'),
   ]);
   const expressReceiveSlot = createKeccakHash('keccak256').update(data).digest('hex');
@@ -405,6 +405,13 @@ test("Execute receive token with data express caller", async () => {
 });
 
 test("Execute receive token with data errors", async () => {
+  const payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256'],
+    [
+      1, // selector receive token
+    ]
+  ).substring(2);
+
   // Invalid other address from other chain
   await user.callContract({
     callee: its,
@@ -414,9 +421,7 @@ test("Execute receive token with data errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
-      e.Buffer(
-        e.Tuple(e.U(2)).toTopBytes()
-      ),
+      payload,
     ],
   }).assertFail({ code: 4, message: 'Not remote service' });
 
@@ -428,9 +433,7 @@ test("Execute receive token with data errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(
-        e.Tuple(e.U(2)).toTopBytes()
-      ),
+      payload,
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 });

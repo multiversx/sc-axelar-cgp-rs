@@ -8,6 +8,7 @@ use crate::{events, proxy};
 use core::convert::TryFrom;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use crate::abi::AbiDecode;
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:
@@ -21,8 +22,7 @@ pub trait ExecutableModule:
     ) {
         let express_caller = self.pop_express_receive_token(&payload, &command_id);
 
-        // TODO: Switch this to abi decoding
-        let send_token_payload = SendTokenPayload::<Self::Api>::top_decode(payload).unwrap();
+        let send_token_payload = SendTokenPayload::<Self::Api>::abi_decode(payload);
 
         let destination_address =
             ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
