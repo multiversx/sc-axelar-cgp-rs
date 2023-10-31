@@ -53,7 +53,7 @@ pub trait Auth {
     #[endpoint(transferOperatorship)]
     fn transfer_operatorship(&self, transfer_data: TransferData<Self::Api>) {
         require!(
-            transfer_data.new_operators.len() > 0
+            !transfer_data.new_operators.is_empty()
                 && self.contains_no_duplicate(&transfer_data.new_operators),
             "Invalid operators"
         );
@@ -103,16 +103,15 @@ pub trait Auth {
         threshold: BigUint,
         signatures: ManagedVec<ManagedByteArray<ED25519_SIGNATURE_BYTE_LEN>>,
     ) {
-        let mut operator_index: usize = 0;
         let mut weight = BigUint::zero();
 
-        for signature in signatures.iter() {
+        for (operator_index, signature) in signatures.iter().enumerate() {
             let address = operators.get(operator_index);
 
             self.crypto().verify_ed25519(
-                &address.as_managed_buffer(),
-                &message_hash.as_managed_buffer(),
-                &signature.as_managed_buffer(),
+                address.as_managed_buffer(),
+                message_hash.as_managed_buffer(),
+                signature.as_managed_buffer(),
             );
 
             // Check that operators do not repeat
@@ -127,8 +126,6 @@ pub trait Auth {
             if weight >= threshold {
                 return;
             }
-
-            operator_index += 1;
         }
 
         sc_panic!("Low signatures weight");

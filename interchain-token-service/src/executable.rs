@@ -1,5 +1,6 @@
 multiversx_sc::imports!();
 
+use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     DeployStandardizedTokenAndManagerPayload, DeployTokenManagerParams, DeployTokenManagerPayload,
     SendTokenPayload, TokenId, TokenManagerType, SELECTOR_RECEIVE_TOKEN,
@@ -8,7 +9,6 @@ use crate::{events, proxy};
 use core::convert::TryFrom;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use crate::abi::AbiEncodeDecode;
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:
@@ -75,7 +75,7 @@ pub trait ExecutableModule:
             source_chain,
             send_token_payload.source_address.unwrap(),
             send_token_payload.data.unwrap(),
-            send_token_payload.token_id.clone(),
+            send_token_payload.token_id,
             token_identifier,
             amount,
             command_id,
@@ -106,17 +106,14 @@ pub trait ExecutableModule:
         payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         payload: ManagedBuffer,
     ) {
-        let data =
-            DeployStandardizedTokenAndManagerPayload::<Self::Api>::abi_decode(payload);
+        let data = DeployStandardizedTokenAndManagerPayload::<Self::Api>::abi_decode(payload);
 
         let operator_raw = ManagedAddress::try_from(data.operator);
-        let operator;
-
-        if operator_raw.is_err() {
-            operator = self.blockchain().get_sc_address();
+        let operator = if operator_raw.is_err() {
+            self.blockchain().get_sc_address()
         } else {
-            operator = operator_raw.unwrap();
-        }
+            operator_raw.unwrap()
+        };
 
         // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
         // This is because we can not deploy token manager and call it to deploy the token in the same transaction
@@ -145,20 +142,18 @@ pub trait ExecutableModule:
         let token_manager_address = token_manager_address_mapper.get();
 
         let distributor_raw = ManagedAddress::try_from(data.distributor);
-        let distributor;
-        if distributor_raw.is_err() {
-            distributor = token_manager_address;
+        let distributor = if distributor_raw.is_err() {
+            token_manager_address
         } else {
-            distributor = distributor_raw.unwrap();
-        }
+            distributor_raw.unwrap()
+        };
 
         let mint_to_raw = ManagedAddress::try_from(data.mint_to);
-        let mint_to;
-        if mint_to_raw.is_err() {
-            mint_to = distributor.clone();
+        let mint_to = if mint_to_raw.is_err() {
+            distributor.clone()
         } else {
-            mint_to = mint_to_raw.unwrap();
-        }
+            mint_to_raw.unwrap()
+        };
 
         // The second time this is called, the call will be validated
         let valid = self.gateway_validate_contract_call(

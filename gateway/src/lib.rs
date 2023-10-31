@@ -168,7 +168,7 @@ pub trait Gateway:
             },
         );
 
-        return true;
+        true
     }
 
     fn transfer_operatorship(&self, params: &ManagedBuffer) -> bool {
@@ -176,7 +176,7 @@ pub trait Gateway:
 
         self.operatorship_transferred_event(params);
 
-        return true;
+        true
     }
 
     fn get_is_command_executed_key(

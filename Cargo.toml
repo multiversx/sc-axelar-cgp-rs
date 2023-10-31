@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "auth",
+    "auth/meta",
+    "gas-service",
+    "gas-service/meta",
+    "gateway",
+    "gateway/meta",
+    "interchain-token-service",
+    "interchain-token-service/meta",
+    "ping-pong-interchain",
+    "ping-pong-interchain/meta",
+    "remote-address-validator",
+    "remote-address-validator/meta",
+    "token-manager-lock-unlock",
+    "token-manager-lock-unlock/meta",
+    "token-manager-mint-burn",
+    "token-manager-mint-burn/meta",
+]

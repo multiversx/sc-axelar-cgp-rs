@@ -122,7 +122,7 @@ impl<M: ManagedTypeApi> Token<M> {
                 result.append_bytes(bytes);
             } else {
                 let mut padded = [0u8; 32];
-                padded[..to_copy].copy_from_slice(&bytes);
+                padded[..to_copy].copy_from_slice(bytes);
                 result.append_bytes(&padded);
             }
 
@@ -145,7 +145,7 @@ impl<M: ManagedTypeApi> Token<M> {
         let _ = bytes.load_slice(0, loaded_slice);
 
         let mut padded = [0u8; 32];
-        padded[start_from..32].copy_from_slice(&loaded_slice);
+        padded[start_from..32].copy_from_slice(loaded_slice);
 
         padded
     }
@@ -258,7 +258,6 @@ impl<M: ManagedTypeApi> ParamType<M> {
     }
 }
 
-// TODO: Test this using Rust tests
 pub trait AbiEncodeDecode<M: ManagedTypeApi> {
     fn abi_encode(self) -> ManagedBuffer<M>;
 
@@ -279,7 +278,7 @@ pub trait AbiEncodeDecode<M: ManagedTypeApi> {
             token.tail_append(&mut acc);
         }
 
-        return acc;
+        acc
     }
 
     fn raw_abi_decode<const CAP: usize>(

@@ -178,7 +178,7 @@ pub trait InterchainTokenServiceContract:
 
         let deployer = self.blockchain().get_caller();
 
-        let token_name = token_identifier.clone().into_name();
+        let token_name = token_identifier.into_name();
 
         let token_id = self.get_custom_token_id(&deployer, &token_name);
 
@@ -559,7 +559,7 @@ pub trait InterchainTokenServiceContract:
 
         encoded.append(prefix_custom_token_id.as_managed_buffer());
         encoded.append(sender.as_managed_buffer());
-        encoded.append(&salt);
+        encoded.append(salt);
 
         self.crypto().keccak256(encoded)
     }

@@ -26,7 +26,7 @@ pub enum TokenManagerType {
 }
 
 impl TokenManagerType {
-    fn to_u8(&self) -> u8 {
+    fn to_u8(self) -> u8 {
         match self {
             TokenManagerType::MintBurn => 0,
             TokenManagerType::MintBurnFrom => 1,
@@ -66,14 +66,14 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for SendTokenPayload<M> {
             ]);
         }
 
-        return Self::raw_abi_encode(&[
+        Self::raw_abi_encode(&[
             Token::Uint256(self.selector),
             Token::Bytes32(self.token_id),
             Token::Bytes(self.destination_address),
             Token::Uint256(self.amount),
             Token::Bytes(self.source_address.unwrap()),
             Token::Bytes(self.data.unwrap()),
-        ]);
+        ])
     }
 
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
@@ -142,12 +142,12 @@ pub struct DeployTokenManagerPayload<M: ManagedTypeApi> {
 
 impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployTokenManagerPayload<M> {
     fn abi_encode(self) -> ManagedBuffer<M> {
-        return Self::raw_abi_encode(&[
+        Self::raw_abi_encode(&[
             Token::Uint256(self.selector),
             Token::Bytes32(self.token_id),
             Token::Uint8(self.token_manager_type.to_u8()),
             Token::Bytes(self.params),
-        ]);
+        ])
     }
 
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
@@ -193,7 +193,7 @@ pub struct DeployStandardizedTokenAndManagerPayload<M: ManagedTypeApi> {
 
 impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployStandardizedTokenAndManagerPayload<M> {
     fn abi_encode(self) -> ManagedBuffer<M> {
-        return Self::raw_abi_encode(&[
+        Self::raw_abi_encode(&[
             Token::Uint256(self.selector),
             Token::Bytes32(self.token_id),
             Token::String(self.name),
@@ -203,7 +203,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployStandardizedTokenAndManager
             Token::Bytes(self.mint_to),
             Token::Uint256(self.mint_amount),
             Token::Bytes(self.operator),
-        ]);
+        ])
     }
 
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
