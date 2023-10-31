@@ -229,7 +229,7 @@ impl<M: ManagedTypeApi> ParamType<M> {
     fn peek_32_bytes(data: &ManagedBuffer<M>, offset: usize) -> Word {
         let mut word = [0u8; 32];
 
-        let _ = data.load_slice(offset, &mut word);
+        data.load_slice(offset, &mut word).unwrap();
 
         word
     }

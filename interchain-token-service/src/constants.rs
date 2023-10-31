@@ -15,7 +15,9 @@ pub const SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN: u64 = 4;
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 
 // Enum has same types as on EVM for compatibility
-#[derive(TypeAbi, TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, Copy)]
+#[derive(
+    TypeAbi, Debug, PartialEq, TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, Copy,
+)]
 pub enum TokenManagerType {
     MintBurn,
     MintBurnFrom,
@@ -207,17 +209,22 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployStandardizedTokenAndManager
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
         let mut result = ArrayVec::<Token<M>, 9>::new();
 
-        Self::raw_abi_decode(&[
-            ParamType::Uint256,
-            ParamType::Bytes32,
-            ParamType::String,
-            ParamType::String,
-            ParamType::Uint8,
-            ParamType::Bytes,
-            ParamType::Bytes,
-            ParamType::Uint256,
-            ParamType::Bytes
-        ], &payload, &mut result, 0);
+        Self::raw_abi_decode(
+            &[
+                ParamType::Uint256,
+                ParamType::Bytes32,
+                ParamType::String,
+                ParamType::String,
+                ParamType::Uint8,
+                ParamType::Bytes,
+                ParamType::Bytes,
+                ParamType::Uint256,
+                ParamType::Bytes,
+            ],
+            &payload,
+            &mut result,
+            0,
+        );
 
         let operator = result.pop().unwrap().into_managed_buffer();
         let mint_amount = result.pop().unwrap().into_biguint();

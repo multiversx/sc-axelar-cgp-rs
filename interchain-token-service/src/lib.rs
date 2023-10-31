@@ -16,12 +16,12 @@ use crate::proxy::CallbackProxy;
 
 multiversx_sc::imports!();
 
-mod abi;
-mod constants;
-mod events;
-mod executable;
-mod proxy;
-mod remote;
+pub mod abi;
+pub mod constants;
+pub mod events;
+pub mod executable;
+pub mod proxy;
+pub mod remote;
 
 #[multiversx_sc::contract]
 pub trait InterchainTokenServiceContract:
