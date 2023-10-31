@@ -8,7 +8,7 @@ use crate::{events, proxy};
 use core::convert::TryFrom;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use crate::abi::AbiDecode;
+use crate::abi::AbiEncodeDecode;
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:
@@ -37,7 +37,7 @@ pub trait ExecutableModule:
             return;
         }
 
-        if send_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN) {
+        if send_token_payload.selector == SELECTOR_RECEIVE_TOKEN {
             let (_, amount) = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -83,9 +83,8 @@ pub trait ExecutableModule:
     }
 
     fn process_deploy_token_manager_payload(&self, payload: ManagedBuffer) {
-        // TODO: Decode using abi decoding
         let deploy_token_manager_payload =
-            DeployTokenManagerPayload::<Self::Api>::top_decode(payload).unwrap();
+            DeployTokenManagerPayload::<Self::Api>::abi_decode(payload);
 
         let params =
             DeployTokenManagerParams::<Self::Api>::top_decode(deploy_token_manager_payload.params)
@@ -107,9 +106,8 @@ pub trait ExecutableModule:
         payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         payload: ManagedBuffer,
     ) {
-        // TODO: Decode using abi decoding
         let data =
-            DeployStandardizedTokenAndManagerPayload::<Self::Api>::top_decode(payload).unwrap();
+            DeployStandardizedTokenAndManagerPayload::<Self::Api>::abi_decode(payload);
 
         let operator_raw = ManagedAddress::try_from(data.operator);
         let operator;

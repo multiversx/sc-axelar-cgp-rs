@@ -1,11 +1,16 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
+use core::convert::Infallible;
+use core::marker::PhantomData;
+
 use multiversx_sc::types::ManagedBuffer;
+
+/// Basic Solidity ABI implementation in Rust for MultiversX managed types
+/// Loosely based on https://github.com/rust-ethereum/ethabi
 
 pub type Word = [u8; 32];
 
-#[derive(TypeAbi, TopEncode)]
 pub enum Token<M: ManagedTypeApi> {
     Uint256(BigUint<M>),
     Bytes32(ManagedByteArray<M, 32>),
@@ -42,17 +47,15 @@ impl<M: ManagedTypeApi> Token<M> {
 
         panic!("Unsupported type");
     }
-}
 
-pub enum ParamType {
-    Uint256,
-    Bytes32,
-    Bytes,
-    String,
-    Uint8,
-}
+    pub fn into_u8(self) -> u8 {
+        if let Token::Uint8(value) = self {
+            return value;
+        }
 
-impl<M: ManagedTypeApi> Token<M> {
+        panic!("Unsupported type");
+    }
+
     fn head_len(&self) -> u32 {
         match self {
             Token::Uint256(_)
@@ -66,85 +69,86 @@ impl<M: ManagedTypeApi> Token<M> {
     fn tail_len(&self) -> u32 {
         match self {
             Token::Uint256(_) | Token::Bytes32(_) | Token::Uint8(_) => 0,
-            Token::Bytes(data) | Token::String(data) => pad_bytes_len(data) * 32,
+            Token::Bytes(data) | Token::String(data) => Self::pad_bytes_len(data) * 32,
         }
     }
 
     fn head_append(&self, acc: &mut ManagedBuffer<M>, suffix_offset: u32) {
         match self {
-            Token::Uint256(data) => acc.append_bytes(&pad_biguint(data)),
-            Token::Bytes32(data) => fixed_bytes_append(acc, data.as_managed_buffer()),
-            Token::Bytes(_) | Token::String(_) => acc.append_bytes(&pad_u32(suffix_offset)),
-            Token::Uint8(data) => acc.append_bytes(&pad_u32(*data as u32)),
+            Token::Uint256(data) => acc.append_bytes(&Self::pad_biguint(data)),
+            Token::Bytes32(data) => Self::fixed_bytes_append(acc, data.as_managed_buffer()),
+            Token::Bytes(_) | Token::String(_) => acc.append_bytes(&Self::pad_u32(suffix_offset)),
+            Token::Uint8(data) => acc.append_bytes(&Self::pad_u32(*data as u32)),
         }
     }
 
     fn tail_append(&self, acc: &mut ManagedBuffer<M>) {
         match self {
-            Token::Bytes(data) | Token::String(data) => pad_bytes_append(acc, data),
+            Token::Bytes(data) | Token::String(data) => Self::pad_bytes_append(acc, data),
             _ => {}
         };
     }
-}
 
-pub fn pad_u32(value: u32) -> Word {
-    let mut padded = [0u8; 32];
-    padded[28..32].copy_from_slice(&value.to_be_bytes());
-    padded
-}
-
-fn pad_bytes_len<M: ManagedTypeApi>(bytes: &ManagedBuffer<M>) -> u32 {
-    // "+ 1" because len is also appended
-    ((bytes.len() + 31) / 32) as u32 + 1
-}
-
-fn pad_bytes_append<M: ManagedTypeApi>(data: &mut ManagedBuffer<M>, bytes: &ManagedBuffer<M>) {
-    data.append_bytes(&pad_u32(bytes.len() as u32));
-    fixed_bytes_append(data, bytes);
-}
-
-fn fixed_bytes_append<M: ManagedTypeApi>(result: &mut ManagedBuffer<M>, data: &ManagedBuffer<M>) {
-    let len = (data.len() + 31) / 32;
-
-    let mut i = 0;
-    data.for_each_batch::<32, _>(|bytes| {
-        let to_copy = match i == len - 1 {
-            false => 32,
-            true => match bytes.len() % 32 {
-                0 => 32,
-                x => x,
-            },
-        };
-
-        if to_copy == 32 {
-            result.append_bytes(bytes);
-        } else {
-            let mut padded = [0u8; 32];
-            padded[..to_copy].copy_from_slice(&bytes);
-            result.append_bytes(&padded);
-        }
-
-        i += 1;
-    });
-}
-
-pub fn pad_biguint<M: ManagedTypeApi>(value: &BigUint<M>) -> Word {
-    let bytes = value.to_bytes_be_buffer();
-
-    // TODO: How to better handle this?
-    if bytes.len() > 32 {
-        panic!("Unsupported number size");
+    fn pad_bytes_len(bytes: &ManagedBuffer<M>) -> u32 {
+        // "+ 1" because len is also appended
+        ((bytes.len() + 31) / 32) as u32 + 1
     }
 
-    let start_from = 32 - bytes.len();
+    fn pad_bytes_append(data: &mut ManagedBuffer<M>, bytes: &ManagedBuffer<M>) {
+        data.append_bytes(&Self::pad_u32(bytes.len() as u32));
+        Self::fixed_bytes_append(data, bytes);
+    }
 
-    let mut buffer = [0u8; 32];
-    let loaded_slice = &mut buffer[0..bytes.len()];
-    let _ = bytes.load_slice(0, loaded_slice);
+    fn pad_u32(value: u32) -> Word {
+        let mut padded = [0u8; 32];
+        padded[28..32].copy_from_slice(&value.to_be_bytes());
+        padded
+    }
 
-    let mut padded = [0u8; 32];
-    padded[start_from..32].copy_from_slice(&loaded_slice);
-    padded
+    fn fixed_bytes_append(result: &mut ManagedBuffer<M>, data: &ManagedBuffer<M>) {
+        let len = (data.len() + 31) / 32;
+
+        let mut i = 0;
+        data.for_each_batch::<32, _>(|bytes| {
+            let to_copy = match i == len - 1 {
+                false => 32,
+                true => match bytes.len() % 32 {
+                    0 => 32,
+                    x => x,
+                },
+            };
+
+            if to_copy == 32 {
+                result.append_bytes(bytes);
+            } else {
+                let mut padded = [0u8; 32];
+                padded[..to_copy].copy_from_slice(&bytes);
+                result.append_bytes(&padded);
+            }
+
+            i += 1;
+        });
+    }
+
+    fn pad_biguint(value: &BigUint<M>) -> Word {
+        let bytes = value.to_bytes_be_buffer();
+
+        // TODO: How to better handle this?
+        if bytes.len() > 32 {
+            panic!("Unsupported number size");
+        }
+
+        let start_from = 32 - bytes.len();
+
+        let mut buffer = [0u8; 32];
+        let loaded_slice = &mut buffer[0..bytes.len()];
+        let _ = bytes.load_slice(0, loaded_slice);
+
+        let mut padded = [0u8; 32];
+        padded[start_from..32].copy_from_slice(&loaded_slice);
+
+        padded
+    }
 }
 
 pub struct DecodeResult<M: ManagedTypeApi> {
@@ -152,138 +156,146 @@ pub struct DecodeResult<M: ManagedTypeApi> {
     pub new_offset: usize,
 }
 
-fn peek_32_bytes<M: ManagedTypeApi>(data: &ManagedBuffer<M>, offset: usize) -> Word {
-    let mut word = [0u8; 32];
-
-    let _ = data.load_slice(offset, &mut word);
-
-    word
+pub enum ParamType<M: ManagedTypeApi> {
+    Uint256,
+    Bytes32,
+    Bytes,
+    String,
+    Uint8,
+    _None(Infallible, PhantomData<M>),
 }
 
-fn as_usize(slice: &Word) -> usize {
-    if !slice[..28].iter().all(|x| *x == 0) {
-        panic!("Invalid data");
-    }
+impl<M: ManagedTypeApi> ParamType<M> {
+    pub fn abi_decode(&self, data: &ManagedBuffer<M>, offset: usize) -> DecodeResult<M> {
+        match self {
+            ParamType::Uint256 => {
+                let slice = Self::peek_32_bytes(data, offset);
 
-    ((slice[28] as usize) << 24)
-        + ((slice[29] as usize) << 16)
-        + ((slice[30] as usize) << 8)
-        + (slice[31] as usize)
-}
+                let value = BigUint::from_bytes_be(&slice);
 
-fn as_u8(slice: &Word) -> u8 {
-    if !slice[..31].iter().all(|x| *x == 0) {
-        panic!("Invalid data");
-    }
+                DecodeResult {
+                    token: Token::Uint256(value),
+                    new_offset: offset + 32,
+                }
+            }
+            ParamType::Bytes32 => {
+                let slice = Self::peek_32_bytes(data, offset);
 
-    slice[31]
-}
+                let value = ManagedByteArray::<M, 32>::from(&slice);
 
-fn take_bytes<M: ManagedTypeApi>(data: &ManagedBuffer<M>, offset: usize, len: usize) -> ManagedBuffer<M> {
-    data.copy_slice(offset, len).unwrap()
-}
+                DecodeResult {
+                    token: Token::Bytes32(value),
+                    new_offset: offset + 32,
+                }
+            }
+            ParamType::Bytes => {
+                let dynamic_offset = Self::take_usize(&Self::peek_32_bytes(data, offset));
+                let len = Self::take_usize(&Self::peek_32_bytes(data, dynamic_offset));
 
-pub fn decode_param<M: ManagedTypeApi>(
-    param: &ParamType,
-    data: &ManagedBuffer<M>,
-    offset: usize,
-) -> DecodeResult<M> {
-    match param {
-        ParamType::Uint256 => {
-            let slice = peek_32_bytes(data, offset);
+                let value = Self::take_bytes(data, dynamic_offset + 32, len);
 
-            let value = BigUint::from_bytes_be(&slice);
+                DecodeResult {
+                    token: Token::Bytes(value),
+                    new_offset: offset + 32,
+                }
+            }
+            ParamType::String => {
+                let dynamic_offset = Self::take_usize(&Self::peek_32_bytes(data, offset));
+                let len = Self::take_usize(&Self::peek_32_bytes(data, dynamic_offset));
 
-            DecodeResult {
-                token: Token::Uint256(value),
-                new_offset: offset + 32,
+                let value = Self::take_bytes(data, dynamic_offset + 32, len);
+
+                DecodeResult {
+                    token: Token::String(value),
+                    new_offset: offset + 32,
+                }
+            }
+            ParamType::Uint8 => {
+                let slice = Self::peek_32_bytes(data, offset);
+
+                let value = Self::take_u8(&slice);
+
+                DecodeResult {
+                    token: Token::Uint8(value),
+                    new_offset: offset + 32,
+                }
+            }
+            _ => {
+                unreachable!()
             }
         }
-        ParamType::Bytes32 => {
-            let slice = peek_32_bytes(data, offset);
+    }
 
-            let value = ManagedByteArray::<M, 32>::from(&slice);
+    fn peek_32_bytes(data: &ManagedBuffer<M>, offset: usize) -> Word {
+        let mut word = [0u8; 32];
 
-            DecodeResult {
-                token: Token::Bytes32(value),
-                new_offset: offset + 32,
-            }
-        },
-        ParamType::Bytes => {
-            let dynamic_offset = as_usize(&peek_32_bytes(data, offset));
-            let len = as_usize(&peek_32_bytes(data, dynamic_offset));
+        let _ = data.load_slice(offset, &mut word);
 
-            let value = take_bytes(data, dynamic_offset + 32, len);
+        word
+    }
 
-            DecodeResult {
-                token: Token::Bytes(value),
-                new_offset: offset + 32,
-            }
-        },
-        ParamType::String => {
-            let dynamic_offset = as_usize(&peek_32_bytes(data, offset));
-            let len = as_usize(&peek_32_bytes(data, dynamic_offset));
+    fn take_bytes(data: &ManagedBuffer<M>, offset: usize, len: usize) -> ManagedBuffer<M> {
+        data.copy_slice(offset, len).unwrap()
+    }
 
-            let value = take_bytes(data, dynamic_offset + 32, len);
+    fn take_usize(slice: &Word) -> usize {
+        if !slice[..28].iter().all(|x| *x == 0) {
+            panic!("Invalid data");
+        }
 
-            DecodeResult {
-                token: Token::String(value),
-                new_offset: offset + 32,
-            }
-        },
-        ParamType::Uint8 => {
-            let slice = peek_32_bytes(data, offset);
+        ((slice[28] as usize) << 24)
+            + ((slice[29] as usize) << 16)
+            + ((slice[30] as usize) << 8)
+            + (slice[31] as usize)
+    }
 
-            let value = as_u8(&slice);
+    fn take_u8(slice: &Word) -> u8 {
+        if !slice[..31].iter().all(|x| *x == 0) {
+            panic!("Invalid data");
+        }
 
-            DecodeResult {
-                token: Token::Uint8(value),
-                new_offset: offset + 32,
-            }
-        },
+        slice[31]
     }
 }
 
 // TODO: Test this using Rust tests
-pub fn abi_encode<M: ManagedTypeApi>(tokens: &[Token<M>]) -> ManagedBuffer<M> {
-    let heads_len = tokens.iter().fold(0, |head_acc, t| head_acc + t.head_len());
-
-    let mut acc = ManagedBuffer::new();
-    let mut offset = heads_len;
-    for token in tokens {
-        token.head_append(&mut acc, offset);
-
-        offset += token.tail_len();
-    }
-
-    for token in tokens {
-        token.tail_append(&mut acc);
-    }
-
-    return acc;
-}
-
-pub fn abi_decode<M: ManagedTypeApi, const CAP: usize>(
-    types: &[ParamType],
-    data: &ManagedBuffer<M>,
-    result: &mut ArrayVec<Token<M>, CAP>,
-    initial_offset: usize
-) {
-    let mut offset = initial_offset * 32;
-
-    for param in types {
-        let res = decode_param(param, data, offset);
-
-        offset = res.new_offset;
-
-        result.push(res.token);
-    }
-}
-
-pub trait AbiEncode<M: ManagedTypeApi> {
+pub trait AbiEncodeDecode<M: ManagedTypeApi> {
     fn abi_encode(self) -> ManagedBuffer<M>;
-}
 
-pub trait AbiDecode<M: ManagedTypeApi> {
     fn abi_decode(payload: ManagedBuffer<M>) -> Self;
+
+    fn raw_abi_encode(tokens: &[Token<M>]) -> ManagedBuffer<M> {
+        let heads_len = tokens.iter().fold(0, |head_acc, t| head_acc + t.head_len());
+
+        let mut acc = ManagedBuffer::new();
+        let mut offset = heads_len;
+        for token in tokens {
+            token.head_append(&mut acc, offset);
+
+            offset += token.tail_len();
+        }
+
+        for token in tokens {
+            token.tail_append(&mut acc);
+        }
+
+        return acc;
+    }
+
+    fn raw_abi_decode<const CAP: usize>(
+        types: &[ParamType<M>],
+        data: &ManagedBuffer<M>,
+        result: &mut ArrayVec<Token<M>, CAP>,
+        initial_offset: usize,
+    ) {
+        let mut offset = initial_offset * 32;
+
+        for param in types {
+            let res = param.abi_decode(data, offset);
+
+            offset = res.new_offset;
+
+            result.push(res.token);
+        }
+    }
 }

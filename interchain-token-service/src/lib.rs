@@ -4,9 +4,9 @@ use core::convert::TryFrom;
 use core::ops::Deref;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use multiversx_sc::codec::{EncodeError, TopDecodeInput};
+use multiversx_sc::codec::{EncodeError};
 
-use crate::abi::{decode_param, AbiDecode, ParamType};
+use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::constants::{
     Metadata, SendTokenPayload, TokenId, TokenManagerType, PREFIX_CUSTOM_TOKEN_ID,
     PREFIX_STANDARDIZED_TOKEN_ID, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
@@ -312,7 +312,7 @@ pub trait InterchainTokenServiceContract:
             "Wrong token or amount sent"
         );
 
-        if receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN_WITH_DATA) {
+        if receive_token_payload.selector == SELECTOR_RECEIVE_TOKEN_WITH_DATA {
             self.executable_contract_express_execute_with_interchain_token(
                 destination_address,
                 source_chain,
@@ -330,7 +330,7 @@ pub trait InterchainTokenServiceContract:
         }
 
         require!(
-            receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN),
+            receive_token_payload.selector == SELECTOR_RECEIVE_TOKEN,
             "Invalid express selector"
         );
 
@@ -460,12 +460,11 @@ pub trait InterchainTokenServiceContract:
 
         let payload_hash = self.crypto().keccak256(&payload);
 
-        // TODO: Use abi decoding here. Optimize to not decode this selector multiple times?
-        let selector = decode_param(&ParamType::Uint256, &payload, 0)
+        let selector = ParamType::Uint256.abi_decode(&payload, 0)
             .token
             .into_biguint()
             .to_u64()
-            .unwrap() as u32;
+            .unwrap();
 
         match selector {
             SELECTOR_RECEIVE_TOKEN
@@ -526,10 +525,6 @@ pub trait InterchainTokenServiceContract:
 
     fn validate_token(&self, token_identifier: &EgldOrEsdtTokenIdentifier) {
         require!(token_identifier.is_valid(), "Invalid token identifier");
-
-        // TODO: This also has validation for token in sol contract, check if this works and checks that the token exists?
-        // In sol contract this returns the name and decimals of the token, but there is no way to do that on MultiversX sync
-        // Should we require that a small amount of the token be sent to an endpoint to validate that it actually exists?
     }
 
     #[view]

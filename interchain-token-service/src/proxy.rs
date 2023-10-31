@@ -7,7 +7,7 @@ use crate::constants::{
 use crate::events;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use crate::abi::AbiEncode;
+use crate::abi::AbiEncodeDecode;
 
 pub mod remote_address_validator_proxy {
     multiversx_sc::imports!();

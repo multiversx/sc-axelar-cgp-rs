@@ -2,7 +2,7 @@ multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::{events, proxy};
-use crate::abi::AbiEncode;
+use crate::abi::AbiEncodeDecode;
 use crate::constants::{DeployTokenManagerPayload, Metadata, SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA, SendTokenPayload, TokenId, TokenManagerType};
 use crate::proxy::remote_address_validator_proxy::ProxyTrait as RemoteAddressValidatorProxyTrait;
 
@@ -49,8 +49,6 @@ pub trait RemoteModule:
     ) {
         let (version, metadata, is_err) = self.decode_metadata(raw_metadata);
 
-        // TODO: Not sure what this metadata contains exactly and how to decode it
-        // This check was changed here because of different encoding/decoding
         if is_err {
             let data = SendTokenPayload {
                 selector: BigUint::from(SELECTOR_RECEIVE_TOKEN),
@@ -97,8 +95,8 @@ pub trait RemoteModule:
         );
     }
 
+    // TODO: Check if this is correct and what this metadata actually is
     fn decode_metadata(&self, raw_metadata: ManagedBuffer) -> (u32, ManagedBuffer, bool) {
-        // TODO: Check if this is correct and what this metadata actually is
         let metadata = Metadata::<Self::Api>::top_decode(raw_metadata);
         let raw_metadata: Metadata<Self::Api>;
         let is_err;
@@ -113,8 +111,6 @@ pub trait RemoteModule:
             is_err = false;
         }
 
-        // TODO: This does some Assembly logic specific to sol, what should we actually do here?
-        // Currently we use the MultiversX encoding/decoding and a custom struct for this
         (raw_metadata.version, raw_metadata.metadata, is_err)
     }
 
