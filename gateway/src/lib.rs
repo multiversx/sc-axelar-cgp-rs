@@ -6,15 +6,13 @@ mod constants;
 mod events;
 mod proxy;
 
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::constants::*;
 use crate::events::{ContractCallApprovedData, ContractCallData};
 use core::ops::Deref;
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::contract]
-pub trait Gateway:
-    proxy::ProxyModule + events::Events
-{
+pub trait Gateway: proxy::ProxyModule + events::Events {
     #[init]
     fn init(&self, auth_module: &ManagedAddress) {
         require!(
