@@ -4,7 +4,7 @@ Before diving into these contracts, it is important to have a basic high level u
 - https://docs.axelar.dev/learn
 - https://docs.axelar.dev/learn/network/flow
 
-## CGP Contracts
+## CGP (Cross-chain Gateway Protocol) Contracts
 
 The MultiversX CGP contracts are based on the Axelar CGP (Cross-Chain Gateway Protocol) spec:
 - https://github.com/axelarnetwork/cgp-spec
@@ -16,3 +16,21 @@ The following contracts were written starting from the referance Solidity implem
 
 Also take a look at the full [Axelar Cross-Chain Gateway Protocol Specification MultiversX](https://docs.google.com/document/d/1hrMicw1I4tFHHAITNtmuxlyfqTkC--Pq7XmXBCRPAxU/edit?usp=sharing) if interested,
 although the README files in this project should contain most of the information from there.
+
+## ITS (Interchain Token Service) Contracts
+
+ITS is a comprised of a set of contracts which enable token transfers on top of the CGP protocol.
+
+It is based on the Axelar ITS Solidity implementation available at the time of writing: (final specs TBD)
+- https://github.com/axelarnetwork/interchain-token-service/tree/main
+
+It consists of the following contracts:
+- [Interchain Token Service](/interchain-token-service) - main contract which handles transfering of tokens, registering & deploying of token managers
+- [Remote Address Validator](/remote-address-validator) - holds & validates addresses of other ITS contracts from other chains
+- [Token Managed Lock Unlock](/token-manager-lock-unlock) - an implementation of a Token Manager which stores tokens in the contract
+- [Token Manager Mint Burn](/token-manager-mint-burn) - an implementation of a Token Manager which burns & mints tokens as needed
+
+There are also 3 modules used by the Token Manager contracts:
+- [Flow Limit module](/modules/flow-limit) - used to manage in/out flow limit of tokens
+- [Operatable module](/modules/operatable) - holds details regarding the operator (pseudo owner) of a contract
+- [Token Manager module](/modules/token-manager) - base module implemented by Token Managers
