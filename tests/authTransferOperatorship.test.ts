@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
-import { ALICE_ADDR, BOB_ADDR, getOperatorsHash, MOCK_CONTRACT_ADDRESS_1, MOCK_CONTRACT_ADDRESS_2 } from './helpers';
+import {
+  ALICE_PUB_KEY,
+  BOB_PUB_KEY,
+  getOperatorsHash,
+  MOCK_CONTRACT_ADDRESS_1,
+  MOCK_CONTRACT_ADDRESS_2,
+  MOCK_PUB_KEY_1, MOCK_PUB_KEY_2
+} from './helpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -44,7 +51,7 @@ test("Transfer operatorship not owner", async () => {
   const otherWallet = await world.createWallet();
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -82,7 +89,7 @@ test("Transfer operatorship invalid operators duplicate", async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR), e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -101,7 +108,7 @@ test("Transfer operatorship invalid operators duplicate 2", async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR), e.Addr(BOB_ADDR), e.Addr(MOCK_CONTRACT_ADDRESS_1), e.Addr(BOB_ADDR), e.Addr(MOCK_CONTRACT_ADDRESS_2)),
+    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY), e.Bytes(MOCK_PUB_KEY_1), e.Bytes(BOB_PUB_KEY), e.Bytes(MOCK_PUB_KEY_2)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -120,7 +127,7 @@ test("Transfer operatorship invalid weights", async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(), // not enough weights
     e.U(10),
   );
@@ -139,7 +146,7 @@ test("Transfer operatorship invalid threshold zero", async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(0),
   );
@@ -158,7 +165,7 @@ test("Transfer operatorship invalid threshold less", async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(11),
   );
@@ -176,7 +183,7 @@ test("Transfer operatorship invalid threshold less", async () => {
 test("Transfer operatorship duplicate operators", async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
+  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
     owner: deployer,
@@ -187,7 +194,7 @@ test("Transfer operatorship duplicate operators", async () => {
   });
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -206,7 +213,7 @@ test("Transfer operatorship", async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -220,7 +227,7 @@ test("Transfer operatorship", async () => {
     ],
   });
 
-  const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
+  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
@@ -239,12 +246,12 @@ test("Deploy with recent operators", async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
   const data2 = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR), e.Addr(BOB_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(2)),
     e.U(12),
   );
@@ -259,8 +266,8 @@ test("Deploy with recent operators", async () => {
     ],
   }));
 
-  const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
-  const operatorsHash2 = getOperatorsHash([ALICE_ADDR, BOB_ADDR], [10, 2], 12);
+  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash2 = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {

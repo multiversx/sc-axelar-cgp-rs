@@ -3,7 +3,7 @@ import { assertAccount } from "xsuite";
 import { SWorld, SContract, SWallet } from "xsuite";
 import { e } from "xsuite";
 import createKeccakHash from "keccak";
-import { ALICE_ADDR, BOB_ADDR, generateSignature, getOperatorsHash, TOKEN_ID, TOKEN_ID2 } from './helpers';
+import { ALICE_PUB_KEY, BOB_PUB_KEY, generateSignature, getOperatorsHash, TOKEN_ID, TOKEN_ID2 } from './helpers';
 
 let world: SWorld;
 let deployer: SWallet;

@@ -6,8 +6,8 @@ import data from './data.json';
 import { e } from 'xsuite/data';
 import createKeccakHash from 'keccak';
 import {
-    ALICE_ADDR,
-    BOB_ADDR,
+    ALICE_PUB_KEY,
+    BOB_PUB_KEY,
     generateProof,
     generateSignature,
     getOperatorsHash,
@@ -29,12 +29,12 @@ program.command('deploy').action(async () => {
     const wallet = await loadWallet();
 
     const recent_operator = e.Tuple(
-        e.List(e.Addr(ALICE_ADDR)),
+        e.List(e.Addr(ALICE_PUB_KEY)),
         e.List(e.U(10)),
         e.U(10)
     );
     const recent_operator2 = e.Tuple(
-        e.List(e.Addr(ALICE_ADDR), e.Addr(BOB_ADDR)),
+        e.List(e.Addr(ALICE_PUB_KEY), e.Addr(BOB_PUB_KEY)),
         e.List(e.U(10), e.U(2)),
         e.U(12)
     );
@@ -196,7 +196,7 @@ program.command('executeTransferOperatorship')
             e.List(
                 e.Buffer(
                     e.Tuple(
-                        e.List(e.Addr(BOB_ADDR)),
+                        e.List(e.Addr(BOB_PUB_KEY)),
                         e.List(e.U(2)),
                         e.U(2)
                     ).toTopBytes()
@@ -211,7 +211,7 @@ program.command('executeTransferOperatorship')
             const signatureBob = generateSignature(hash, './bob.pem');
 
             proof = e.Tuple(
-                e.List(e.Addr(ALICE_ADDR), e.Addr(BOB_ADDR)),
+                e.List(e.Addr(ALICE_PUB_KEY), e.Addr(BOB_PUB_KEY)),
                 e.List(e.U(10), e.U(2)),
                 e.U(12),
                 e.List(e.Bytes(signature), e.Bytes(signatureBob))

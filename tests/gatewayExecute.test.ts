@@ -4,8 +4,8 @@ import { SWorld, SContract, SWallet } from "xsuite";
 import { e } from "xsuite";
 import createKeccakHash from "keccak";
 import {
-  ALICE_ADDR,
-  BOB_ADDR, DEFAULT_ESDT_ISSUE_COST,
+  ALICE_PUB_KEY,
+  BOB_PUB_KEY, DEFAULT_ESDT_ISSUE_COST,
   generateProof,
   generateSignature,
   getOperatorsHash,
@@ -68,8 +68,8 @@ const deployContract = async () => {
     ],
   });
 
-  const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
-  const operatorsHashCanTransfer = getOperatorsHash([ALICE_ADDR, BOB_ADDR], [10, 2], 12);
+  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHashCanTransfer = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
   // Set gateway contract as owner of auth contract for transfer operatorship
   await contractAuth.setAccount({
     ...await contractAuth.getAccount(),
@@ -100,7 +100,7 @@ test("Execute invalid proof", async () => {
   const hash = createKeccakHash('keccak256').update(Buffer.from(data.toTopHex(), 'hex')).digest('hex');
   const signature = generateSignature(hash);
   const proof = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(11)), // wrong weight
     e.U(10),
     e.List(e.Bytes(signature))
@@ -310,14 +310,14 @@ test("Execute transfer operatorship", async () => {
     e.List(
       e.Buffer(
         e.Tuple(
-          e.List(e.Addr(BOB_ADDR)),
+          e.List(e.Bytes(BOB_PUB_KEY)),
           e.List(e.U(2)),
           e.U(2),
         ).toTopBytes()
       ),
       e.Buffer(
         e.Tuple(
-          e.List(e.Addr(ALICE_ADDR)),
+          e.List(e.Bytes(ALICE_PUB_KEY)),
           e.List(e.U(5)),
           e.U(5),
         ).toTopBytes()
@@ -330,7 +330,7 @@ test("Execute transfer operatorship", async () => {
   const signatureBob = generateSignature(hash, './bob.pem');
 
   const proof = e.Tuple(
-    e.List(e.Addr(ALICE_ADDR), e.Addr(BOB_ADDR)),
+    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(2)),
     e.U(12),
     e.List(e.Bytes(signature), e.Bytes(signatureBob))
@@ -358,9 +358,9 @@ test("Execute transfer operatorship", async () => {
     ],
   });
 
-  const operatorsHash = getOperatorsHash([ALICE_ADDR], [10], 10);
-  const operatorsHash2 = getOperatorsHash([ALICE_ADDR, BOB_ADDR], [10, 2], 12);
-  const operatorsHash3 = getOperatorsHash([BOB_ADDR], [2], 2);
+  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash2 = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
+  const operatorsHash3 = getOperatorsHash([BOB_PUB_KEY], [2], 2);
 
   // Check that Auth contract was updated
   pairs = await contractAuth.getAccountWithKvs();
