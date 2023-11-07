@@ -4,9 +4,10 @@ import { SWorld, SContract, SWallet } from "xsuite";
 import { e } from "xsuite";
 import createKeccakHash from "keccak";
 import {
-  MOCK_CONTRACT_ADDRESS_1,
+  CHAIN_ID, COMMAND_ID,
+  MOCK_CONTRACT_ADDRESS_1, PAYLOAD_HASH,
   TOKEN_ID,
-  TOKEN_ID2,
+  TOKEN_ID2
 } from './helpers';
 
 let world: SWorld;
@@ -49,6 +50,7 @@ const deployContract = async () => {
     gasLimit: 100_000_000,
     codeArgs: [
       e.Addr(MOCK_CONTRACT_ADDRESS_1),
+      e.Str(CHAIN_ID),
     ]
   }));
 
@@ -57,6 +59,7 @@ const deployContract = async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper("chain_id").Value(e.Str(CHAIN_ID)),
     ],
   });
 }
@@ -81,6 +84,7 @@ test("Call contract", async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper("chain_id").Value(e.Str(CHAIN_ID)),
     ],
   });
 });
@@ -93,10 +97,10 @@ test("Validate contract call invalid", async () => {
     gasLimit: 10_000_000,
     funcName: "validateContractCall",
     funcArgs: [
-      e.Str("commandId"),
+      e.Bytes(COMMAND_ID),
       e.Str("ethereum"),
       e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
-      e.Str("payloadHash"),
+      e.Bytes(PAYLOAD_HASH),
     ]
   });
   assert(result.returnData[0] === '');
@@ -106,6 +110,7 @@ test("Validate contract call invalid", async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper("chain_id").Value(e.Str(CHAIN_ID)),
     ],
   });
 });
@@ -115,11 +120,11 @@ test("Validate contract call valid", async () => {
 
   // get_is_contract_call_approved_key hash
   let data = Buffer.concat([
-    Buffer.from("commandId"),
+    Buffer.from(COMMAND_ID, 'hex'),
     Buffer.from("ethereum"),
     Buffer.from("0x4976da71bF84D750b5451B053051158EC0A4E876"),
     deployer.toTopBytes(),
-    Buffer.from("payloadHash"),
+    Buffer.from(PAYLOAD_HASH, 'hex'),
   ]);
 
   const dataHash = createKeccakHash('keccak256').update(data).digest('hex');
@@ -129,6 +134,7 @@ test("Validate contract call valid", async () => {
     codeMetadata: ["payable"],
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper("chain_id").Value(e.Str(CHAIN_ID)),
 
       // Manually approve call
       e.kvs.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
@@ -140,10 +146,10 @@ test("Validate contract call valid", async () => {
     gasLimit: 10_000_000,
     funcName: "validateContractCall",
     funcArgs: [
-      e.Str("commandId"),
+      e.Bytes(COMMAND_ID),
       e.Str("ethereum"),
       e.Str("0x4976da71bF84D750b5451B053051158EC0A4E876"),
-      e.Str("payloadHash"),
+      e.Bytes(PAYLOAD_HASH),
     ]
   });
   assert(result.returnData[0] === '01');
@@ -153,6 +159,7 @@ test("Validate contract call valid", async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper("chain_id").Value(e.Str(CHAIN_ID)),
     ],
   });
 });

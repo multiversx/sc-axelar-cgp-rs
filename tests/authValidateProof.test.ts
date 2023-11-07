@@ -3,7 +3,13 @@ import { assertAccount } from 'xsuite';
 import { SWorld, SContract, SWallet } from 'xsuite';
 import { e } from 'xsuite';
 import createKeccakHash from 'keccak';
-import { ALICE_PUB_KEY, BOB_PUB_KEY, generateSignature, getOperatorsHash } from './helpers';
+import {
+  ALICE_PUB_KEY,
+  BOB_PUB_KEY, COMMAND_ID, generateMessageHash,
+  generateSignature,
+  getOperatorsHash,
+  MULTIVERSX_SIGNED_MESSAGE_PREFIX
+} from './helpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -42,14 +48,15 @@ const deployContract = async () => {
 };
 
 const getHashAndProof = () => {
-  const hash = createKeccakHash('keccak256').update('hash').digest('hex');
-  const signature = generateSignature(hash);
+  const signature = generateSignature(Buffer.from('hash'));
   const data = e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
     e.List(e.Bytes(signature))
   );
+
+  const hash = generateMessageHash(Buffer.from('hash'));
 
   return { hash: e.Bytes(hash), data };
 };
@@ -122,15 +129,14 @@ test('Validate proof wrong operators weight', async () => {
     ]
   });
 
-  const hash = createKeccakHash('keccak256').update('hash').digest('hex');
-  const wrongHash = createKeccakHash('keccak256').update('wrongHash').digest('hex');
-  const signature = generateSignature(wrongHash);
+  const signature = generateSignature(Buffer.from('wrongHash'));
   const data = e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(9)), // Wrong weight here
     e.U(10),
     e.List(e.Bytes(signature))
   );
+  const hash = generateMessageHash(Buffer.from('hash'));
 
   await deployer.callContract({
     callee: contract,
@@ -167,15 +173,14 @@ test('Validate proof invalid signature', async () => {
     ]
   });
 
-  const hash = createKeccakHash('keccak256').update('hash').digest('hex');
-  const wrongHash = createKeccakHash('keccak256').update('wrongHash').digest('hex');
-  const signature = generateSignature(wrongHash);
+  const signature = generateSignature(Buffer.from('wrongHash'));
   const data = e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
     e.List(e.Bytes(signature))
   );
+  const hash = generateMessageHash(Buffer.from('hash'));
 
   await deployer.callContract({
     callee: contract,
@@ -212,14 +217,14 @@ test('Validate proof operators repeat', async () => {
     ]
   });
 
-  const hash = createKeccakHash('keccak256').update('hash').digest('hex');
-  const signature = generateSignature(hash);
+  const signature = generateSignature(Buffer.from('hash'));
   const data = e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(20),
     e.List(e.Bytes(signature), e.Bytes(signature))
   );
+  const hash = generateMessageHash(Buffer.from('hash'));
 
   await deployer.callContract({
     callee: contract,
@@ -256,14 +261,14 @@ test('Validate proof low signatures weight', async () => {
     ]
   });
 
-  const hash = createKeccakHash('keccak256').update('hash').digest('hex');
-  const signature = generateSignature(hash);
+  const signature = generateSignature(Buffer.from('hash'));
   const data = e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(9)),
     e.U(10),
     e.List(e.Bytes(signature))
   );
+  const hash = generateMessageHash(Buffer.from('hash'));
 
   await deployer.callContract({
     callee: contract,
@@ -300,14 +305,14 @@ test('Validate proof only first operator checked', async () => {
     ]
   });
 
-  const hash = createKeccakHash('keccak256').update('hash').digest('hex');
-  const signature = generateSignature(hash);
+  const signature = generateSignature(Buffer.from('hash'));
   const data = e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(10),
     e.List(e.Bytes(signature), e.Bytes(signature)) // wrong signature for bob will not be checked
   );
+  const hash = generateMessageHash(Buffer.from('hash'));
 
   const result = await deployer.callContract({
     callee: contract,
@@ -331,7 +336,6 @@ test('Validate proof only first operator checked', async () => {
   });
 });
 
-
 test('Validate proof', async () => {
   await deployContract();
 
@@ -346,15 +350,16 @@ test('Validate proof', async () => {
     ]
   });
 
-  const hash = createKeccakHash('keccak256').update('hash').digest('hex');
-  const signature = generateSignature(hash);
-  const signatureBob = generateSignature(hash, './bob.pem');
+  const signatureData = Buffer.from(COMMAND_ID, 'hex');
+  const signature = generateSignature(signatureData);
+  const signatureBob = generateSignature(signatureData, './bob.pem');
   const data = e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(20),
     e.List(e.Bytes(signature), e.Bytes(signatureBob))
   );
+  const hash = generateMessageHash(signatureData);
 
   const result = await deployer.callContract({
     callee: contract,

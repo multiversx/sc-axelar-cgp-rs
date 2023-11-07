@@ -1,7 +1,9 @@
-import fs from "fs"
-import { UserSecretKey } from "@multiversx/sdk-wallet/out"
-import createKeccakHash from "keccak";
+import fs from 'fs';
+import { UserSecretKey } from '@multiversx/sdk-wallet/out';
+import createKeccakHash from 'keccak';
 import { e } from 'xsuite';
+import { Encodable } from 'xsuite/dist/data/Encodable';
+import { TupleEncodable } from 'xsuite/dist/data/TupleEncodable';
 
 export const MOCK_CONTRACT_ADDRESS_1: string = "erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax";
 export const MOCK_CONTRACT_ADDRESS_2: string = "erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh";
@@ -15,11 +17,30 @@ export const TOKEN_SYMBOL: string = "WEGLD";
 export const TOKEN_ID: string = "WEGLD-123456";
 export const TOKEN_ID2: string = "OTHER-654321";
 
-export const generateSignature = (dataHash: string, signerPem = './alice.pem') => {
+export const CHAIN_ID: string = 'D';
+
+export const COMMAND_ID: string = '8e45d084f6d317209d1d9e862bce4c3b17bf03ab71a687406c111f55b8dceb76';
+
+export const PAYLOAD_HASH: string = '07b8e6f7ea72578a764983050201bba8fda552f6510db37cca751f0cae27986f';
+
+export const MULTIVERSX_SIGNED_MESSAGE_PREFIX = "\x19MultiversX Signed Message:\n";
+
+export const generateMessageHash = (data: Buffer): string => {
+  const messageHashData = Buffer.concat([
+    Buffer.from(MULTIVERSX_SIGNED_MESSAGE_PREFIX),
+    data,
+  ]);
+
+  return createKeccakHash('keccak256').update(messageHashData).digest('hex');
+}
+
+export const generateSignature = (data: Buffer, signerPem = './alice.pem'): Buffer => {
   const file = fs.readFileSync(signerPem).toString();
   const privateKey = UserSecretKey.fromPem(file);
 
-  return privateKey.sign(Buffer.from(dataHash, 'hex'));
+  const messageHash = generateMessageHash(data);
+
+  return privateKey.sign(Buffer.from(messageHash, 'hex'));
 }
 
 export const getOperatorsHash = (pubKeys: string[], weights: number[], threshold: number) => {
@@ -45,16 +66,13 @@ export const getOperatorsHash = (pubKeys: string[], weights: number[], threshold
   return createKeccakHash('keccak256').update(data).digest();
 }
 
-export const generateProof = (data: any): any => {
-  const hash = createKeccakHash('keccak256').update(Buffer.from(data.toTopHex(), 'hex')).digest('hex');
-  const signature = generateSignature(hash);
+export const generateProof = (data: Encodable): TupleEncodable => {
+  const signature = generateSignature(Buffer.from(data.toTopHex(), 'hex'));
 
-  const proof = e.Tuple(
+  return e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
     e.List(e.Bytes(signature))
   );
-
-  return { hash, proof };
 }

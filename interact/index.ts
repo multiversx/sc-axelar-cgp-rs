@@ -147,15 +147,14 @@ program.command('executeApproveContractCall').action(async () => {
         )
     );
 
-    const { proof } = generateProof(executeData);
+    const proof = generateProof(executeData);
 
     const result = await wallet.callContract({
         callee: envChain.select(data.address),
         gasLimit: 15_000_000,
         funcName: 'execute',
         funcArgs: [
-            executeData,
-            proof
+            e.Tuple(executeData, proof)
         ]
     });
     console.log('Result:', result);
@@ -206,9 +205,8 @@ program.command('executeTransferOperatorship')
 
         let proof;
         if (valid) {
-            const hash = createKeccakHash('keccak256').update(Buffer.from(executeData.toTopHex(), 'hex')).digest('hex');
-            const signature = generateSignature(hash);
-            const signatureBob = generateSignature(hash, './bob.pem');
+            const signature = generateSignature(Buffer.from(executeData.toTopHex(), 'hex'));
+            const signatureBob = generateSignature(Buffer.from(executeData.toTopHex(), 'hex'), './bob.pem');
 
             proof = e.Tuple(
                 e.List(e.Addr(ALICE_PUB_KEY), e.Addr(BOB_PUB_KEY)),
@@ -217,7 +215,7 @@ program.command('executeTransferOperatorship')
                 e.List(e.Bytes(signature), e.Bytes(signatureBob))
             );
         } else {
-            ({ proof } = generateProof(executeData));
+            proof = generateProof(executeData);
         }
 
         const result = await wallet.callContract({
@@ -225,8 +223,7 @@ program.command('executeTransferOperatorship')
             gasLimit: 20_000_000,
             funcName: 'execute',
             funcArgs: [
-                executeData,
-                proof
+              e.Tuple(executeData, proof)
             ]
         });
         console.log('Result:', result);
