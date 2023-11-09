@@ -13,7 +13,7 @@ import path from 'path';
 import fs from 'fs';
 import createKeccakHash from "keccak";
 import { UserSecretKey } from '@multiversx/sdk-wallet/out';
-import { ALICE_ADDR } from '../tests/helpers';
+import { ALICE_PUB_KEY } from '../tests/helpers';
 
 export async function executeGateway(
     commandName: string,
@@ -80,7 +80,7 @@ function generateProof(executeData: Tuple) {
     console.log('Signature', signature.toString('hex'))
 
     return Tuple.fromItems([
-        List.fromItems([new AddressValue(Address.fromBech32(ALICE_ADDR))]),
+        List.fromItems([new AddressValue(Address.fromBech32(ALICE_PUB_KEY))]),
         List.fromItems([new BigUIntValue(10)]),
         new BigUIntValue(10),
         List.fromItems([new H256Value(signature)]),

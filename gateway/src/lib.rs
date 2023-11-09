@@ -1,26 +1,29 @@
 #![no_std]
 
+use core::ops::Deref;
+
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
+
+use crate::constants::*;
+use crate::events::{ContractCallApprovedData, ContractCallData};
+
 multiversx_sc::imports!();
 
 mod constants;
 mod events;
 mod proxy;
 
-use crate::constants::*;
-use crate::events::{ContractCallApprovedData, ContractCallData};
-use core::ops::Deref;
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 #[multiversx_sc::contract]
 pub trait Gateway: proxy::ProxyModule + events::Events {
     #[init]
-    fn init(&self, auth_module: &ManagedAddress) {
+    fn init(&self, auth_module: &ManagedAddress, chain_id: &ManagedBuffer) {
         require!(
             self.blockchain().is_smart_contract(auth_module),
             "Invalid auth module"
         );
 
         self.auth_module().set_if_empty(auth_module);
+        self.chain_id().set_if_empty(chain_id);
     }
 
     #[endpoint(callContract)]
@@ -47,10 +50,10 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
     #[endpoint(validateContractCall)]
     fn validate_contract_call(
         &self,
-        command_id: &ManagedBuffer,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
         source_address: &ManagedBuffer,
-        payload_hash: &ManagedBuffer,
+        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
         let contract_address = &self.blockchain().get_caller();
 
@@ -74,14 +77,19 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
     // External Functions
 
     #[endpoint(execute)]
-    fn execute(&self, data: ManagedBuffer, proof: ManagedBuffer) {
-        let message_hash = self.crypto().keccak256(&data);
+    fn execute(&self, input: ExecuteInput<Self::Api>) {
+        let message_hash = self.get_message_hash(&input.data);
 
-        let mut allow_operatorship_transfer: bool = self.auth_validate_proof(&message_hash, &proof);
+        let mut allow_operatorship_transfer: bool =
+            self.auth_validate_proof(&message_hash, &input.proof);
 
-        // TODO: Should we add chain id here?
         let execute_data: ExecuteData<Self::Api> =
-            ExecuteData::<Self::Api>::top_decode(data).unwrap();
+            ExecuteData::<Self::Api>::top_decode(input.data).unwrap();
+
+        require!(
+            execute_data.chain_id == self.chain_id().get(),
+            "Invalid chain id"
+        );
 
         let commands_length = execute_data.command_ids.len();
 
@@ -100,9 +108,8 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
         for index in 0..commands_length {
             let command_id_ref = execute_data.command_ids.get(index);
             let command_id = command_id_ref.deref();
-            let command_id_hash = self.get_is_command_executed_key(command_id);
 
-            if command_executed_mapper.contains(&command_id_hash) {
+            if command_executed_mapper.contains(command_id) {
                 continue;
             }
 
@@ -126,7 +133,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
             }
 
             if success {
-                command_executed_mapper.add(&command_id_hash);
+                command_executed_mapper.add(command_id);
 
                 self.executed_event(command_id);
             }
@@ -138,7 +145,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
     fn approve_contract_call(
         &self,
         params_raw: &ManagedBuffer,
-        command_id: &ManagedBuffer,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
         let params: ApproveContractCallParams<Self::Api> =
             ApproveContractCallParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
@@ -176,47 +183,47 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
         return true;
     }
 
-    fn get_is_command_executed_key(
-        &self,
-        command_id: &ManagedBuffer,
-    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        self.crypto().keccak256(command_id)
-    }
-
     fn get_is_contract_call_approved_key(
         &self,
-        command_id: &ManagedBuffer,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
-        payload_hash: &ManagedBuffer,
+        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        encoded.append(command_id);
+        encoded.append(command_id.as_managed_buffer());
         encoded.append(source_chain);
         encoded.append(source_address);
         encoded.append(contract_address.as_managed_buffer());
-        encoded.append(payload_hash);
+        encoded.append(payload_hash.as_managed_buffer());
+
+        self.crypto().keccak256(encoded)
+    }
+
+    fn get_message_hash(&self, data: &ManagedBuffer) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        let mut encoded = ManagedBuffer::new();
+
+        encoded.append(&ManagedBuffer::from(MULTIVERSX_SIGNED_MESSAGE_PREFIX));
+        encoded.append(data);
 
         self.crypto().keccak256(encoded)
     }
 
     #[view(isCommandExecuted)]
-    fn is_command_executed(&self, command_id: &ManagedBuffer) -> bool {
-        let hash = self.get_is_command_executed_key(command_id);
-
-        self.command_executed().contains(&hash)
+    fn is_command_executed(&self, command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> bool {
+        self.command_executed().contains(&command_id)
     }
 
     #[view(isContractCallApproved)]
     fn is_contract_call_approved(
         &self,
-        command_id: &ManagedBuffer,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
-        payload_hash: &ManagedBuffer,
+        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
         let hash = self.get_is_contract_call_approved_key(
             command_id,
@@ -234,4 +241,8 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
 
     #[storage_mapper("contract_call_approved")]
     fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
+
+    #[view]
+    #[storage_mapper("chain_id")]
+    fn chain_id(&self) -> SingleValueMapper<ManagedBuffer>;
 }
