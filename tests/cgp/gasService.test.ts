@@ -2,8 +2,7 @@ import { afterEach, assert, beforeEach, test } from "vitest";
 import { assertAccount } from "xsuite";
 import { SWorld, SContract, SWallet } from "xsuite";
 import { e } from "xsuite";
-import createKeccakHash from "keccak";
-import { ALICE_ADDR, BOB_ADDR, generateSignature, getOperatorsHash, TOKEN_ID, TOKEN_ID2 } from '../helpers';
+import { TOKEN_ID } from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;

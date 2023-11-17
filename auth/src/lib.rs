@@ -4,7 +4,7 @@ multiversx_sc::imports!();
 
 mod constants;
 
-use crate::constants::{ProofData, TransferData, OLD_KEY_RETENTION};
+use crate::constants::{ProofData, TransferData, OLD_KEY_RETENTION, Operator};
 use core::ops::Deref;
 use multiversx_sc::api::{ED25519_SIGNATURE_BYTE_LEN, KECCAK256_RESULT_LEN};
 
@@ -98,7 +98,7 @@ pub trait Auth {
     fn validate_signatures(
         &self,
         message_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        operators: ManagedVec<ManagedAddress>,
+        operators: ManagedVec<Operator<Self::Api>>,
         weights: ManagedVec<BigUint>,
         threshold: BigUint,
         signatures: ManagedVec<ManagedByteArray<ED25519_SIGNATURE_BYTE_LEN>>,
@@ -136,7 +136,7 @@ pub trait Auth {
 
     fn get_operators_hash(
         &self,
-        operators: &ManagedVec<ManagedAddress>,
+        operators: &ManagedVec<Operator<Self::Api>>,
         weights: &ManagedVec<BigUint>,
         threshold: &BigUint,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
@@ -155,8 +155,12 @@ pub trait Auth {
         self.crypto().keccak256(encoded)
     }
 
-    // TODO: Check for a better way of doing this when ManagedMap is available
-    fn contains_no_duplicate(&self, operators: &ManagedVec<ManagedAddress>) -> bool {
+    // TODO: Check for a better way of doing this when ManagedMap is available?
+    fn contains_no_duplicate(&self, operators: &ManagedVec<Operator<Self::Api>>) -> bool {
+        if operators.is_empty() {
+            return false;
+        }
+
         for iindex in 0..(operators.len() - 1) {
             for jindex in (iindex + 1)..operators.len() {
                 if operators.get(iindex) == operators.get(jindex) {
