@@ -39,9 +39,11 @@ jobs:
 
       - name: Install prerequisites
         run: |
-          pip3 install multiversx-sdk-cli==v8.1.2
+          pip3 install multiversx-sdk-cli==v8.1.5
           mkdir $HOME/multiversx-sdk
-          python3 -m multiversx_sdk_cli.cli deps install vmtools --tag v1.4.60
+          python3 -m multiversx_sdk_cli.cli config set "dependencies.vmtools.urlTemplate.linux" "https://github.com/multiversx/mx-chain-vm-go/archive/{TAG}.tar.gz"
+          python3 -m multiversx_sdk_cli.cli config set "dependencies.vmtools.tag" "latest"
+          python3 -m multiversx_sdk_cli.cli deps install vmtools --overwrite
           
           wget -O binaryen.tar.gz https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz
           tar -xf binaryen.tar.gz

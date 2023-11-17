@@ -2,7 +2,8 @@ import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
-  CHAIN_NAME_HASH,
+  CHAIN_ID,
+  CHAIN_NAME_HASH, COMMAND_ID,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
@@ -95,7 +96,7 @@ const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([
-    Buffer.from("commandId"),
+    Buffer.from(COMMAND_ID, 'hex'),
     Buffer.from(OTHER_CHAIN_NAME),
     Buffer.from(OTHER_CHAIN_ADDRESS),
     its.toTopBytes(),
@@ -108,6 +109,7 @@ const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
     codeMetadata: [],
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
       // Manually approve call
       e.kvs.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
@@ -125,7 +127,7 @@ test("Execute deploy token manager", async () => {
     funcName: "execute",
     gasLimit: 50_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -165,6 +167,7 @@ test("Execute deploy token manager", async () => {
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
     ]
   });
 });
@@ -183,7 +186,7 @@ test("Execute deploy token manager errors", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
       payload,
@@ -195,7 +198,7 @@ test("Execute deploy token manager errors", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -218,7 +221,7 @@ test("Execute deploy token manager errors", async () => {
     funcName: "execute",
     gasLimit: 50_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
-  CHAIN_NAME_HASH,
+  CHAIN_ID,
+  CHAIN_NAME_HASH, COMMAND_ID, getCommandId, getCommandIdHash,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
@@ -96,7 +97,7 @@ const mockGatewayCall = async () => {
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([
-    Buffer.from("commandId"),
+    Buffer.from(COMMAND_ID, 'hex'),
     Buffer.from(OTHER_CHAIN_NAME),
     Buffer.from(OTHER_CHAIN_ADDRESS),
     its.toTopBytes(),
@@ -109,6 +110,7 @@ const mockGatewayCall = async () => {
     codeMetadata: [],
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
       // Manually approve call
       e.kvs.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
@@ -126,7 +128,7 @@ test("Execute deploy and register standardized token only deploy token manager",
     funcName: "execute",
     gasLimit: 100_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -154,6 +156,7 @@ test("Execute deploy and register standardized token only deploy token manager",
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
       e.kvs.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
     ]
@@ -187,7 +190,7 @@ test("Execute deploy and register standardized token only issue esdt", async () 
     gasLimit: 600_000_000,
     value: BigInt('50000000000000000'),
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -215,6 +218,7 @@ test("Execute deploy and register standardized token only issue esdt", async () 
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
     ]
   });
 });
@@ -233,7 +237,7 @@ test("Execute receive token with data errors", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
       payload,
@@ -261,7 +265,7 @@ test("Execute receive token with data errors", async () => {
     gasLimit: 100_000_000,
     value: BigInt('50000000000000000'),
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -273,7 +277,7 @@ test("Execute receive token with data errors", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload
@@ -296,7 +300,7 @@ test("Execute receive token with data errors", async () => {
     gasLimit: 20_000_000,
     value: BigInt('50000000000000000'),
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload

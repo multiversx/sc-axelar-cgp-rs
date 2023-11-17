@@ -2,8 +2,8 @@ import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
-  CHAIN_NAME_HASH,
-  getCommandIdHash,
+  CHAIN_NAME_HASH, COMMAND_ID,
+  getCommandId,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
@@ -104,7 +104,7 @@ test("Express receive token", async () => {
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
     esdts: [{ id: TOKEN_ID, amount: 100_000 }]
@@ -113,7 +113,7 @@ test("Express receive token", async () => {
   // Assert express receive slot set
   const data = Buffer.concat([
     Buffer.from(payload, 'hex'),
-    Buffer.from('commandId'),
+    Buffer.from(COMMAND_ID, 'hex'),
   ]);
   const expressReceiveSlot = createKeccakHash('keccak256').update(data).digest('hex');
 
@@ -178,7 +178,7 @@ test("Express receive token with data", async () => {
     value: 1_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
   });
@@ -186,7 +186,7 @@ test("Express receive token with data", async () => {
   // Assert express receive slot set
   const data = Buffer.concat([
     Buffer.from(payload, 'hex'),
-    Buffer.from('commandId'),
+    Buffer.from(COMMAND_ID, 'hex'),
   ]);
   const expressReceiveSlot = createKeccakHash('keccak256').update(data).digest('hex');
 
@@ -263,7 +263,7 @@ test.skip("Express receive token with data error", async () => {
     value: 1_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
   });
@@ -322,7 +322,7 @@ test("Express receive token errors", async () => {
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
   }).assertFail({ code: 4, message: 'Token manager does not exist' });
@@ -352,7 +352,7 @@ test("Express receive token errors", async () => {
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
     esdts: [{ id: TOKEN_ID, amount: 100_000 }]
@@ -375,7 +375,7 @@ test("Express receive token errors", async () => {
     value: 100_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
   }).assertFail({ code: 4, message: 'Wrong token or amount sent' });
@@ -386,7 +386,7 @@ test("Express receive token errors", async () => {
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
     esdts: [{ id: TOKEN_ID, amount: 99_999 }]
@@ -399,7 +399,7 @@ test("Express receive token errors", async () => {
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
     esdts: [{ id: TOKEN_ID, amount: 100_000 }]
@@ -411,12 +411,12 @@ test("Express receive token errors", async () => {
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
   }).assertFail({ code: 4, message: 'Already express called' });
 
-  const commandIdHash = getCommandIdHash();
+  const commandIdHash = getCommandId();
 
   // Mock command executed
   await gateway.setAccount({
@@ -442,7 +442,7 @@ test("Express receive token errors", async () => {
           e.U(100_000),
         ).toTopBytes()
       ),
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
   }).assertFail({ code: 4, message: 'Already executed' });

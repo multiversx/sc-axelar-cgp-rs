@@ -16,7 +16,7 @@ pub trait ExecutableModule:
 {
     fn process_receive_token_payload(
         &self,
-        command_id: ManagedBuffer,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
@@ -100,7 +100,7 @@ pub trait ExecutableModule:
 
     fn process_deploy_standardized_token_and_manager_payload(
         &self,
-        command_id: ManagedBuffer,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
         source_address: ManagedBuffer,
         payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -224,12 +224,12 @@ pub trait ExecutableModule:
     fn pop_express_receive_token(
         &self,
         payload: &ManagedBuffer,
-        command_id: &ManagedBuffer,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> ManagedAddress {
         let mut hash_data = ManagedBuffer::new();
 
         hash_data.append(payload);
-        hash_data.append(command_id);
+        hash_data.append(command_id.as_managed_buffer());
 
         let hash = self.crypto().keccak256(hash_data);
 

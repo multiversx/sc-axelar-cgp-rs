@@ -94,6 +94,6 @@ export const generateProof = (data: Encodable | Buffer): TupleEncodable => {
     e.List(e.Bytes(signature))
   );
 };
-export const getCommandIdHash = (commandId: string = 'commandId') => {
+export const getCommandId = (commandId: string = 'commandId') => {
   return createKeccakHash('keccak256').update(Buffer.from(commandId)).digest('hex');
 };

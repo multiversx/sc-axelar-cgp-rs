@@ -284,7 +284,7 @@ pub trait InterchainTokenServiceContract:
     fn express_receive_token(
         &self,
         payload: ManagedBuffer,
-        command_id: ManagedBuffer,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
     ) {
         require!(
@@ -450,7 +450,7 @@ pub trait InterchainTokenServiceContract:
     #[endpoint]
     fn execute(
         &self,
-        command_id: ManagedBuffer,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
         source_address: ManagedBuffer,
         payload: ManagedBuffer,

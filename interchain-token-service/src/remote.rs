@@ -126,13 +126,13 @@ pub trait RemoteModule:
     fn set_express_receive_token(
         &self,
         payload: &ManagedBuffer,
-        command_id: &ManagedBuffer,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         express_caller: &ManagedAddress,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut hash_data = ManagedBuffer::new();
 
         hash_data.append(payload);
-        hash_data.append(command_id);
+        hash_data.append(command_id.as_managed_buffer());
 
         let hash = self.crypto().keccak256(hash_data);
 

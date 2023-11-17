@@ -49,6 +49,8 @@ pub mod gas_service_proxy {
 pub mod gateway_proxy {
     multiversx_sc::imports!();
 
+    use multiversx_sc::api::KECCAK256_RESULT_LEN;
+
     #[multiversx_sc::proxy]
     pub trait Gateway {
         #[endpoint(callContract)]
@@ -62,23 +64,23 @@ pub mod gateway_proxy {
         #[endpoint(validateContractCall)]
         fn validate_contract_call(
             &self,
-            command_id: &ManagedBuffer,
+            command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
             source_chain: &ManagedBuffer,
             source_address: &ManagedBuffer,
-            payload_hash: &ManagedBuffer,
+            payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         ) -> bool;
 
         #[view(isCommandExecuted)]
-        fn is_command_executed(&self, command_id: &ManagedBuffer) -> bool;
+        fn is_command_executed(&self, command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> bool;
 
         #[view(isContractCallApproved)]
         fn is_contract_call_approved(
             &self,
-            command_id: &ManagedBuffer,
+            command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
             source_chain: &ManagedBuffer,
             source_address: &ManagedBuffer,
             contract_address: &ManagedAddress,
-            payload_hash: &ManagedBuffer,
+            payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         ) -> bool;
     }
 }
@@ -205,7 +207,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
             .execute_on_dest_context::<()>();
     }
 
-    fn gateway_is_command_executed(&self, command_id: &ManagedBuffer) -> bool {
+    fn gateway_is_command_executed(&self, command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> bool {
         self.gateway_proxy(self.gateway().get())
             .is_command_executed(command_id)
             .execute_on_dest_context::<bool>()
@@ -213,7 +215,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
 
     fn gateway_validate_contract_call(
         &self,
-        command_id: &ManagedBuffer,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -223,14 +225,14 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                 command_id,
                 source_chain,
                 source_address,
-                payload_hash.as_managed_buffer(),
+                payload_hash,
             )
             .execute_on_dest_context::<bool>()
     }
 
     fn gateway_is_contract_call_approved(
         &self,
-        command_id: &ManagedBuffer,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -241,7 +243,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                 source_chain,
                 source_address,
                 &self.blockchain().get_sc_address(),
-                payload_hash.as_managed_buffer(),
+                payload_hash,
             )
             .execute_on_dest_context::<bool>()
     }
@@ -306,7 +308,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
-        command_id: ManagedBuffer,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.executable_contract_proxy(destination_address)
             .execute_with_interchain_token(source_chain, source_address, data, token_id.clone())
@@ -331,7 +333,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
         caller: ManagedAddress,
-        command_id: ManagedBuffer,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.executable_contract_proxy(destination_address)
@@ -527,7 +529,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
     #[callback]
     fn execute_with_token_callback(
         &self,
-        command_id: ManagedBuffer,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
@@ -560,7 +562,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
     fn exp_execute_with_token_callback(
         &self,
         caller: ManagedAddress,
-        command_id: ManagedBuffer,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,

@@ -3,6 +3,8 @@ multiversx_sc::derive_imports!();
 
 use crate::constants::{TokenId, TokenManagerType};
 
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
+
 #[derive(TypeAbi, TopEncode)]
 pub struct TokenManagerDeployedEventData<M: ManagedTypeApi> {
     token_manager_type: TokenManagerType,
@@ -243,7 +245,7 @@ pub trait EventsModule {
     #[event("express_receive_event")]
     fn express_receive_event(
         &self,
-        #[indexed] command_id: &ManagedBuffer,
+        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] express_caller: &ManagedAddress,
         payload: &ManagedBuffer,
     );
@@ -283,7 +285,7 @@ pub trait EventsModule {
     #[event("token_received_with_data_success_event")]
     fn token_received_with_data_success_event(
         &self,
-        #[indexed] command_id: ManagedBuffer,
+        #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] token_id: TokenId<Self::Api>,
         #[indexed] token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
@@ -292,7 +294,7 @@ pub trait EventsModule {
     #[event("token_received_with_data_error_event")]
     fn token_received_with_data_error_event(
         &self,
-        #[indexed] command_id: ManagedBuffer,
+        #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier,
         amount: &BigUint,
@@ -302,7 +304,7 @@ pub trait EventsModule {
     fn express_token_received_with_data_success_event(
         &self,
         #[indexed] caller: ManagedAddress,
-        #[indexed] command_id: ManagedBuffer,
+        #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] token_id: TokenId<Self::Api>,
         #[indexed] token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
@@ -312,7 +314,7 @@ pub trait EventsModule {
     fn express_token_received_with_data_error_event(
         &self,
         #[indexed] caller: &ManagedAddress,
-        #[indexed] command_id: ManagedBuffer,
+        #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier,
         amount: &BigUint,

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
-  CHAIN_NAME_HASH,
+  CHAIN_ID,
+  CHAIN_NAME_HASH, COMMAND_ID,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
@@ -95,7 +96,7 @@ const mockGatewayCall = async (tokenId: string) => {
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([
-    Buffer.from("commandId"),
+    Buffer.from(COMMAND_ID, 'hex'),
     Buffer.from(OTHER_CHAIN_NAME),
     Buffer.from(OTHER_CHAIN_ADDRESS),
     its.toTopBytes(),
@@ -108,6 +109,7 @@ const mockGatewayCall = async (tokenId: string) => {
     codeMetadata: [],
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
       // Manually approve call
       e.kvs.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
@@ -152,7 +154,7 @@ test("Execute receive token mint/burn", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -186,6 +188,7 @@ test("Execute receive token mint/burn", async () => {
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
     ]
   });
 });
@@ -221,7 +224,7 @@ test("Execute receive token lock/unlock", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -287,7 +290,7 @@ test("Execute receive token flow limit", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -322,7 +325,7 @@ test("Execute receive token flow limit", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -341,7 +344,7 @@ test("Execute receive token flow limit", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -398,7 +401,7 @@ test("Execute receive token express caller", async () => {
 
   const data = Buffer.concat([
     Buffer.from(payload, 'hex'),
-    Buffer.from('commandId'),
+    Buffer.from(COMMAND_ID, 'hex'),
   ]);
   const expressReceiveSlot = createKeccakHash('keccak256').update(data).digest('hex');
 
@@ -423,9 +426,9 @@ test("Execute receive token express caller", async () => {
   await user.callContract({
     callee: its,
     funcName: "execute",
-    gasLimit: 20_000_000,
+    gasLimit: 25_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -444,8 +447,9 @@ test("Execute receive token express caller", async () => {
   // Gateway contract call approved key was removed
   const gatewayKvs = await gateway.getAccountWithKvs();
   assertAccount(gatewayKvs, {
-    kvs: [
+    allKvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID))
     ]
   });
 
@@ -495,7 +499,7 @@ test("Execute receive token errors", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
       payload,
@@ -507,7 +511,7 @@ test("Execute receive token errors", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -524,7 +528,7 @@ test("Execute receive token errors", async () => {
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([
-    Buffer.from("commandId"),
+    Buffer.from(COMMAND_ID, 'hex'),
     Buffer.from(OTHER_CHAIN_NAME),
     Buffer.from(OTHER_CHAIN_ADDRESS),
     its.toTopBytes(),
@@ -548,7 +552,7 @@ test("Execute receive token errors", async () => {
     funcName: "execute",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('commandId'),
+      e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
