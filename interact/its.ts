@@ -5,9 +5,10 @@ import { loadWallet, program } from './index';
 import { Command } from 'commander';
 import { Wallet } from 'xsuite';
 import { envChain } from 'xsuite/interact';
-import { generateProof, MOCK_CONTRACT_ADDRESS_2 } from '../tests/helpers';
+import { generateProof } from '../tests/helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
+import { AbiCoder } from 'ethers';
 
 const chainName = 'multiversx-devnet';
 const otherChainName = 'ethereum-2';
@@ -240,21 +241,20 @@ export const setupITSCommands = (program: Command) => {
     });
 
   const executePingPongPayload = (wallet: Wallet) => {
-    return e.Buffer(
-      e.Tuple(
-        e.U(2), // selector receive token with data
-        e.Bytes(envChain.select<any>(data.knownTokens)['EGLD']['tokenId']),
-        e.Buffer(e.Addr(envChain.select(data.addressPingPongInterchain)).toTopBytes()), // destination address
-        e.U(BigInt('10000000000000000')),
-        e.Buffer(wallet.toTopBytes()), // source address (in this case address for ping)
-        e.Buffer(
-          e.Str("ping").toTopBytes() // data passed to contract
-        )
-      ).toTopBytes()
-    );
+    return AbiCoder.defaultAbiCoder().encode(
+      ['uint256', 'bytes32', 'bytes', 'uint256', 'bytes', 'bytes'],
+      [
+        2, // selector receive token with data
+        Buffer.from(envChain.select<any>(data.knownTokens)['EGLD']['tokenId'], 'hex'),
+        Buffer.from(e.Addr(envChain.select(data.addressPingPongInterchain)).toTopBytes()),
+        '10000000000000000',
+        Buffer.from(wallet.toTopBytes()),
+        Buffer.from(e.Str("ping").toTopBytes()) // data passed to contract, in this case the string "ping"
+      ]
+    ).substring(2);
   };
 
-  program.command('itsExpressReceiveToken').action(async () => {
+  program.command('itsExpressReceiveTokenWithData').action(async () => {
     const wallet = await loadWallet();
 
     const payload = executePingPongPayload(wallet);
@@ -263,7 +263,7 @@ export const setupITSCommands = (program: Command) => {
       callee: envChain.select(data.addressIts),
       funcName: "expressReceiveToken",
       gasLimit: 100_000_000,
-      value: BigInt('10000000000000000'),
+      value: BigInt('10000000000000000'), // 0.01 EGLD
       funcArgs: [
         payload,
         e.Str('mockCommandId2'),
@@ -279,10 +279,10 @@ export const setupITSCommands = (program: Command) => {
 
     const payload = executePingPongPayload(wallet);
 
-    const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
+    const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
 
     const executeData = e.Tuple(
-      e.List(e.Str('mockCommandId-2')),
+      e.List(e.Str('mockCommandId-3')),
       e.List(e.Str('approveContractCall')),
       e.List(
         e.Buffer(
@@ -322,7 +322,7 @@ export const setupITSCommands = (program: Command) => {
       funcName: "execute",
       gasLimit: 200_000_000,
       funcArgs: [
-        e.Str('mockCommandId-2'),
+        e.Str('mockCommandId-3'),
         e.Str(otherChainName),
         e.Str(otherChainAddress),
         payload,

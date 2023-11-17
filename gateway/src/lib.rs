@@ -168,7 +168,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
             params.payload_hash,
         );
 
-        return true;
+        true
     }
 
     fn transfer_operatorship(&self, params: &ManagedBuffer) -> bool {
@@ -176,7 +176,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
 
         self.operatorship_transferred_event(params);
 
-        return true;
+        true
     }
 
     fn get_is_contract_call_approved_key(

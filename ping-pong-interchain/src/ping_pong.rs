@@ -61,7 +61,7 @@ pub trait PingPong {
         require!(self.blockchain().get_caller() == self.interchain_token_service().get(), "Not interchain token service");
 
         if payload == ManagedBuffer::from("ping") {
-            self.ping(OptionalValue::Some(source_address), IgnoreValue::default());
+            self.ping(OptionalValue::Some(source_address), IgnoreValue);
         } else if payload == ManagedBuffer::from("pong") {
             self.pong(OptionalValue::Some(source_address));
         } else {

@@ -22,6 +22,7 @@ import {
   tokenManagerLockUnlock,
   tokenManagerMintBurn
 } from '../itsHelpers';
+import { AbiCoder } from 'ethers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -76,20 +77,22 @@ afterEach(async () => {
 });
 
 const mockGatewayCall = async () => {
-  const payload = e.Buffer(
-    e.Tuple(
-      e.U(4), // selector deploy and register standardized token
-      e.Bytes(TOKEN_ID_CANONICAL),
-      e.Str('TokenName'),
-      e.Str('SYMBOL'),
-      e.U8(18),
-      e.Buffer(user.toTopBytes()),
-      e.Buffer(user.toTopBytes()),
-      e.U(1_000_000),
-      e.Buffer(its.toTopBytes()),
-    ).toTopBytes()
-  );
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
+  const payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes', 'bytes', 'uint256', 'bytes'],
+    [
+      4, // selector deploy and register standardized token
+      Buffer.from(TOKEN_ID_CANONICAL, 'hex'),
+      'TokenName',
+      'SYMBOL',
+      18,
+      Buffer.from(user.toTopBytes()),
+      Buffer.from(user.toTopBytes()),
+      1_000_000,
+      Buffer.from(its.toTopBytes()),
+    ]
+  ).substring(2);
+
+  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([
@@ -117,19 +120,6 @@ const mockGatewayCall = async () => {
 
 test("Execute deploy and register standardized token only deploy token manager", async () => {
   const { payload, dataHash } = await mockGatewayCall();
-
-  await user.callContract({
-    callee: its,
-    funcName: "execute",
-    gasLimit: 100_000_000,
-    value: BigInt('50000000000000000'),
-    funcArgs: [
-      e.Str('commandId'),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
 
   await user.callContract({
     callee: its,
@@ -230,6 +220,13 @@ test("Execute deploy and register standardized token only issue esdt", async () 
 });
 
 test("Execute receive token with data errors", async () => {
+  let payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256'],
+    [
+      4, // selector deploy and register standardized token
+    ]
+  ).substring(2);
+
   // Invalid other address from other chain
   await user.callContract({
     callee: its,
@@ -239,30 +236,65 @@ test("Execute receive token with data errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
-      e.Buffer(
-        e.Tuple(e.U(4)).toTopBytes()
-      ),
+      payload,
     ],
   }).assertFail({ code: 4, message: 'Not remote service' });
 
-  const payload = e.Buffer(
-    e.Tuple(
-      e.U(4), // selector deploy and register standardized token
-      e.Bytes(TOKEN_ID_CANONICAL),
-      e.Str('TokenName'),
-      e.Str('SYMBOL'),
-      e.U8(18),
-      e.Buffer(user.toTopBytes()),
-      e.Buffer(user.toTopBytes()),
-      e.U(1_000_000),
-      e.Buffer(its.toTopBytes()),
-    ).toTopBytes()
-  );
+  payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes', 'bytes', 'uint256', 'bytes'],
+    [
+      4, // selector deploy and register standardized token
+      Buffer.from(TOKEN_ID_CANONICAL, 'hex'),
+      'TokenName',
+      'SYMBOL',
+      18,
+      Buffer.from(user.toTopBytes()),
+      Buffer.from(user.toTopBytes()),
+      1_000_000,
+      Buffer.from(its.toTopBytes()),
+    ]
+  ).substring(2);
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 100_000_000,
+    value: BigInt('50000000000000000'),
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
 
   await user.callContract({
     callee: its,
     funcName: "execute",
     gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str('commandId'),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload
+    ],
+  }).assertFail({ code: 4, message: 'Not approved by gateway' });
+
+  // Mock token manager exists
+  await user.callContract({
+    callee: its,
+    funcName: "registerCanonicalToken",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str(TOKEN_ID)
+    ],
+  });
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    value: BigInt('50000000000000000'),
     funcArgs: [
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),

@@ -21,6 +21,7 @@ import {
   tokenManagerLockUnlock,
   tokenManagerMintBurn
 } from '../itsHelpers';
+import { AbiCoder } from 'ethers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -75,18 +76,22 @@ afterEach(async () => {
 });
 
 const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
-  const payload = e.Buffer(
-    e.Tuple(
-      e.U(3), // selector deploy token manager
-      e.Bytes(tokenId),
-      e.U8(0), // Mint/Burn
-      e.Tuple(
-        its,
-        e.Str(TOKEN_ID),
+  const payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'uint8', 'bytes'],
+    [
+      3, // selector deploy token manager
+      Buffer.from(tokenId, 'hex'),
+      0, // Mint/Burn
+      Buffer.from(
+        e.Tuple(
+          its,
+          e.Str(TOKEN_ID),
+        ).toTopBytes(),
       )
-    ).toTopBytes()
-  );
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopHex(), 'hex')).digest('hex');
+    ]
+  ).substring(2);
+
+  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
 
   // Mock contract call approved by gateway
   let data = Buffer.concat([
@@ -165,6 +170,13 @@ test("Execute deploy token manager", async () => {
 });
 
 test("Execute deploy token manager errors", async () => {
+  let payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256'],
+    [
+      3, // selector deploy token manager
+    ]
+  ).substring(2);
+
   // Invalid other address from other chain
   await user.callContract({
     callee: its,
@@ -174,9 +186,7 @@ test("Execute deploy token manager errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
-      e.Buffer(
-        e.Tuple(e.U(3)).toTopBytes()
-      ),
+      payload,
     ],
   }).assertFail({ code: 4, message: 'Not remote service' });
 
@@ -188,9 +198,7 @@ test("Execute deploy token manager errors", async () => {
       e.Str('commandId'),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(
-        e.Tuple(e.U(3)).toTopBytes()
-      ),
+      payload,
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
@@ -203,7 +211,7 @@ test("Execute deploy token manager errors", async () => {
     ],
   });
 
-  const payload = await mockGatewayCall();
+  payload = await mockGatewayCall();
 
   await user.callContract({
     callee: its,

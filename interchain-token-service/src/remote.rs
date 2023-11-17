@@ -2,7 +2,8 @@ multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::{events, proxy};
-use crate::constants::{Metadata, SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA, SendTokenPayload, TokenId, TokenManagerType};
+use crate::abi::AbiEncodeDecode;
+use crate::constants::{DeployTokenManagerPayload, Metadata, SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA, SendTokenPayload, TokenId, TokenManagerType};
 use crate::proxy::remote_address_validator_proxy::ProxyTrait as RemoteAddressValidatorProxyTrait;
 
 #[multiversx_sc::module]
@@ -17,13 +18,14 @@ pub trait RemoteModule:
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) {
-        let mut payload = ManagedBuffer::new();
+        let data = DeployTokenManagerPayload {
+            selector: BigUint::from(SELECTOR_DEPLOY_TOKEN_MANAGER),
+            token_id: token_id.clone(),
+            token_manager_type,
+            params: params.clone(),
+        };
 
-        // TODO: Switch this to use abi encoding
-        payload.append(&BigUint::from(SELECTOR_DEPLOY_TOKEN_MANAGER).to_bytes_be_buffer());
-        payload.append(token_id.as_managed_buffer());
-        let _ = token_manager_type.top_encode(&mut payload);
-        payload.append(&params);
+        let payload = data.abi_encode();
 
         self.call_contract(&destination_chain, &payload, &gas_value);
 
@@ -45,24 +47,19 @@ pub trait RemoteModule:
         amount: BigUint,
         raw_metadata: ManagedBuffer,
     ) {
-        let mut payload = ManagedBuffer::new();
-
         let (version, metadata, is_err) = self.decode_metadata(raw_metadata);
 
-        // TODO: Not sure what this metadata contains exactly and how to decode it
-        // This check was changed here because of different encoding/decoding
         if is_err {
-            // TODO: Change this to abi encoding
             let data = SendTokenPayload {
                 selector: BigUint::from(SELECTOR_RECEIVE_TOKEN),
                 token_id: token_id.clone(),
                 destination_address: destination_address.clone(),
                 amount: amount.clone(),
-                source_address: Option::None,
-                data: Option::None,
+                source_address: None,
+                data: None,
             };
 
-            data.top_encode(&mut payload).unwrap();
+            let payload = data.abi_encode();
 
             // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
             self.call_contract(&destination_chain, &payload, &BigUint::zero());
@@ -74,7 +71,6 @@ pub trait RemoteModule:
 
         require!(version == 0, "Invalid metadata version");
 
-        // TODO: Change this to abi encoding
         let data = SendTokenPayload {
             selector: BigUint::from(SELECTOR_RECEIVE_TOKEN_WITH_DATA),
             token_id: token_id.clone(),
@@ -84,7 +80,7 @@ pub trait RemoteModule:
             data: Some(metadata.clone()),
         };
 
-        data.top_encode(&mut payload).unwrap();
+        let payload = data.abi_encode();
 
         // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
         self.call_contract(&destination_chain, &payload, &BigUint::zero());
@@ -99,8 +95,8 @@ pub trait RemoteModule:
         );
     }
 
+    // TODO: Check if this is correct and what this metadata actually is
     fn decode_metadata(&self, raw_metadata: ManagedBuffer) -> (u32, ManagedBuffer, bool) {
-        // TODO: Check if this is correct and what this metadata actually is
         let metadata = Metadata::<Self::Api>::top_decode(raw_metadata);
         let raw_metadata: Metadata<Self::Api>;
         let is_err;
@@ -115,8 +111,6 @@ pub trait RemoteModule:
             is_err = false;
         }
 
-        // TODO: This does some Assembly logic specific to sol, what should we actually do here?
-        // Currently we use the MultiversX encoding/decoding and a custom struct for this
         (raw_metadata.version, raw_metadata.metadata, is_err)
     }
 

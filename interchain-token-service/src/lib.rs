@@ -4,8 +4,9 @@ use core::convert::TryFrom;
 use core::ops::Deref;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use multiversx_sc::codec::{EncodeError, TopDecodeInput};
+use multiversx_sc::codec::{EncodeError};
 
+use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::constants::{
     Metadata, SendTokenPayload, TokenId, TokenManagerType, PREFIX_CUSTOM_TOKEN_ID,
     PREFIX_STANDARDIZED_TOKEN_ID, SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
@@ -15,11 +16,12 @@ use crate::proxy::CallbackProxy;
 
 multiversx_sc::imports!();
 
-mod constants;
-mod events;
-mod executable;
-mod proxy;
-mod remote;
+pub mod abi;
+pub mod constants;
+pub mod events;
+pub mod executable;
+pub mod proxy;
+pub mod remote;
 
 #[multiversx_sc::contract]
 pub trait InterchainTokenServiceContract:
@@ -176,7 +178,7 @@ pub trait InterchainTokenServiceContract:
 
         let deployer = self.blockchain().get_caller();
 
-        let token_name = token_identifier.clone().into_name();
+        let token_name = token_identifier.into_name();
 
         let token_id = self.get_custom_token_id(&deployer, &token_name);
 
@@ -295,7 +297,7 @@ pub trait InterchainTokenServiceContract:
         let express_hash = self.set_express_receive_token(&payload, &command_id, &caller);
 
         let receive_token_payload: SendTokenPayload<Self::Api> =
-            SendTokenPayload::<Self::Api>::top_decode(payload).unwrap();
+            SendTokenPayload::<Self::Api>::abi_decode(payload);
 
         let token_identifier = self.get_token_identifier(&receive_token_payload.token_id);
 
@@ -310,7 +312,7 @@ pub trait InterchainTokenServiceContract:
             "Wrong token or amount sent"
         );
 
-        if receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN_WITH_DATA) {
+        if receive_token_payload.selector == SELECTOR_RECEIVE_TOKEN_WITH_DATA {
             self.executable_contract_express_execute_with_interchain_token(
                 destination_address,
                 source_chain,
@@ -328,7 +330,7 @@ pub trait InterchainTokenServiceContract:
         }
 
         require!(
-            receive_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN),
+            receive_token_payload.selector == SELECTOR_RECEIVE_TOKEN,
             "Invalid express selector"
         );
 
@@ -451,17 +453,18 @@ pub trait InterchainTokenServiceContract:
         command_id: ManagedBuffer,
         source_chain: ManagedBuffer,
         source_address: ManagedBuffer,
-        payload_raw: ManagedBuffer,
+        payload: ManagedBuffer,
     ) {
         self.require_not_paused();
         self.only_remote_service(&source_chain, &source_address);
 
-        let payload_hash = self.crypto().keccak256(&payload_raw);
+        let payload_hash = self.crypto().keccak256(&payload);
 
-        let mut payload = payload_raw.clone().into_nested_buffer();
-
-        // TODO: Use abi decoding here. Optimize to not decode this selector multiple times
-        let selector = BigUint::dep_decode(&mut payload).unwrap().to_u64().unwrap() as u32;
+        let selector = ParamType::Uint256.abi_decode(&payload, 0)
+            .token
+            .into_biguint()
+            .to_u64()
+            .unwrap();
 
         match selector {
             SELECTOR_RECEIVE_TOKEN
@@ -491,10 +494,10 @@ pub trait InterchainTokenServiceContract:
 
         match selector {
             SELECTOR_RECEIVE_TOKEN | SELECTOR_RECEIVE_TOKEN_WITH_DATA => {
-                self.process_receive_token_payload(command_id, source_chain, payload_raw);
+                self.process_receive_token_payload(command_id, source_chain, payload);
             }
             SELECTOR_DEPLOY_TOKEN_MANAGER => {
-                self.process_deploy_token_manager_payload(payload_raw);
+                self.process_deploy_token_manager_payload(payload);
             }
             SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN => {
                 self.process_deploy_standardized_token_and_manager_payload(
@@ -502,7 +505,7 @@ pub trait InterchainTokenServiceContract:
                     source_chain,
                     source_address,
                     payload_hash,
-                    payload_raw,
+                    payload,
                 );
             }
             _ => {
@@ -522,10 +525,6 @@ pub trait InterchainTokenServiceContract:
 
     fn validate_token(&self, token_identifier: &EgldOrEsdtTokenIdentifier) {
         require!(token_identifier.is_valid(), "Invalid token identifier");
-
-        // TODO: This also has validation for token in sol contract, check if this works and checks that the token exists?
-        // In sol contract this returns the name and decimals of the token, but there is no way to do that on MultiversX sync
-        // Should we require that a small amount of the token be sent to an endpoint to validate that it actually exists?
     }
 
     #[view]
@@ -560,7 +559,7 @@ pub trait InterchainTokenServiceContract:
 
         encoded.append(prefix_custom_token_id.as_managed_buffer());
         encoded.append(sender.as_managed_buffer());
-        encoded.append(&salt);
+        encoded.append(salt);
 
         self.crypto().keccak256(encoded)
     }

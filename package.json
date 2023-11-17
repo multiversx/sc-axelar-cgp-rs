@@ -11,6 +11,15 @@
     "build:token-manager-mint-burn": "cd token-manager-mint-burn && mxpy contract build",
     "build:token-manager-lock-unlock": "cd token-manager-lock-unlock && mxpy contract build",
     "build:ping-pong": "cd ping-pong-interchain && mxpy contract build",
+    "build:ci": "npm run build:ci:gateway && npm run build:ci:auth && npm run build:ci:gas-service && npm run build:ci:its && npm run build:ci:remote-address-validator && npm run build:ci:token-manager-mint-burn && npm run build:ci:token-manager-lock-unlock && npm run build:ci:ping-pong",
+    "build:ci:gateway": "cd gateway && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:auth": "cd auth && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:gas-service": "cd gas-service && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:its": "cd interchain-token-service && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:remote-address-validator": "cd remote-address-validator && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:token-manager-mint-burn": "cd token-manager-mint-burn && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:token-manager-lock-unlock": "cd token-manager-lock-unlock && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:ping-pong": "cd ping-pong-interchain && python3 -m multiversx_sdk_cli.cli contract build",
     "test": "vitest run",
     "test:all": "npm run build && npm run test",
     "typecheck": "tsc --noEmit",
@@ -28,6 +37,7 @@
     "tsx": "^3.12.7",
     "typescript": "^5.0.4",
     "vitest": "^0.33.0",
-    "xsuite": "0.0.34"
+    "xsuite": "0.0.34",
+    "ethers": "^6.8.0"
   }
 }

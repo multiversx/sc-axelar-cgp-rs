@@ -1,8 +1,9 @@
 multiversx_sc::imports!();
 
+use crate::abi::AbiEncodeDecode;
 use crate::constants::{
-    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenId,
-    TokenManagerType, SELECTOR_RECEIVE_TOKEN,
+    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerParams, DeployTokenManagerPayload,
+    SendTokenPayload, TokenId, TokenManagerType, SELECTOR_RECEIVE_TOKEN,
 };
 use crate::{events, proxy};
 use core::convert::TryFrom;
@@ -21,8 +22,7 @@ pub trait ExecutableModule:
     ) {
         let express_caller = self.pop_express_receive_token(&payload, &command_id);
 
-        // TODO: Switch this to abi decoding
-        let send_token_payload = SendTokenPayload::<Self::Api>::top_decode(payload).unwrap();
+        let send_token_payload = SendTokenPayload::<Self::Api>::abi_decode(payload);
 
         let destination_address =
             ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
@@ -37,7 +37,7 @@ pub trait ExecutableModule:
             return;
         }
 
-        if send_token_payload.selector == BigUint::from(SELECTOR_RECEIVE_TOKEN) {
+        if send_token_payload.selector == SELECTOR_RECEIVE_TOKEN {
             let (_, amount) = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -75,7 +75,7 @@ pub trait ExecutableModule:
             source_chain,
             send_token_payload.source_address.unwrap(),
             send_token_payload.data.unwrap(),
-            send_token_payload.token_id.clone(),
+            send_token_payload.token_id,
             token_identifier,
             amount,
             command_id,
@@ -83,15 +83,18 @@ pub trait ExecutableModule:
     }
 
     fn process_deploy_token_manager_payload(&self, payload: ManagedBuffer) {
-        // TODO: Decode using abi decoding
         let deploy_token_manager_payload =
-            DeployTokenManagerPayload::<Self::Api>::top_decode(payload).unwrap();
+            DeployTokenManagerPayload::<Self::Api>::abi_decode(payload);
+
+        let params =
+            DeployTokenManagerParams::<Self::Api>::top_decode(deploy_token_manager_payload.params)
+                .unwrap();
 
         self.deploy_token_manager(
             &deploy_token_manager_payload.token_id,
             deploy_token_manager_payload.token_manager_type,
-            deploy_token_manager_payload.params.operator,
-            Some(deploy_token_manager_payload.params.token_identifier),
+            params.operator,
+            Some(params.token_identifier),
         );
     }
 
@@ -103,18 +106,14 @@ pub trait ExecutableModule:
         payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         payload: ManagedBuffer,
     ) {
-        // TODO: Decode using abi decoding
-        let data =
-            DeployStandardizedTokenAndManagerPayload::<Self::Api>::top_decode(payload).unwrap();
+        let data = DeployStandardizedTokenAndManagerPayload::<Self::Api>::abi_decode(payload);
 
         let operator_raw = ManagedAddress::try_from(data.operator);
-        let operator;
-
-        if operator_raw.is_err() {
-            operator = self.blockchain().get_sc_address();
+        let operator = if operator_raw.is_err() {
+            self.blockchain().get_sc_address()
         } else {
-            operator = operator_raw.unwrap();
-        }
+            operator_raw.unwrap()
+        };
 
         // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
         // This is because we can not deploy token manager and call it to deploy the token in the same transaction
@@ -143,20 +142,18 @@ pub trait ExecutableModule:
         let token_manager_address = token_manager_address_mapper.get();
 
         let distributor_raw = ManagedAddress::try_from(data.distributor);
-        let distributor;
-        if distributor_raw.is_err() {
-            distributor = token_manager_address;
+        let distributor = if distributor_raw.is_err() {
+            token_manager_address
         } else {
-            distributor = distributor_raw.unwrap();
-        }
+            distributor_raw.unwrap()
+        };
 
         let mint_to_raw = ManagedAddress::try_from(data.mint_to);
-        let mint_to;
-        if mint_to_raw.is_err() {
-            mint_to = distributor.clone();
+        let mint_to = if mint_to_raw.is_err() {
+            distributor.clone()
         } else {
-            mint_to = mint_to_raw.unwrap();
-        }
+            mint_to_raw.unwrap()
+        };
 
         // The second time this is called, the call will be validated
         let valid = self.gateway_validate_contract_call(
@@ -253,7 +250,6 @@ pub trait ExecutableModule:
             TokenManagerType::MintBurnFrom => self.implementation_mint_burn().get(),
             TokenManagerType::LockUnlock => self.implementation_lock_unlock().get(),
             TokenManagerType::LockUnlockFee => self.implementation_lock_unlock().get(),
-            TokenManagerType::LiquidityPool => self.implementation_lock_unlock().get(),
         }
     }
 

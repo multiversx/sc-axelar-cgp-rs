@@ -70,11 +70,9 @@ pub trait TokenManagerLockUnlockContract:
     #[payable("*")]
     #[endpoint(takeToken)]
     fn take_token(&self) -> BigUint {
-        let amount = self.take_token_endpoint();
-
         // Nothing to do here, tokens remain in contract
 
-        amount
+        self.take_token_endpoint()
     }
 
     fn give_token_raw(&self, destination_address: &ManagedAddress, amount: &BigUint) -> (EgldOrEsdtTokenIdentifier, BigUint) {

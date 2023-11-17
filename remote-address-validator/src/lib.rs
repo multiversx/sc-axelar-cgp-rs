@@ -32,7 +32,7 @@ pub trait RemoteAddressValidatorContract {
         trusted_chain_names: MultiValueManagedVecCounted<ManagedBuffer>,
         trusted_addresses: MultiValueManagedVecCounted<ManagedBuffer>,
     ) {
-        require!(chain_name.len() > 0, "Zero string length");
+        require!(!chain_name.is_empty(), "Zero string length");
 
         self.chain_name().set_if_empty(chain_name);
 
@@ -50,13 +50,13 @@ pub trait RemoteAddressValidatorContract {
     #[endpoint(addTrustedAddress)]
     fn add_trusted_address(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
         require!(
-            source_chain.len() > 0 && source_address.len() > 0,
+            !source_chain.is_empty() && !source_address.is_empty(),
             "Zero string length"
         );
 
         self.remote_address_hashes(source_chain)
             .set(self.crypto().keccak256(source_address.lowercase()));
-        self.remote_addresses(&source_chain).set(source_address.clone());
+        self.remote_addresses(source_chain).set(source_address.clone());
 
         self.trusted_address_added_event(source_chain, source_address);
     }
@@ -65,13 +65,13 @@ pub trait RemoteAddressValidatorContract {
     #[endpoint(removeTrustedAddress)]
     fn remove_trusted_address(&self, source_chain: &ManagedBuffer) {
         require!(
-            source_chain.len() > 0,
+            !source_chain.is_empty(),
             "Zero string length"
         );
 
         self.remote_address_hashes(source_chain)
             .clear();
-        self.remote_addresses(&source_chain).clear();
+        self.remote_addresses(source_chain).clear();
 
         self.trusted_address_removed_event(source_chain);
     }
@@ -85,7 +85,7 @@ pub trait RemoteAddressValidatorContract {
             return false;
         }
 
-        return source_address_hash == self.remote_address_hashes(source_chain).get();
+        source_address_hash == self.remote_address_hashes(source_chain).get()
     }
 
     #[view(getRemoteAddress)]

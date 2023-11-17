@@ -17,9 +17,5 @@ version = "0.43.4"
 [dependencies.multiversx-sc-modules]
 version = "0.43.4"
 
-# TODO: Find out if there is a better way to encode/decode using ethereum ABI
-[dependencies]
-alloy-sol-types = "0.4.2"
-
 [dev-dependencies.multiversx-sc-scenario]
 version = "0.43.4"
