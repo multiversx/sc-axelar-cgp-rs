@@ -9,11 +9,6 @@ pub struct ContractCallData<M: ManagedTypeApi> {
     pub payload: ManagedBuffer<M>,
 }
 
-#[derive(TypeAbi, TopEncode)]
-pub struct ContractCallApprovedData<M: ManagedTypeApi> {
-    pub source_tx_hash: ManagedBuffer<M>,
-    pub source_event_index: BigUint<M>,
-}
 #[multiversx_sc::module]
 pub trait Events {
     #[event("contract_call_event")]
@@ -36,7 +31,6 @@ pub trait Events {
         #[indexed] source_address: ManagedBuffer,
         #[indexed] contract_address: ManagedAddress,
         #[indexed] payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        data: ContractCallApprovedData<Self::Api>,
     );
 
     #[event("operatorship_transferred_event")]

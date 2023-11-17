@@ -28,6 +28,4 @@ pub struct ApproveContractCallParams<M: ManagedTypeApi> {
     pub source_address: ManagedBuffer<M>,
     pub contract_address: ManagedAddress<M>,
     pub payload_hash: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
-    pub source_tx_hash: ManagedBuffer<M>,
-    pub source_event_index: BigUint<M>,
 }
