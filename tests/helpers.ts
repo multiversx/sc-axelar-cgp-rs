@@ -13,6 +13,9 @@ export const BOB_PUB_KEY = '8049d639e5a6980d1cd2392abcce41029cda74a1563523a202f0
 export const MOCK_PUB_KEY_1 = '000000000000000005006fbc99e58a82ef3c082afcd2679292693049c9371090';
 export const MOCK_PUB_KEY_2 = '00000000000000000500f12dd10c4d2be8264fe339da14b9fad7bdf364ae7ceb';
 
+export const MULTISIG_PROVER_PUB_KEY_1 = 'ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6';
+export const MULTISIG_PROVER_PUB_KEY_2 = 'ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449';
+
 export const TOKEN_SYMBOL: string = "WEGLD";
 export const TOKEN_ID: string = "WEGLD-123456";
 export const TOKEN_ID2: string = "OTHER-654321";
@@ -66,8 +69,12 @@ export const getOperatorsHash = (pubKeys: string[], weights: number[], threshold
   return createKeccakHash('keccak256').update(data).digest();
 }
 
-export const generateProof = (data: Encodable): TupleEncodable => {
-  const signature = generateSignature(Buffer.from(data.toTopHex(), 'hex'));
+export const generateProof = (data: Encodable | Buffer): TupleEncodable => {
+  if (data instanceof Encodable) {
+    data = Buffer.from(data.toTopHex(), 'hex');
+  }
+
+  const signature = generateSignature(data);
 
   return e.Tuple(
     e.List(e.Bytes(ALICE_PUB_KEY)),

@@ -10,6 +10,7 @@ import {
   generateProof,
   generateSignature,
   getOperatorsHash,
+  MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2,
   PAYLOAD_HASH,
   TOKEN_ID
 } from './helpers';
@@ -227,8 +228,6 @@ test('Execute approve contract call', async () => {
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
           e.Bytes(getKeccak256Hash('payloadHash')),
-          e.Str('sourceTxHash'),
-          e.U(123)
         ).toTopBytes()
       )
     )
@@ -417,8 +416,6 @@ test('Execute multiple commands', async () => {
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
           e.Bytes(getKeccak256Hash('payloadHash2')),
-          e.Str('sourceTxHash2'),
-          e.U(123)
         ).toTopBytes()
       ),
       e.Buffer(''),
@@ -428,8 +425,6 @@ test('Execute multiple commands', async () => {
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
           e.Bytes(getKeccak256Hash('payloadHash')),
-          e.Str('sourceTxHash'),
-          e.U(123)
         ).toTopBytes()
       )
     )
@@ -482,6 +477,128 @@ test('Execute multiple commands', async () => {
 
       e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash)).Value(e.U8(1)),
       e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash3)).Value(e.U8(1))
+    ]
+  });
+});
+
+test('Execute approve contract call with multisig prover encoded data', async () => {
+  await deployContract();
+
+  // 00000001 - length of text
+  // 44 - 'D' as hex
+  // 00000001 - length of command ids
+  // ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff - command id
+  // 00000001 - length of commands
+  // 00000013 - length of text
+  // 617070726f7665436f6e747261637443616c6c - 'approveContractCall' as hex
+  // 00000001 - length of params
+  // 00000052 - length of param
+  // 00000008457468657265756d00000002303000000000000000000500be4eba4b2eccbcf1703bbd6b2e0d1351430e769f54830202020202020202020202020202020202020202020202020202020202020202 - params
+  const data = Buffer.from('000000014400000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000100000013617070726f7665436f6e747261637443616c6c000000010000005200000008457468657265756d00000002303000000000000000000500be4eba4b2eccbcf1703bbd6b2e0d1351430e769f54830202020202020202020202020202020202020202020202020202020202020202', 'hex');
+
+  const proof = generateProof(data);
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 25_000_000,
+    funcName: 'execute',
+    funcArgs: [
+      e.Tuple(e.Buffer(data), e.Buffer(proof.toTopBytes()))
+    ]
+  });
+
+  const commandId = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+  const payloadHash = '0202020202020202020202020202020202020202020202020202020202020202';
+
+  // get_is_contract_call_approved_key hash
+  let approvedData = Buffer.concat([
+    Buffer.from(commandId, 'hex'),
+    Buffer.from('Ethereum'),
+    Buffer.from('00'),
+    e.Addr('erd1qqqqqqqqqqqqqpgqhe8t5jewej70zupmh44jurgn29psua5l2jps3ntjj3').toTopBytes(),
+    Buffer.from(payloadHash, 'hex')
+  ]);
+
+  const approvedDataHash = createKeccakHash('keccak256').update(approvedData).digest('hex');
+
+  let kvs = await contract.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0,
+    hasKvs: [
+      e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+
+      e.kvs.Mapper('command_executed', e.Bytes(commandId)).Value(e.U8(1)),
+
+      e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash)).Value(e.U8(1)),
+    ]
+  });
+});
+
+test('Execute transfer operatorship with multisig prover encoded data', async () => {
+  await deployContract();
+
+  // 00000001 - length of text
+  // 44 - 'D' as hex
+  // 00000001 - length of command ids
+  // ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff - command id
+  // 00000001 - length of commands
+  // 00000014 - length of text
+  // 7472616e736665724f70657261746f7273686970 - 'approveContractCall' as hex
+  // 00000001 - length of params
+  // 00000057 - length of param
+  // 00000002ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000002000000010a000000010a0000000114 - params
+  const data = Buffer.from('000000014400000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000001000000147472616e736665724f70657261746f7273686970000000010000005700000002ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000002000000010a000000010a0000000114', 'hex');
+
+  const signature = generateSignature(data);
+  const signatureBob = generateSignature(data, './bob.pem');
+
+  const proof = e.Tuple(
+    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
+    e.List(e.U(10), e.U(2)),
+    e.U(12),
+    e.List(e.Bytes(signature), e.Bytes(signatureBob))
+  );
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 25_000_000,
+    funcName: 'execute',
+    funcArgs: [
+      e.Tuple(e.Buffer(data), e.Buffer(proof.toTopBytes()))
+    ]
+  });
+
+  const commandId = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+
+  let kvs = await contract.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0,
+    allKvs: [
+      e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+
+      e.kvs.Mapper('command_executed', e.Bytes(commandId)).Value(e.U8(1))
+    ]
+  });
+
+  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash2 = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
+  const operatorsHash3 = getOperatorsHash([MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2], [10, 10], 20);
+
+  // Check that Auth contract was updated
+  kvs = await contractAuth.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0,
+    allKvs: [
+      // Manually add epoch for hash & current epoch
+      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash2)).Value(e.U64(16)),
+      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash3)).Value(e.U64(17)),
+
+      e.kvs.Mapper('hash_for_epoch', e.U64(17)).Value(e.Bytes(operatorsHash3)),
+
+      e.kvs.Mapper('current_epoch').Value(e.U64(17))
     ]
   });
 });

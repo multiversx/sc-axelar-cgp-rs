@@ -7,7 +7,7 @@ import {
   ALICE_PUB_KEY,
   BOB_PUB_KEY, COMMAND_ID, generateMessageHash,
   generateSignature,
-  getOperatorsHash,
+  getOperatorsHash, MULTISIG_PROVER_PUB_KEY, MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2,
   MULTIVERSX_SIGNED_MESSAGE_PREFIX
 } from './helpers';
 
@@ -381,4 +381,44 @@ test('Validate proof', async () => {
       e.kvs.Mapper('current_epoch').Value(e.U64(16))
     ]
   });
+});
+
+test('Validate proof with multisig prover encoded proof', async () => {
+  await deployContract();
+
+  const operatorsHash = getOperatorsHash([MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2], [10, 10], 10);
+  await contract.setAccount({
+    ...await contract.getAccount(),
+    kvs: [
+      // Manually add epoch for hash & current epoch
+      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+
+      e.kvs.Mapper('current_epoch').Value(e.U64(16))
+    ]
+  });
+
+  // 00000002 - length of operators
+  // ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6 - first operator public key
+  // ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449 - second operator public key
+  // 00000002 - length of weigths
+  // 00000001 0a - length of biguint weight followed by 10 as hex
+  // 00000001 0a
+  // 00000001 0a - length of biguint threshold followed by 10 as hex
+  // 00000002 - length of signatures
+  // fdae22df86f53a39985674072ed1442d08a66683e464134b8d17e373a07e8b82137b96087fa7bbbd2764c4e7658564c32480b2bb31ba70c1225350724494e507 - first signature
+  // b054d00827810f8384b85c88352dabf81dcc9be76a77617df942e8bd65ca15fadaef5941a0022f29d86fa5bd33c7fc593580930e521e337544716b5901f8810f - second signature
+  const data = Buffer.from('00000002ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000002000000010a000000010a000000010a00000002fdae22df86f53a39985674072ed1442d08a66683e464134b8d17e373a07e8b82137b96087fa7bbbd2764c4e7658564c32480b2bb31ba70c1225350724494e507b054d00827810f8384b85c88352dabf81dcc9be76a77617df942e8bd65ca15fadaef5941a0022f29d86fa5bd33c7fc593580930e521e337544716b5901f8810f', 'hex');
+
+  const messageHash = Buffer.from('84219fac907aad564fe5f1af58993d1c3f8f288af30b8bff5b50ffb5bba96bc0', 'hex');
+
+  // Signature is invalid because we use mock public keys, but we test if decoding of the raw data works properly
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'validateProof',
+    funcArgs: [
+      e.Bytes(messageHash),
+      e.Bytes(data),
+    ]
+  }).assertFail({ code: 10, message: 'invalid signature' });
 });

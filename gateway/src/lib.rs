@@ -5,7 +5,7 @@ use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use crate::constants::*;
-use crate::events::{ContractCallApprovedData, ContractCallData};
+use crate::events::{ContractCallData};
 
 multiversx_sc::imports!();
 
@@ -166,10 +166,6 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
             params.source_address,
             params.contract_address,
             params.payload_hash,
-            ContractCallApprovedData {
-                source_tx_hash: params.source_tx_hash,
-                source_event_index: params.source_event_index,
-            },
         );
 
         return true;
