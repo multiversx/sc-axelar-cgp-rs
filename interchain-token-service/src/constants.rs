@@ -5,12 +5,12 @@ use crate::abi::{AbiEncodeDecode, ParamType, Token};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 pub const PREFIX_STANDARDIZED_TOKEN_ID: &[u8] = b"its-standardized-token-id";
-pub const PREFIX_CUSTOM_TOKEN_ID: &[u8] = b"its-custom-token-id";
+pub const PREFIX_INTERCHAIN_TOKEN_ID: &[u8] = b"its-interchain-token-id";
 
-pub const SELECTOR_RECEIVE_TOKEN: u64 = 1;
-pub const SELECTOR_RECEIVE_TOKEN_WITH_DATA: u64 = 2;
-pub const SELECTOR_DEPLOY_TOKEN_MANAGER: u64 = 3;
-pub const SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN: u64 = 4;
+pub const MESSAGE_TYPE_INTERCHAIN_TRANSFER: u64 = 0;
+pub const MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA: u64 = 1;
+pub const MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN: u64 = 2;
+pub const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER: u64 = 3;
 
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 
@@ -47,7 +47,7 @@ impl TokenManagerType {
 }
 
 pub struct SendTokenPayload<M: ManagedTypeApi> {
-    pub selector: BigUint<M>,
+    pub message_type: BigUint<M>,
     pub token_id: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
     pub destination_address: ManagedBuffer<M>,
     pub amount: BigUint<M>,
@@ -59,7 +59,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for SendTokenPayload<M> {
     fn abi_encode(self) -> ManagedBuffer<M> {
         if self.source_address.is_none() || self.data.is_none() {
             return Self::raw_abi_encode(&[
-                Token::Uint256(self.selector),
+                Token::Uint256(self.message_type),
                 Token::Bytes32(self.token_id),
                 Token::Bytes(self.destination_address),
                 Token::Uint256(self.amount),
@@ -67,7 +67,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for SendTokenPayload<M> {
         }
 
         Self::raw_abi_encode(&[
-            Token::Uint256(self.selector),
+            Token::Uint256(self.message_type),
             Token::Bytes32(self.token_id),
             Token::Bytes(self.destination_address),
             Token::Uint256(self.amount),
@@ -97,7 +97,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for SendTokenPayload<M> {
 
         let mut source_address = None;
         let mut data = None;
-        if selector == SELECTOR_RECEIVE_TOKEN_WITH_DATA {
+        if selector == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA {
             let mut result = ArrayVec::<Token<M>, 2>::new();
             Self::raw_abi_decode(
                 &[ParamType::Bytes, ParamType::Bytes],
@@ -111,7 +111,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for SendTokenPayload<M> {
         }
 
         SendTokenPayload {
-            selector,
+            message_type: selector,
             token_id,
             destination_address,
             amount,
@@ -179,19 +179,16 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployTokenManagerPayload<M> {
     }
 }
 
-pub struct DeployStandardizedTokenAndManagerPayload<M: ManagedTypeApi> {
+pub struct DeployInterchainTokenPayload<M: ManagedTypeApi> {
     pub selector: BigUint<M>,
     pub token_id: TokenId<M>,
     pub name: ManagedBuffer<M>,
     pub symbol: ManagedBuffer<M>,
     pub decimals: u8,
     pub distributor: ManagedBuffer<M>,
-    pub mint_to: ManagedBuffer<M>,
-    pub mint_amount: BigUint<M>,
-    pub operator: ManagedBuffer<M>,
 }
 
-impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployStandardizedTokenAndManagerPayload<M> {
+impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
     fn abi_encode(self) -> ManagedBuffer<M> {
         Self::raw_abi_encode(&[
             Token::Uint256(self.selector),
@@ -200,9 +197,6 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployStandardizedTokenAndManager
             Token::String(self.symbol),
             Token::Uint8(self.decimals),
             Token::Bytes(self.distributor),
-            Token::Bytes(self.mint_to),
-            Token::Uint256(self.mint_amount),
-            Token::Bytes(self.operator),
         ])
     }
 
@@ -217,18 +211,12 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployStandardizedTokenAndManager
                 ParamType::String,
                 ParamType::Uint8,
                 ParamType::Bytes,
-                ParamType::Bytes,
-                ParamType::Uint256,
-                ParamType::Bytes,
             ],
             &payload,
             &mut result,
             0,
         );
 
-        let operator = result.pop().unwrap().into_managed_buffer();
-        let mint_amount = result.pop().unwrap().into_biguint();
-        let mint_to = result.pop().unwrap().into_managed_buffer();
         let distributor = result.pop().unwrap().into_managed_buffer();
         let decimals = result.pop().unwrap().into_u8();
         let symbol = result.pop().unwrap().into_managed_buffer();
@@ -236,16 +224,13 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployStandardizedTokenAndManager
         let token_id = result.pop().unwrap().into_managed_byte_array();
         let selector = result.pop().unwrap().into_biguint();
 
-        DeployStandardizedTokenAndManagerPayload {
+        DeployInterchainTokenPayload {
             selector,
             token_id,
             name,
             symbol,
             decimals,
             distributor,
-            mint_to,
-            mint_amount,
-            operator,
         }
     }
 }

@@ -2,61 +2,44 @@
 
 multiversx_sc::imports!();
 
+pub mod roles;
+
+use roles::Roles;
+
 #[multiversx_sc::module]
-pub trait Operatable {
+pub trait Operatable: roles::AccountRoles {
     #[endpoint(transferOperatorship)]
     fn transfer_operatorship(&self, operator: ManagedAddress) {
         self.only_operator();
 
-        self.set_operator(operator);
+        self.transfer_account_roles(self.blockchain().get_caller(), operator, Roles::OPERATOR);
     }
 
     #[endpoint(proposeOperatorship)]
     fn propose_operatorship(&self, operator: ManagedAddress) {
         self.only_operator();
 
-        self.operator_change_proposed_event(&operator);
-
-        self.proposed_operator().set(operator);
+        self.propose_account_roles(self.blockchain().get_caller(), operator, Roles::OPERATOR);
     }
 
     #[endpoint(acceptOperatorship)]
-    fn accept_operatorship(&self) {
-        let caller = self.blockchain().get_caller();
-
-        require!(
-            !self.proposed_operator().is_empty()
-                && caller == self.proposed_operator().take(),
-            "Not proposed operator"
+    fn accept_operatorship(&self, from_operator: ManagedAddress) {
+        self.accept_account_roles(
+            from_operator,
+            self.blockchain().get_caller(),
+            Roles::OPERATOR,
         );
-
-        self.set_operator(caller);
     }
 
-    fn set_operator(&self, operator: ManagedAddress) {
-        self.operatorship_transferred_event(&operator);
-
-        self.operator().set(operator);
+    fn add_operator(&self, operator: ManagedAddress) {
+        self.add_account_roles(operator, Roles::OPERATOR);
     }
 
     fn only_operator(&self) {
-        require!(
-            self.blockchain().get_caller() == self.operator().get(),
-            "Not operator"
-        );
+        self.only_role(Roles::OPERATOR);
     }
 
-    #[view]
-    #[storage_mapper("operator")]
-    fn operator(&self) -> SingleValueMapper<ManagedAddress>;
-
-    #[view]
-    #[storage_mapper("proposed_operator")]
-    fn proposed_operator(&self) -> SingleValueMapper<ManagedAddress>;
-
-    #[event("operatorship_transferred_event")]
-    fn operatorship_transferred_event(&self, operator: &ManagedAddress);
-
-    #[event("operator_change_proposed_event")]
-    fn operator_change_proposed_event(&self, operator: &ManagedAddress);
+    fn is_operator(&self, address: &ManagedAddress) -> bool {
+        self.has_role(address, Roles::OPERATOR)
+    }
 }

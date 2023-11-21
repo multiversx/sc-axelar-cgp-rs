@@ -7,7 +7,7 @@ use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::ParamType;
 use interchain_token_service::abi::Token;
 use interchain_token_service::constants::{
-    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload,
+    DeployInterchainTokenPayload, DeployTokenManagerPayload, SendTokenPayload,
     TokenManagerType,
 };
 
@@ -212,7 +212,7 @@ fn decode_send_token_payload() {
     )));
 
     let expected = SendTokenPayload::<StaticApi> {
-        selector: BigUint::from(11u64),
+        message_type: BigUint::from(11u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
         )),
@@ -222,7 +222,7 @@ fn decode_send_token_payload() {
         data: None,
     };
 
-    assert_eq!(result.selector, expected.selector);
+    assert_eq!(result.message_type, expected.message_type);
     assert_eq!(result.token_id, expected.token_id);
     assert_eq!(result.destination_address, expected.destination_address);
     assert_eq!(result.amount, expected.amount);
@@ -250,7 +250,7 @@ fn decode_send_token_payload_larger() {
     )));
 
     let expected = SendTokenPayload::<StaticApi> {
-        selector: BigUint::from(11u64),
+        message_type: BigUint::from(11u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
         )),
@@ -260,7 +260,7 @@ fn decode_send_token_payload_larger() {
         data: None,
     };
 
-    assert_eq!(result.selector, expected.selector);
+    assert_eq!(result.message_type, expected.message_type);
     assert_eq!(result.token_id, expected.token_id);
     assert_eq!(result.destination_address, expected.destination_address);
     assert_eq!(result.amount, expected.amount);
@@ -288,7 +288,7 @@ fn decode_send_token_with_data_payload() {
     )));
 
     let expected = SendTokenPayload::<StaticApi> {
-        selector: BigUint::from(2u64),
+        message_type: BigUint::from(2u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
         )),
@@ -300,7 +300,7 @@ fn decode_send_token_with_data_payload() {
         data: Some(ManagedBuffer::from(&hex!("536f6d6544617461"))),
     };
 
-    assert_eq!(result.selector, expected.selector);
+    assert_eq!(result.message_type, expected.message_type);
     assert_eq!(result.token_id, expected.token_id);
     assert_eq!(result.destination_address, expected.destination_address);
     assert_eq!(result.amount, expected.amount);
@@ -338,7 +338,7 @@ fn decode_deploy_token_manager_payload() {
 
 #[test]
 fn decode_deploy_standardized_token_and_manager_payload() {
-    let result = DeployStandardizedTokenAndManagerPayload::<StaticApi>::abi_decode(
+    let result = DeployInterchainTokenPayload::<StaticApi>::abi_decode(
         ManagedBuffer::from(&hex!(
             "
 			000000000000000000000000000000000000000000000000000000000000002c
@@ -363,7 +363,7 @@ fn decode_deploy_standardized_token_and_manager_payload() {
         )),
     );
 
-    let expected = DeployStandardizedTokenAndManagerPayload::<StaticApi> {
+    let expected = DeployInterchainTokenPayload::<StaticApi> {
         selector: BigUint::from(44u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"

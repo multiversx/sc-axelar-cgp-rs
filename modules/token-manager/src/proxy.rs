@@ -9,8 +9,8 @@ mod interchain_token_service_proxy {
 
     #[multiversx_sc::proxy]
     pub trait InterchainTokenServiceProxy {
-        #[endpoint(transmitSendToken)]
-        fn transmit_send_token(
+        #[endpoint(transmitInterchainTransfer)]
+        fn transmit_interchain_transfer(
             &self,
             token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
             source_address: &ManagedAddress,
@@ -25,7 +25,7 @@ mod interchain_token_service_proxy {
 #[multiversx_sc::module]
 pub trait ProxyModule
 {
-    fn interchain_token_service_transmit_send_token(
+    fn interchain_token_service_transmit_interchain_transfer(
         &self,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_address: &ManagedAddress,
@@ -35,7 +35,7 @@ pub trait ProxyModule
         metadata: ManagedBuffer,
     ) {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .transmit_send_token(
+            .transmit_interchain_transfer(
                 token_id,
                 source_address,
                 destination_chain,

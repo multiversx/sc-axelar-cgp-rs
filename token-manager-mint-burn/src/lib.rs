@@ -3,6 +3,7 @@
 multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use token_manager::TokenManagerType;
 
 // If this needs updating, the TokenManagerMintBurn contract from which deployments are made can be upgraded
 const DEFAULT_ESDT_ISSUE_COST: u64 = 50000000000000000; // 0.05 EGLD
@@ -19,7 +20,7 @@ pub trait TokenManagerMintBurnContract:
         &self,
         interchain_token_service: ManagedAddress,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        operator: ManagedAddress,
+        operator: Option<ManagedAddress>,
         token_identifier: Option<EgldOrEsdtTokenIdentifier>,
     ) {
         require!(
@@ -85,8 +86,8 @@ pub trait TokenManagerMintBurnContract:
     }
 
     #[payable("EGLD")]
-    #[endpoint(deployStandardizedToken)]
-    fn deploy_standardized_token(
+    #[endpoint(deployInterchainToken)]
+    fn deploy_interchain_token(
         &self,
         _distributor: ManagedAddress, // TODO: What should we use this for? In Sui it is also not used
         name: ManagedBuffer,
@@ -148,6 +149,11 @@ pub trait TokenManagerMintBurnContract:
         );
 
         (token_identifier, amount.clone())
+    }
+
+    #[view(implementationType)]
+    fn implementation_type(&self) -> TokenManagerType {
+        TokenManagerType::LockUnlock
     }
 
     #[callback]

@@ -1,33 +1,13 @@
 multiversx_sc::imports!();
 
+use crate::abi::AbiEncodeDecode;
 use crate::constants::{
-    DeployStandardizedTokenAndManagerPayload, ManagedBufferAscii, TokenId,
-    SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN,
+    DeployInterchainTokenPayload, ManagedBufferAscii, TokenId,
+    MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
 };
-use crate::events;
+use crate::{address_tracker, events};
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use crate::abi::AbiEncodeDecode;
-
-pub mod remote_address_validator_proxy {
-    multiversx_sc::imports!();
-
-    #[multiversx_sc::proxy]
-    pub trait RemoteAddressValidatorProxy {
-        #[view(chainName)]
-        fn chain_name(&self) -> ManagedBuffer;
-
-        #[view(validateSender)]
-        fn validate_sender(
-            &self,
-            source_chain: &ManagedBuffer,
-            source_address: &ManagedBuffer,
-        ) -> bool;
-
-        #[view(getRemoteAddress)]
-        fn get_remote_address(&self, destination_chain: &ManagedBuffer) -> ManagedBuffer;
-    }
-}
 
 pub mod gas_service_proxy {
     multiversx_sc::imports!();
@@ -106,10 +86,10 @@ pub mod token_manager_proxy {
 
         // Endpoint only available on MintBurn TokenManager
         #[payable("EGLD")]
-        #[endpoint(deployStandardizedToken)]
-        fn deploy_standardized_token(
+        #[endpoint(deployInterchainToken)]
+        fn deploy_interchain_token(
             &self,
-            _distributor: ManagedAddress,
+            distributor: ManagedAddress,
             name: ManagedBuffer,
             symbol: ManagedBuffer,
             decimals: u8,
@@ -121,12 +101,12 @@ pub mod token_manager_proxy {
         fn token_identifier(&self) -> EgldOrEsdtTokenIdentifier;
 
         #[view(getFlowLimit)]
-        fn get_flow_limit(&self) -> BigUint;
+        fn flow_limit(&self) -> BigUint;
 
-        #[view(getFlowOutAmount)]
+        #[view(flowOutAmount)]
         fn get_flow_out_amount(&self) -> BigUint;
 
-        #[view(getFlowInAmount)]
+        #[view(flowInAmount)]
         fn get_flow_in_amount(&self) -> BigUint;
     }
 }
@@ -145,9 +125,9 @@ pub mod executable_contract_proxy {
             &self,
             source_chain: ManagedBuffer,
             source_address: ManagedBuffer,
-            payload: ManagedBuffer,
+            data: ManagedBuffer,
             token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        ) -> BigUint;
+        );
 
         #[payable("*")]
         #[endpoint(expressExecuteWithInterchainToken)]
@@ -155,29 +135,16 @@ pub mod executable_contract_proxy {
             &self,
             source_chain: ManagedBuffer,
             source_address: ManagedBuffer,
-            payload: ManagedBuffer,
+            data: ManagedBuffer,
             token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        ) -> BigUint;
+        );
     }
 }
 
 #[multiversx_sc::module]
-pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::PauseModule {
-    fn remote_address_validator_chain_name(&self) -> ManagedBuffer {
-        self.remote_address_validator_proxy(self.remote_address_validator().get())
-            .chain_name()
-            .execute_on_dest_context()
-    }
-
-    fn remote_address_validator_get_remote_address(
-        &self,
-        destination_chain: &ManagedBuffer,
-    ) -> ManagedBuffer {
-        self.remote_address_validator_proxy(self.remote_address_validator().get())
-            .get_remote_address(destination_chain)
-            .execute_on_dest_context()
-    }
-
+pub trait ProxyModule:
+    events::EventsModule + address_tracker::AddressTracker + multiversx_sc_modules::pause::PauseModule
+{
     fn gas_service_pay_native_gas_for_contract_call(
         &self,
         destination_chain: &ManagedBuffer,
@@ -207,7 +174,10 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
             .execute_on_dest_context::<()>();
     }
 
-    fn gateway_is_command_executed(&self, command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> bool {
+    fn gateway_is_command_executed(
+        &self,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> bool {
         self.gateway_proxy(self.gateway().get())
             .is_command_executed(command_id)
             .execute_on_dest_context::<bool>()
@@ -221,12 +191,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
         self.gateway_proxy(self.gateway().get())
-            .validate_contract_call(
-                command_id,
-                source_chain,
-                source_address,
-                payload_hash,
-            )
+            .validate_contract_call(command_id, source_chain, source_address, payload_hash)
             .execute_on_dest_context::<bool>()
     }
 
@@ -254,7 +219,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
     ) {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.valid_token_manager_address(token_id))
             .take_token()
             .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(
                 token_identifier,
@@ -265,7 +230,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
     }
 
     fn token_manager_set_flow_limit(&self, token_id: &TokenId<Self::Api>, flow_limit: &BigUint) {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.valid_token_manager_address(token_id))
             .set_flow_limit(flow_limit)
             .execute_on_dest_context::<()>();
     }
@@ -276,7 +241,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         destination_address: &ManagedAddress,
         amount: &BigUint,
     ) -> (EgldOrEsdtTokenIdentifier, BigUint) {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.valid_token_manager_address(token_id))
             .give_token(destination_address, amount)
             .execute_on_dest_context::<MultiValue2<EgldOrEsdtTokenIdentifier, BigUint>>()
             .into_tuple()
@@ -292,7 +257,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         mint_amount: BigUint,
         mint_to: ManagedAddress,
     ) {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.valid_token_manager_address(token_id))
             .deploy_standardized_token(distributor, name, symbol, decimals, mint_amount, mint_to)
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
@@ -376,46 +341,38 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
             .call_and_exit();
     }
 
-    fn deploy_remote_standardized_token(
+    fn deploy_remote_interchain_token(
         &self,
         token_id: TokenId<Self::Api>,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
         distributor: ManagedBuffer,
-        mint_to: ManagedBuffer,
-        mint_amount: BigUint,
-        operator: ManagedBuffer,
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
     ) {
-        let data = DeployStandardizedTokenAndManagerPayload {
-            selector: BigUint::from(SELECTOR_DEPLOY_AND_REGISTER_STANDARDIZED_TOKEN),
+        self.valid_token_manager_address(&token_id);
+
+        let data = DeployInterchainTokenPayload {
+            selector: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
             token_id: token_id.clone(),
             name: name.clone(),
             symbol: symbol.clone(),
             decimals,
             distributor: distributor.clone(),
-            mint_to: mint_to.clone(),
-            mint_amount: mint_amount.clone(),
-            operator: operator.clone(),
         };
 
         let payload = data.abi_encode();
 
         self.call_contract(&destination_chain, &payload, &gas_value);
 
-        self.emit_remote_standardized_token_and_manager_deployment_initialized_event(
+        self.emit_interchain_token_deployment_started_event(
             token_id,
             name,
             symbol,
             decimals,
             distributor,
-            mint_to,
-            mint_amount,
-            operator,
             destination_chain,
-            gas_value,
         );
     }
 
@@ -425,8 +382,11 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         payload: &ManagedBuffer,
         gas_value: &BigUint,
     ) {
-        let destination_address =
-            self.remote_address_validator_get_remote_address(destination_chain);
+        let destination_address = self.trusted_address(destination_chain);
+
+        require!(!destination_address.is_empty(), "Not trusted chain");
+
+        let destination_address = destination_address.get();
 
         // TODO: see how to properly handle the gas here, since on MultiversX we can not send both EGLD and ESDT in the same transaction,
         if gas_value > &BigUint::zero() {
@@ -441,36 +401,36 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         self.gateway_call_contract(destination_chain, &destination_address, payload);
     }
 
-    #[view]
-    fn get_flow_limit(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.get_valid_token_manager_address(&token_id))
-            .get_flow_limit()
+    #[view(flowLimit)]
+    fn flow_limit(&self, token_id: TokenId<Self::Api>) -> BigUint {
+        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
+            .flow_limit()
             .execute_on_dest_context()
     }
 
-    #[view]
-    fn get_flow_out_amount(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.get_valid_token_manager_address(&token_id))
+    #[view(flowOutAmount)]
+    fn flow_out_amount(&self, token_id: TokenId<Self::Api>) -> BigUint {
+        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
             .get_flow_out_amount()
             .execute_on_dest_context()
     }
 
-    #[view]
-    fn get_flow_in_amount(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.get_valid_token_manager_address(&token_id))
+    #[view(flowInAmount)]
+    fn flow_in_amount(&self, token_id: TokenId<Self::Api>) -> BigUint {
+        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
             .get_flow_in_amount()
             .execute_on_dest_context()
     }
 
-    #[view]
-    fn get_token_identifier(&self, token_id: &TokenId<Self::Api>) -> EgldOrEsdtTokenIdentifier {
-        self.token_manager_proxy(self.get_valid_token_manager_address(token_id))
+    #[view(validTokenIdentifier)]
+    fn valid_token_identifier(&self, token_id: &TokenId<Self::Api>) -> EgldOrEsdtTokenIdentifier {
+        self.token_manager_proxy(self.valid_token_manager_address(token_id))
             .token_identifier()
             .execute_on_dest_context()
     }
 
-    #[view]
-    fn get_valid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
+    #[view(validTokenManagerAddress)]
+    fn valid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
         let token_manager_address_mapper = self.token_manager_address(token_id);
 
         require!(
@@ -487,9 +447,6 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
     #[storage_mapper("gas_service")]
     fn gas_service(&self) -> SingleValueMapper<ManagedAddress>;
 
-    #[storage_mapper("remote_address_validator")]
-    fn remote_address_validator(&self) -> SingleValueMapper<ManagedAddress>;
-
     #[view]
     #[storage_mapper("token_manager_address")]
     fn token_manager_address(
@@ -497,23 +454,11 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
         token_id: &TokenId<Self::Api>,
     ) -> SingleValueMapper<ManagedAddress>;
 
-    #[storage_mapper("express_receive_token_slot")]
-    fn express_receive_token_slot(
-        &self,
-        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> SingleValueMapper<ManagedAddress>;
-
     #[proxy]
     fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway_proxy::Proxy<Self::Api>;
 
     #[proxy]
     fn gas_service_proxy(&self, sc_address: ManagedAddress) -> gas_service_proxy::Proxy<Self::Api>;
-
-    #[proxy]
-    fn remote_address_validator_proxy(
-        &self,
-        address: ManagedAddress,
-    ) -> remote_address_validator_proxy::Proxy<Self::Api>;
 
     #[proxy]
     fn token_manager_proxy(&self, address: ManagedAddress)
@@ -582,7 +527,7 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
             ManagedAsyncCallResult::Err(_) => {
                 self.send().direct(&caller, &token_identifier, 0, &amount);
 
-                self.express_receive_token_slot(&express_hash).clear();
+                self.express_execute(&express_hash).clear();
 
                 self.express_token_received_with_data_error_event(
                     &caller,
@@ -635,14 +580,12 @@ pub trait ProxyModule: events::EventsModule + multiversx_sc_modules::pause::Paus
                     .copy_slice(0, token_identifier_name.len() - 7)
                     .unwrap();
 
-                self.deploy_remote_standardized_token(
+                // TODO:
+                self.deploy_remote_interchain_token(
                     token_id,
                     token_name,
                     token_symbol,
                     token_decimals,
-                    ManagedBuffer::new(),
-                    ManagedBuffer::new(),
-                    BigUint::zero(),
                     ManagedBuffer::new(),
                     destination_chain,
                     gas_value,

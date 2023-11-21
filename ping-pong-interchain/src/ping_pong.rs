@@ -4,8 +4,13 @@ multiversx_sc::imports!();
 
 mod user_status;
 
-use user_status::UserStatus;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use user_status::UserStatus;
+
+pub struct Data<M: ManagedTypeApi> {
+    pub function: ManagedBuffer<M>,
+    pub address: ManagedAddress<M>,
+}
 
 /// Derived empirically.
 const PONG_ALL_LOW_GAS_LIMIT: u64 = 3_000_000;
@@ -39,7 +44,8 @@ pub trait PingPong {
         opt_activation_timestamp: Option<u64>,
         max_funds: OptionalValue<BigUint>,
     ) {
-        self.interchain_token_service().set(interchain_token_service);
+        self.interchain_token_service()
+            .set(interchain_token_service);
         self.ping_amount().set(ping_amount);
         let activation_timestamp =
             opt_activation_timestamp.unwrap_or_else(|| self.blockchain().get_block_timestamp());
@@ -54,21 +60,22 @@ pub trait PingPong {
     fn execute_with_interchain_token(
         &self,
         _source_chain: ManagedBuffer,
-        source_address: ManagedAddress,
-        payload: ManagedBuffer,
+        _source_address: ManagedBuffer,
+        data: Data<Self::Api>, // this will be automatically decoded from a ManagedBuffer
         _token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> BigUint {
-        require!(self.blockchain().get_caller() == self.interchain_token_service().get(), "Not interchain token service");
+    ) {
+        require!(
+            self.blockchain().get_caller() == self.interchain_token_service().get(),
+            "Not service"
+        );
 
-        if payload == ManagedBuffer::from("ping") {
-            self.ping(OptionalValue::Some(source_address), IgnoreValue);
-        } else if payload == ManagedBuffer::from("pong") {
-            self.pong(OptionalValue::Some(source_address));
+        if data.function == ManagedBuffer::from("ping") {
+            self.ping(OptionalValue::Some(data.address), IgnoreValue);
+        } else if data.function == ManagedBuffer::from("pong") {
+            self.pong(OptionalValue::Some(data.address));
         } else {
             sc_panic!("Unsupported payload");
         }
-
-        self.call_value().egld_value().clone_value()
     }
 
     #[payable("*")]
@@ -76,11 +83,11 @@ pub trait PingPong {
     fn express_execute_with_interchain_token(
         &self,
         source_chain: ManagedBuffer,
-        source_address: ManagedAddress,
-        payload: ManagedBuffer,
+        source_address: ManagedBuffer,
+        data: Data<Self::Api>,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> BigUint {
-        self.execute_with_interchain_token(source_chain, source_address, payload, token_id)
+    ) {
+        self.execute_with_interchain_token(source_chain, source_address, data, token_id);
     }
 
     /// User sends some EGLD to be locked in the contract for a period of time.
@@ -127,13 +134,13 @@ pub trait PingPong {
         match user_status {
             UserStatus::New => {
                 self.user_status(user_id).set(UserStatus::Registered);
-            },
+            }
             UserStatus::Registered => {
                 sc_panic!("can only ping once")
-            },
+            }
             UserStatus::Withdrawn => {
                 sc_panic!("already withdrawn")
-            },
+            }
         }
     }
 
@@ -150,7 +157,7 @@ pub trait PingPong {
                 } else {
                     Result::Err("unknown user")
                 }
-            },
+            }
             UserStatus::Withdrawn => Result::Err("already withdrawn"),
         }
     }

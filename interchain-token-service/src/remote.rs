@@ -1,14 +1,19 @@
 multiversx_sc::imports!();
 
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use crate::{events, proxy};
 use crate::abi::AbiEncodeDecode;
-use crate::constants::{DeployTokenManagerPayload, Metadata, SELECTOR_DEPLOY_TOKEN_MANAGER, SELECTOR_RECEIVE_TOKEN, SELECTOR_RECEIVE_TOKEN_WITH_DATA, SendTokenPayload, TokenId, TokenManagerType};
-use crate::proxy::remote_address_validator_proxy::ProxyTrait as RemoteAddressValidatorProxyTrait;
+use crate::constants::{
+    DeployTokenManagerPayload, Metadata, SendTokenPayload, TokenId, TokenManagerType,
+    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER, MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
+};
+use crate::{events, proxy};
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::module]
 pub trait RemoteModule:
-    multiversx_sc_modules::pause::PauseModule + events::EventsModule + proxy::ProxyModule
+    express_executor_tracker::ExpressExecutorTracker
+    + multiversx_sc_modules::pause::PauseModule
+    + events::EventsModule
+    + proxy::ProxyModule
 {
     fn deploy_remote_token_manager(
         &self,
@@ -19,7 +24,7 @@ pub trait RemoteModule:
         params: ManagedBuffer,
     ) {
         let data = DeployTokenManagerPayload {
-            selector: BigUint::from(SELECTOR_DEPLOY_TOKEN_MANAGER),
+            selector: BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER),
             token_id: token_id.clone(),
             token_manager_type,
             params: params.clone(),
@@ -51,7 +56,7 @@ pub trait RemoteModule:
 
         if is_err {
             let data = SendTokenPayload {
-                selector: BigUint::from(SELECTOR_RECEIVE_TOKEN),
+                message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER),
                 token_id: token_id.clone(),
                 destination_address: destination_address.clone(),
                 amount: amount.clone(),
@@ -72,7 +77,7 @@ pub trait RemoteModule:
         require!(version == 0, "Invalid metadata version");
 
         let data = SendTokenPayload {
-            selector: BigUint::from(SELECTOR_RECEIVE_TOKEN_WITH_DATA),
+            message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA),
             token_id: token_id.clone(),
             destination_address: destination_address.clone(),
             amount: amount.clone(),
@@ -115,38 +120,6 @@ pub trait RemoteModule:
     }
 
     fn only_remote_service(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
-        let valid_sender: bool = self
-            .remote_address_validator_proxy(self.remote_address_validator().get())
-            .validate_sender(source_chain, source_address)
-            .execute_on_dest_context();
-
-        require!(valid_sender, "Not remote service");
-    }
-
-    fn set_express_receive_token(
-        &self,
-        payload: &ManagedBuffer,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-        express_caller: &ManagedAddress,
-    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        let mut hash_data = ManagedBuffer::new();
-
-        hash_data.append(payload);
-        hash_data.append(command_id.as_managed_buffer());
-
-        let hash = self.crypto().keccak256(hash_data);
-
-        let express_receive_token_slot_mapper = self.express_receive_token_slot(&hash);
-
-        require!(
-            express_receive_token_slot_mapper.is_empty(),
-            "Already express called"
-        );
-
-        express_receive_token_slot_mapper.set(express_caller);
-
-        self.express_receive_event(command_id, express_caller, payload);
-
-        hash
+        require!(self.is_trusted_address(source_chain, source_address), "Not remote service");
     }
 }

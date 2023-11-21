@@ -13,16 +13,12 @@ pub struct TokenManagerDeployedEventData<M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-pub struct RemoteStandardizedTokenAndManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
+pub struct InterchainTokenDeploymentStartedEventData<M: ManagedTypeApi> {
     name: ManagedBuffer<M>,
     symbol: ManagedBuffer<M>,
     decimals: u8,
     distributor: ManagedBuffer<M>,
-    mint_to: ManagedBuffer<M>,
-    mint_amount: BigUint<M>,
-    operator: ManagedBuffer<M>,
     destination_chain: ManagedBuffer<M>,
-    gas_value: BigUint<M>,
 }
 
 #[derive(TypeAbi, TopEncode)]
@@ -84,32 +80,24 @@ pub trait EventsModule {
         );
     }
 
-    fn emit_remote_standardized_token_and_manager_deployment_initialized_event(
+    fn emit_interchain_token_deployment_started_event(
         &self,
         token_id: TokenId<Self::Api>,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
         distributor: ManagedBuffer,
-        mint_to: ManagedBuffer,
-        mint_amount: BigUint,
-        operator: ManagedBuffer,
         destination_chain: ManagedBuffer,
-        gas_value: BigUint,
     ) {
-        let data = RemoteStandardizedTokenAndManagerDeploymentInitializedEventData {
+        let data = InterchainTokenDeploymentStartedEventData {
             name,
             symbol,
             decimals,
             distributor,
-            mint_to,
-            mint_amount,
-            operator,
             destination_chain,
-            gas_value,
         };
 
-        self.remote_standardized_token_and_manager_deployment_initialized_event(token_id, data);
+        self.interchain_token_deployment_started_event(token_id, data);
     }
 
     fn emit_remote_token_manager_deployment_initialized(
@@ -212,19 +200,19 @@ pub trait EventsModule {
         data: TokenManagerDeployedEventData<Self::Api>,
     );
 
-    #[event("remote_standardized_token_and_manager_deployment_initialized_event")]
-    fn remote_standardized_token_and_manager_deployment_initialized_event(
+    #[event("interchain_token_deployment_started_event")]
+    fn interchain_token_deployment_started_event(
         &self,
         #[indexed] token_id: TokenId<Self::Api>,
-        data: RemoteStandardizedTokenAndManagerDeploymentInitializedEventData<Self::Api>,
+        data: InterchainTokenDeploymentStartedEventData<Self::Api>,
     );
 
-    #[event("custom_token_id_claimed_event")]
-    fn custom_token_id_claimed_event(
+    #[event("interchain_token_id_claimed_event")]
+    fn interchain_token_id_claimed_event(
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
-        #[indexed] deployer: ManagedAddress,
-        data: ManagedBuffer,
+        #[indexed] deployer: &ManagedAddress,
+        data: &ManagedBuffer,
     );
 
     #[event("remote_token_manager_deployment_initialized_event")]
@@ -240,14 +228,6 @@ pub trait EventsModule {
         #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] distributor: ManagedAddress,
         data: StandardizedTokenDeployedEventData<Self::Api>,
-    );
-
-    #[event("express_receive_event")]
-    fn express_receive_event(
-        &self,
-        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[indexed] express_caller: &ManagedAddress,
-        payload: &ManagedBuffer,
     );
 
     #[event("token_sent_event")]

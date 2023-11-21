@@ -19,3 +19,6 @@ version = "0.43.4"
 
 [dev-dependencies.multiversx-sc-scenario]
 version = "0.43.4"
+
+[dependencies.operatable]
+path = "../modules/operatable"

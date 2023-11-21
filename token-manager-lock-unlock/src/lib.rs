@@ -3,6 +3,7 @@
 multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use token_manager::TokenManagerType;
 
 #[multiversx_sc::contract]
 pub trait TokenManagerLockUnlockContract:
@@ -16,7 +17,7 @@ pub trait TokenManagerLockUnlockContract:
         &self,
         interchain_token_service: ManagedAddress,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        operator: ManagedAddress,
+        operator: Option<ManagedAddress>,
         token_identifier: Option<EgldOrEsdtTokenIdentifier>,
     ) {
         require!(token_identifier.is_some(), "Invalid token address");
@@ -86,5 +87,10 @@ pub trait TokenManagerLockUnlockContract:
         );
 
         (token_identifier, amount.clone())
+    }
+
+    #[view(implementationType)]
+    fn implementation_type(&self) -> TokenManagerType {
+        TokenManagerType::LockUnlock
     }
 }

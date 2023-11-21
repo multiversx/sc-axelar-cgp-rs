@@ -4,7 +4,7 @@ use multiversx_sc_scenario::api::StaticApi;
 
 use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::Token;
-use interchain_token_service::constants::{DeployStandardizedTokenAndManagerPayload, DeployTokenManagerPayload, SendTokenPayload, TokenManagerType};
+use interchain_token_service::constants::{DeployInterchainTokenPayload, DeployTokenManagerPayload, SendTokenPayload, TokenManagerType};
 
 #[test]
 fn encode_uint256() {
@@ -135,7 +135,7 @@ fn encode_two_bytes() {
 #[test]
 fn encode_send_token_payload() {
     let data = SendTokenPayload::<StaticApi> {
-        selector: BigUint::from(11u64),
+        message_type: BigUint::from(11u64),
         token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
         destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
         amount: BigUint::from(23456789u64),
@@ -161,7 +161,7 @@ fn encode_send_token_payload() {
 #[test]
 fn encode_send_token_payload_with_data() {
     let data = SendTokenPayload::<StaticApi> {
-        selector: BigUint::from(22u64),
+        message_type: BigUint::from(22u64),
         token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
         destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
         amount: BigUint::from(23456789u64),
@@ -216,7 +216,7 @@ fn encode_deploy_token_manager_payload() {
 
 #[test]
 fn encode_deploy_standardized_token_and_manager_payload() {
-    let data = DeployStandardizedTokenAndManagerPayload::<StaticApi> {
+    let data = DeployInterchainTokenPayload::<StaticApi> {
         selector: BigUint::from(44u64),
         token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
         name: ManagedBuffer::from("Name"),

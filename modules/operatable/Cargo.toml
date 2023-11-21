@@ -10,3 +10,6 @@ path = "src/operatable.rs"
 
 [dependencies.multiversx-sc]
 version = "0.43.4"
+
+[dependencies]
+bitflags = "2.4.1"

@@ -2,8 +2,8 @@ multiversx_sc::imports!();
 
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
-    DeployStandardizedTokenAndManagerPayload, DeployTokenManagerParams, DeployTokenManagerPayload,
-    SendTokenPayload, TokenId, TokenManagerType, SELECTOR_RECEIVE_TOKEN,
+    DeployInterchainTokenPayload, DeployTokenManagerParams, DeployTokenManagerPayload,
+    SendTokenPayload, TokenId, TokenManagerType, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
 use crate::{events, proxy};
 use core::convert::TryFrom;
@@ -12,7 +12,10 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:
-    multiversx_sc_modules::pause::PauseModule + events::EventsModule + proxy::ProxyModule
+    express_executor_tracker::ExpressExecutorTracker
+    + multiversx_sc_modules::pause::PauseModule
+    + events::EventsModule
+    + proxy::ProxyModule
 {
     fn process_receive_token_payload(
         &self,
@@ -20,7 +23,7 @@ pub trait ExecutableModule:
         source_chain: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
-        let express_caller = self.pop_express_receive_token(&payload, &command_id);
+        let express_caller = self.pop_express_executor(&payload, &command_id);
 
         let send_token_payload = SendTokenPayload::<Self::Api>::abi_decode(payload);
 
@@ -37,7 +40,7 @@ pub trait ExecutableModule:
             return;
         }
 
-        if send_token_payload.selector == SELECTOR_RECEIVE_TOKEN {
+        if send_token_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER {
             let (_, amount) = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -90,7 +93,7 @@ pub trait ExecutableModule:
             DeployTokenManagerParams::<Self::Api>::top_decode(deploy_token_manager_payload.params)
                 .unwrap();
 
-        self.deploy_token_manager(
+        self.deploy_token_manager_raw(
             &deploy_token_manager_payload.token_id,
             deploy_token_manager_payload.token_manager_type,
             params.operator,
@@ -106,7 +109,7 @@ pub trait ExecutableModule:
         payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         payload: ManagedBuffer,
     ) {
-        let data = DeployStandardizedTokenAndManagerPayload::<Self::Api>::abi_decode(payload);
+        let data = DeployInterchainTokenPayload::<Self::Api>::abi_decode(payload);
 
         let operator_raw = ManagedAddress::try_from(data.operator);
         let operator = if operator_raw.is_err() {
@@ -134,7 +137,7 @@ pub trait ExecutableModule:
 
             require!(valid, "Not approved by gateway");
 
-            self.deploy_token_manager(&data.token_id, TokenManagerType::MintBurn, operator, None);
+            self.deploy_token_manager_raw(&data.token_id, TokenManagerType::MintBurn, operator, None);
 
             return;
         }
@@ -176,11 +179,11 @@ pub trait ExecutableModule:
         );
     }
 
-    fn deploy_token_manager(
+    fn deploy_token_manager_raw(
         &self,
         token_id: &TokenId<Self::Api>,
         token_manager_type: TokenManagerType,
-        operator: ManagedAddress,
+        operator: Option<ManagedAddress>,
         token_identifier: Option<EgldOrEsdtTokenIdentifier>,
     ) -> ManagedAddress {
         let token_manager_address_mapper = self.token_manager_address(token_id);
@@ -190,7 +193,7 @@ pub trait ExecutableModule:
             "Token manager already exists"
         );
 
-        let impl_address = self.get_implementation(token_manager_type);
+        let impl_address = self.token_manager_implementation(token_manager_type);
 
         let mut arguments = ManagedArgBuffer::new();
 
@@ -221,29 +224,8 @@ pub trait ExecutableModule:
         address
     }
 
-    fn pop_express_receive_token(
-        &self,
-        payload: &ManagedBuffer,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> ManagedAddress {
-        let mut hash_data = ManagedBuffer::new();
-
-        hash_data.append(payload);
-        hash_data.append(command_id.as_managed_buffer());
-
-        let hash = self.crypto().keccak256(hash_data);
-
-        let express_receive_token_slot_mapper = self.express_receive_token_slot(&hash);
-
-        if express_receive_token_slot_mapper.is_empty() {
-            return ManagedAddress::zero();
-        }
-
-        express_receive_token_slot_mapper.take()
-    }
-
-    #[view]
-    fn get_implementation(&self, token_manager_type: TokenManagerType) -> ManagedAddress {
+    #[view(tokenManagerImplementation)]
+    fn token_manager_implementation(&self, token_manager_type: TokenManagerType) -> ManagedAddress {
         // Only MintBurn and LockUnlock are supported, the others are kept for EVM compatibility
         match token_manager_type {
             TokenManagerType::MintBurn => self.implementation_mint_burn().get(),

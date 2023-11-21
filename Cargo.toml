@@ -12,8 +12,6 @@ members = [
     "interchain-token-service/meta",
     "ping-pong-interchain",
     "ping-pong-interchain/meta",
-    "remote-address-validator",
-    "remote-address-validator/meta",
     "token-manager-lock-unlock",
     "token-manager-lock-unlock/meta",
     "token-manager-mint-burn",
