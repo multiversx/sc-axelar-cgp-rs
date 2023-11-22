@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           24
+// Endpoints:                           34
 // Async Callback:                       1
-// Total number of exported functions:  26
+// Total number of exported functions:  36
 
 #![no_std]
 
@@ -22,27 +22,37 @@ multiversx_sc_wasm_adapter::endpoints! {
     interchain_token_service
     (
         init => init
-        registerCanonicalToken => register_canonical_token
-        deployRemoteCanonicalToken => deploy_remote_canonical_token
-        deployCustomTokenManager => deploy_custom_token_manager
-        deployRemoteCustomTokenManager => deploy_remote_custom_token_manager
-        deployAndRegisterStandardizedToken => deploy_and_register_standardized_token
-        deployAndRegisterRemoteStandardizedToken => deploy_and_register_remote_standardized_token
-        expressReceiveToken => express_receive_token
+        setInterchainTokenFactory => set_interchain_token_factory
+        deployTokenManager => deploy_token_manager
+        deployInterchainToken => deploy_interchain_token
+        expressExecute => express_execute_endpoint
         interchainTransfer => interchain_transfer
-        sendTokenWithData => send_token_with_data
-        transmitSendToken => transmit_send_token
-        setFlowLimit => set_flow_limit
+        callContractWithInterchainToken => call_contract_with_interchain_token
+        transmitInterchainTransfer => transmit_interchain_transfer
+        setFlowLimits => set_flow_limits
         execute => execute
         get_canonical_token_id => get_canonical_token_id
-        get_custom_token_id => get_custom_token_id
-        get_flow_limit => get_flow_limit
-        get_flow_out_amount => get_flow_out_amount
-        get_flow_in_amount => get_flow_in_amount
-        get_token_identifier => get_token_identifier
-        get_valid_token_manager_address => get_valid_token_manager_address
+        interchainTokenId => interchain_token_id
+        contractCallValue => contract_call_value
+        chainNameHash => chain_name_hash
+        interchainTokenFactory => interchain_token_factory
+        transferOperatorship => transfer_operatorship
+        proposeOperatorship => propose_operatorship
+        acceptOperatorship => accept_operatorship
+        getAccountRoles => account_roles
+        getProposedRoles => proposed_roles
+        setTrustedAddress => set_trusted_address
+        removeTrustedAddress => remove_trusted_address
+        chainName => chain_name
+        trusted_address => trusted_address
+        trusted_address_hash => trusted_address_hash
+        flowLimit => flow_limit
+        flowOutAmount => flow_out_amount
+        flowInAmount => flow_in_amount
+        validTokenIdentifier => valid_token_identifier
+        validTokenManagerAddress => valid_token_manager_address
         token_manager_address => token_manager_address
-        get_implementation => get_implementation
+        tokenManagerImplementation => token_manager_implementation
         pause => pause_endpoint
         unpause => unpause_endpoint
         isPaused => paused_status

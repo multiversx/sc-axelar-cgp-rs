@@ -7,7 +7,7 @@ use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::ParamType;
 use interchain_token_service::abi::Token;
 use interchain_token_service::constants::{
-    DeployInterchainTokenPayload, DeployTokenManagerPayload, SendTokenPayload,
+    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
     TokenManagerType,
 };
 
@@ -16,7 +16,7 @@ use interchain_token_service::constants::{
 fn decode_from_empty_bytes32() {
     let mut result = ArrayVec::<Token<StaticApi>, 0>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::Bytes32],
         &ManagedBuffer::new(),
         &mut result,
@@ -29,7 +29,7 @@ fn decode_from_empty_bytes32() {
 fn decode_from_empty_bytes() {
     let mut result = ArrayVec::<Token<StaticApi>, 0>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::Bytes],
         &ManagedBuffer::new(),
         &mut result,
@@ -42,7 +42,7 @@ fn decode_from_empty_bytes() {
 fn decode_from_empty_string() {
     let mut result = ArrayVec::<Token<StaticApi>, 0>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::String],
         &ManagedBuffer::new(),
         &mut result,
@@ -54,7 +54,7 @@ fn decode_from_empty_string() {
 fn decode_uint256() {
     let mut result = ArrayVec::<Token<StaticApi>, 1>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::Uint256],
         &ManagedBuffer::from(&hex!(
             "000000000000000000000000000000005ce0e9a53831e3936420d9774000000c"
@@ -72,7 +72,7 @@ fn decode_uint256() {
 fn decode_bytes32() {
     let mut result = ArrayVec::<Token<StaticApi>, 1>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::Bytes32],
         &ManagedBuffer::from(&hex!(
             "1234567890000000000000000000000000000000000000000000000000001122"
@@ -94,7 +94,7 @@ fn decode_bytes32() {
 fn decode_bytes() {
     let mut result = ArrayVec::<Token<StaticApi>, 1>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::Bytes],
         &ManagedBuffer::from(&hex!(
             "
@@ -116,7 +116,7 @@ fn decode_bytes() {
 fn decode_string() {
     let mut result = ArrayVec::<Token<StaticApi>, 1>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::String],
         &ManagedBuffer::from(&hex!(
             "
@@ -138,7 +138,7 @@ fn decode_string() {
 fn decode_uint8() {
     let mut result = ArrayVec::<Token<StaticApi>, 1>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::Uint8],
         &ManagedBuffer::from(&hex!(
             "00000000000000000000000000000000000000000000000000000000000000ff"
@@ -157,7 +157,7 @@ fn decode_uint8() {
 fn decode_uint8_error() {
     let mut result = ArrayVec::<Token<StaticApi>, 1>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::Uint8],
         &ManagedBuffer::from(&hex!(
             "0000000000000000000000000000000000000000000000000000000000000fff"
@@ -171,7 +171,7 @@ fn decode_uint8_error() {
 fn decode_two_bytes() {
     let mut result = ArrayVec::<Token<StaticApi>, 2>::new();
 
-    SendTokenPayload::<StaticApi>::raw_abi_decode(
+    InterchainTransferPayload::<StaticApi>::raw_abi_decode(
         &[ParamType::Bytes, ParamType::Bytes],
         &ManagedBuffer::from(&hex!(
             "
@@ -200,7 +200,7 @@ fn decode_two_bytes() {
 
 #[test]
 fn decode_send_token_payload() {
-    let result = SendTokenPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
+    let result = InterchainTransferPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
         "
 			000000000000000000000000000000000000000000000000000000000000000b
             131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
@@ -211,7 +211,7 @@ fn decode_send_token_payload() {
 		"
     )));
 
-    let expected = SendTokenPayload::<StaticApi> {
+    let expected = InterchainTransferPayload::<StaticApi> {
         message_type: BigUint::from(11u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
@@ -232,7 +232,7 @@ fn decode_send_token_payload() {
 
 #[test]
 fn decode_send_token_payload_larger() {
-    let result = SendTokenPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
+    let result = InterchainTransferPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
         "
 			000000000000000000000000000000000000000000000000000000000000000b
             131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
@@ -249,7 +249,7 @@ fn decode_send_token_payload_larger() {
 		"
     )));
 
-    let expected = SendTokenPayload::<StaticApi> {
+    let expected = InterchainTransferPayload::<StaticApi> {
         message_type: BigUint::from(11u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
@@ -270,7 +270,7 @@ fn decode_send_token_payload_larger() {
 
 #[test]
 fn decode_send_token_with_data_payload() {
-    let result = SendTokenPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
+    let result = InterchainTransferPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
         "
 			0000000000000000000000000000000000000000000000000000000000000002
             131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
@@ -287,7 +287,7 @@ fn decode_send_token_with_data_payload() {
 		"
     )));
 
-    let expected = SendTokenPayload::<StaticApi> {
+    let expected = InterchainTransferPayload::<StaticApi> {
         message_type: BigUint::from(2u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
@@ -322,7 +322,7 @@ fn decode_deploy_token_manager_payload() {
     )));
 
     let expected = DeployTokenManagerPayload::<StaticApi> {
-        selector: BigUint::from(33u64),
+        message_type: BigUint::from(33u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
         )),
@@ -330,7 +330,7 @@ fn decode_deploy_token_manager_payload() {
         params: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
     };
 
-    assert_eq!(result.selector, expected.selector);
+    assert_eq!(result.message_type, expected.message_type);
     assert_eq!(result.token_id, expected.token_id);
     assert_eq!(result.token_manager_type, expected.token_manager_type);
     assert_eq!(result.params, expected.params);
@@ -364,7 +364,7 @@ fn decode_deploy_standardized_token_and_manager_payload() {
     );
 
     let expected = DeployInterchainTokenPayload::<StaticApi> {
-        selector: BigUint::from(44u64),
+        message_type: BigUint::from(44u64),
         token_id: ManagedByteArray::from(&hex!(
             "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
         )),
@@ -377,7 +377,7 @@ fn decode_deploy_standardized_token_and_manager_payload() {
         operator: ManagedBuffer::from(&hex!("a786e21509a9d50a9afd033b5940a2b7d872c201")),
     };
 
-    assert_eq!(result.selector, expected.selector);
+    assert_eq!(result.message_type, expected.message_type);
     assert_eq!(result.token_id, expected.token_id);
     assert_eq!(result.name, expected.name);
     assert_eq!(result.symbol, expected.symbol);

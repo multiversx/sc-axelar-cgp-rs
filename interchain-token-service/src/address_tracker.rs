@@ -31,11 +31,11 @@ pub trait AddressTracker {
         self.trusted_address_removed_event(source_chain);
     }
 
-    fn set_chain_name(&self, chain_name: ManagedAddress) {
+    fn set_chain_name(&self, chain_name: ManagedBuffer) {
         self.chain_name().set(chain_name);
     }
 
-    fn is_trusted_address(&self, chain: &ManagedAddress, address: &ManagedAddress) -> bool {
+    fn is_trusted_address(&self, chain: &ManagedBuffer, address: &ManagedBuffer) -> bool {
         let source_address_hash = self.crypto().keccak256(address);
 
         !self.trusted_address_hash(chain).is_empty()

@@ -2,10 +2,10 @@ multiversx_sc::imports!();
 
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
-    DeployInterchainTokenPayload, ManagedBufferAscii, TokenId,
+    DeployInterchainTokenPayload, ManagedBufferAscii, TokenId, TokenManagerType,
     MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
 };
-use crate::{address_tracker, events};
+use crate::{address_tracker, events, express_executor_tracker};
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
@@ -68,6 +68,8 @@ pub mod gateway_proxy {
 pub mod token_manager_proxy {
     multiversx_sc::imports!();
 
+    use crate::constants::TokenManagerType;
+
     #[multiversx_sc::proxy]
     pub trait TokenManagerProxy {
         #[payable("*")]
@@ -89,12 +91,10 @@ pub mod token_manager_proxy {
         #[endpoint(deployInterchainToken)]
         fn deploy_interchain_token(
             &self,
-            distributor: ManagedAddress,
+            distributor: Option<ManagedAddress>,
             name: ManagedBuffer,
             symbol: ManagedBuffer,
             decimals: u8,
-            mint_amount: BigUint,
-            mint_to: ManagedAddress,
         );
 
         #[view(tokenIdentifier)]
@@ -108,6 +108,9 @@ pub mod token_manager_proxy {
 
         #[view(flowInAmount)]
         fn get_flow_in_amount(&self) -> BigUint;
+
+        #[view(implementationType)]
+        fn implementation_type(&self) -> TokenManagerType;
     }
 }
 
@@ -143,7 +146,10 @@ pub mod executable_contract_proxy {
 
 #[multiversx_sc::module]
 pub trait ProxyModule:
-    events::EventsModule + address_tracker::AddressTracker + multiversx_sc_modules::pause::PauseModule
+    events::EventsModule
+    + address_tracker::AddressTracker
+    + express_executor_tracker::ExpressExecutorTracker
+    + multiversx_sc_modules::pause::PauseModule
 {
     fn gas_service_pay_native_gas_for_contract_call(
         &self,
@@ -247,21 +253,25 @@ pub trait ProxyModule:
             .into_tuple()
     }
 
-    fn token_manager_deploy_standardized_token(
+    fn token_manager_deploy_interchain_token(
         &self,
         token_id: &TokenId<Self::Api>,
-        distributor: ManagedAddress,
+        distributor: Option<ManagedAddress>,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
-        mint_amount: BigUint,
-        mint_to: ManagedAddress,
     ) {
         self.token_manager_proxy(self.valid_token_manager_address(token_id))
-            .deploy_standardized_token(distributor, name, symbol, decimals, mint_amount, mint_to)
+            .deploy_interchain_token(distributor, name, symbol, decimals)
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
             .execute_on_dest_context::<()>();
+    }
+
+    fn token_manager_implementation_type(&self, sc_address: ManagedAddress) -> TokenManagerType {
+        self.token_manager_proxy(sc_address)
+            .implementation_type()
+            .execute_on_dest_context()
     }
 
     fn executable_contract_execute_with_interchain_token(
@@ -297,23 +307,17 @@ pub trait ProxyModule:
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
-        caller: ManagedAddress,
+        express_executor: ManagedAddress,
         command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.executable_contract_proxy(destination_address)
-            .express_execute_with_interchain_token(
-                source_chain,
-                source_address,
-                data,
-                token_id.clone(),
-            )
+            .express_execute_with_interchain_token(source_chain, source_address, data, token_id)
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
             .async_call()
             .with_callback(self.callbacks().exp_execute_with_token_callback(
-                caller,
+                express_executor,
                 command_id,
-                token_id,
                 token_identifier,
                 amount,
                 express_hash,
@@ -354,7 +358,7 @@ pub trait ProxyModule:
         self.valid_token_manager_address(&token_id);
 
         let data = DeployInterchainTokenPayload {
-            selector: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
+            message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
             token_id: token_id.clone(),
             name: name.clone(),
             symbol: symbol.clone(),
@@ -384,7 +388,7 @@ pub trait ProxyModule:
     ) {
         let destination_address = self.trusted_address(destination_chain);
 
-        require!(!destination_address.is_empty(), "Not trusted chain");
+        require!(!destination_address.is_empty(), "Untrusted chain");
 
         let destination_address = destination_address.get();
 
@@ -482,22 +486,12 @@ pub trait ProxyModule:
     ) {
         match result {
             ManagedAsyncCallResult::Ok(_) => {
-                self.token_received_with_data_success_event(
-                    command_id,
-                    token_id,
-                    token_identifier,
-                    amount,
-                );
+                self.execute_with_interchain_token_success_event(command_id);
             }
             ManagedAsyncCallResult::Err(_) => {
-                self.token_received_with_data_error_event(
-                    command_id,
-                    &token_id,
-                    &token_identifier,
-                    &amount,
-                );
-
                 self.token_manager_take_token(&token_id, token_identifier, amount);
+
+                self.execute_with_interchain_token_failed_event(command_id);
             }
         }
     }
@@ -506,9 +500,8 @@ pub trait ProxyModule:
     #[callback]
     fn exp_execute_with_token_callback(
         &self,
-        caller: ManagedAddress,
+        express_executor: ManagedAddress,
         command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -516,25 +509,20 @@ pub trait ProxyModule:
     ) {
         match result {
             ManagedAsyncCallResult::Ok(_) => {
-                self.express_token_received_with_data_success_event(
-                    caller,
-                    command_id,
-                    token_id,
-                    token_identifier,
-                    amount,
+                self.express_execute_with_interchain_token_success_event(
+                    &command_id,
+                    &express_executor,
                 );
             }
             ManagedAsyncCallResult::Err(_) => {
-                self.send().direct(&caller, &token_identifier, 0, &amount);
+                self.send()
+                    .direct(&express_executor, &token_identifier, 0, &amount);
 
                 self.express_execute(&express_hash).clear();
 
-                self.express_token_received_with_data_error_event(
-                    &caller,
-                    command_id,
-                    &token_id,
-                    &token_identifier,
-                    &amount,
+                self.express_execute_with_interchain_token_failed_event(
+                    &command_id,
+                    &express_executor,
                 );
             }
         }

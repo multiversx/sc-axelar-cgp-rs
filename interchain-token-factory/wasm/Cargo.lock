@@ -4,13 +4,14 @@ version = 3
 
 [[package]]
 name = "ahash"
-version = "0.8.3"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c99f64d1e06488f620f932677e24bc6e2897582980441ae90a671415bd7ec2f"
+checksum = "91429305e9f0a25f6205c5b8e0d2db09e0708a7a6df0f42212bb56c32c8ac97a"
 dependencies = [
  "cfg-if",
  "once_cell",
  "version_check",
+ "zerocopy",
 ]
 
 [[package]]
@@ -32,12 +33,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
-name = "bitflags"
-version = "2.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -48,13 +43,6 @@ name = "endian-type"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
-
-[[package]]
-name = "flow-limit"
-version = "0.0.0"
-dependencies = [
- "multiversx-sc",
-]
 
 [[package]]
 name = "hashbrown"
@@ -78,12 +66,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 
 [[package]]
-name = "multiversx-sc"
-version = "0.43.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "406939660d0c79dd191c6677f4b048df873a95f4531d8abafc9cdbe282bf1725"
+name = "interchain-token-factory"
+version = "0.0.0"
 dependencies = [
- "bitflags 1.3.2",
+ "multiversx-sc",
+]
+
+[[package]]
+name = "interchain-token-factory-wasm"
+version = "0.0.0"
+dependencies = [
+ "interchain-token-factory",
+ "multiversx-sc-wasm-adapter",
+]
+
+[[package]]
+name = "multiversx-sc"
+version = "0.43.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adbdd41a744caa562646c6d593df35caed84889e0d35df8b9ad8efc45457b5bd"
+dependencies = [
+ "bitflags",
  "hashbrown",
  "hex-literal",
  "multiversx-sc-codec",
@@ -110,27 +113,27 @@ dependencies = [
  "hex",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.109",
 ]
 
 [[package]]
 name = "multiversx-sc-derive"
-version = "0.43.4"
+version = "0.43.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e006240993963b482fe0682ae49b2d07255495e3c86706925d119137376cdfc"
+checksum = "ebdaec412a272d8fd6668bc0b4b8674a5e03148aa72041a4705d502b86f4d9ce"
 dependencies = [
  "hex",
  "proc-macro2",
  "quote",
  "radix_trie",
- "syn",
+ "syn 1.0.109",
 ]
 
 [[package]]
 name = "multiversx-sc-wasm-adapter"
-version = "0.43.4"
+version = "0.43.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40e721d1bc80de2ede4099a9040519486c3c1139cb0287d8fc4f9fc3e8a3f19e"
+checksum = "2befd4545b5b47adf1df89313b76a2282873fd9163b70badd727d8dfce83c588"
 dependencies = [
  "multiversx-sc",
 ]
@@ -146,9 +149,9 @@ dependencies = [
 
 [[package]]
 name = "num-traits"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f30b0abd723be7e2ffca1272140fac1a2f084c77ec3e123c192b66af1ee9e6c2"
+checksum = "39e3200413f237f41ab11ad6d161bc7239c84dcb631773ccd7de3dfe4b5c267c"
 dependencies = [
  "autocfg",
 ]
@@ -160,18 +163,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
-name = "operatable"
-version = "0.0.0"
-dependencies = [
- "bitflags 2.4.1",
- "multiversx-sc",
-]
-
-[[package]]
 name = "proc-macro2"
-version = "1.0.67"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d433d9f1a3e8c1263d9456598b16fec66f4acc9a74dacffd35c7bb09b3a1328"
+checksum = "134c189feb4956b20f6f547d2cf727d4c0fe06722b20a0eec87ed445a97f92da"
 dependencies = [
  "unicode-ident",
 ]
@@ -197,9 +192,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
+checksum = "942b4a808e05215192e39f4ab80813e599068285906cc91aa64f923db842bd5a"
 
 [[package]]
 name = "syn"
@@ -213,30 +208,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "token-manager"
-version = "0.0.0"
+name = "syn"
+version = "2.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e96b79aaa137db8f61e26363a0c9b47d8b4ec75da28b7d1d614c2303e232408b"
 dependencies = [
- "flow-limit",
- "multiversx-sc",
- "operatable",
-]
-
-[[package]]
-name = "token-manager-lock-unlock"
-version = "0.0.0"
-dependencies = [
- "flow-limit",
- "multiversx-sc",
- "operatable",
- "token-manager",
-]
-
-[[package]]
-name = "token-manager-lock-unlock-wasm"
-version = "0.0.0"
-dependencies = [
- "multiversx-sc-wasm-adapter",
- "token-manager-lock-unlock",
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
 ]
 
 [[package]]
@@ -250,3 +229,23 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "zerocopy"
+version = "0.7.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "092cd76b01a033a9965b9097da258689d9e17c69ded5dcf41bca001dd20ebc6d"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.7.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a13a20a7c6a90e2034bcc65495799da92efcec6a8dd4f3fcb6f7a48988637ead"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.38",
+]

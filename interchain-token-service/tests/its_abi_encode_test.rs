@@ -4,12 +4,12 @@ use multiversx_sc_scenario::api::StaticApi;
 
 use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::Token;
-use interchain_token_service::constants::{DeployInterchainTokenPayload, DeployTokenManagerPayload, SendTokenPayload, TokenManagerType};
+use interchain_token_service::constants::{DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, TokenManagerType};
 
 #[test]
 fn encode_uint256() {
     let tokens = Token::Uint256(BigUint::from(123456789000000000000000000000000000012u128));
-    let encoded = SendTokenPayload::<StaticApi>::raw_abi_encode(&[tokens]);
+    let encoded = InterchainTransferPayload::<StaticApi>::raw_abi_encode(&[tokens]);
     let expected = hex!(
         "
             000000000000000000000000000000005ce0e9a53831e3936420d9774000000c
@@ -25,7 +25,7 @@ fn encode_bytes32() {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x11, 0x22,
     ]));
-    let encoded = SendTokenPayload::<StaticApi>::raw_abi_encode(&[tokens]);
+    let encoded = InterchainTransferPayload::<StaticApi>::raw_abi_encode(&[tokens]);
     let expected = hex!(
         "
 			1234567890000000000000000000000000000000000000000000000000001122
@@ -37,7 +37,7 @@ fn encode_bytes32() {
 #[test]
 fn encode_bytes() {
     let tokens = Token::Bytes(ManagedBuffer::from(&[0x12, 0x34]));
-    let encoded = SendTokenPayload::<StaticApi>::raw_abi_encode(&[tokens]);
+    let encoded = InterchainTransferPayload::<StaticApi>::raw_abi_encode(&[tokens]);
     let expected = hex!(
         "
 			0000000000000000000000000000000000000000000000000000000000000020
@@ -51,7 +51,7 @@ fn encode_bytes() {
 #[test]
 fn encode_string() {
     let tokens = Token::Bytes(ManagedBuffer::from("gavofyork"));
-    let encoded = SendTokenPayload::<StaticApi>::raw_abi_encode(&[tokens]);
+    let encoded = InterchainTransferPayload::<StaticApi>::raw_abi_encode(&[tokens]);
     let expected = hex!(
         "
 			0000000000000000000000000000000000000000000000000000000000000020
@@ -65,7 +65,7 @@ fn encode_string() {
 #[test]
 fn encode_uint8() {
     let tokens = Token::Uint8(255u8);
-    let encoded = SendTokenPayload::<StaticApi>::raw_abi_encode(&[tokens]);
+    let encoded = InterchainTransferPayload::<StaticApi>::raw_abi_encode(&[tokens]);
     let expected = hex!(
         "
             00000000000000000000000000000000000000000000000000000000000000ff
@@ -79,7 +79,7 @@ fn encode_bytes2() {
     let tokens = Token::Bytes(ManagedBuffer::from(&hex!(
         "10000000000000000000000000000000000000000000000000000000000002"
     )));
-    let encoded = SendTokenPayload::<StaticApi>::raw_abi_encode(&[tokens]);
+    let encoded = InterchainTransferPayload::<StaticApi>::raw_abi_encode(&[tokens]);
     let expected = hex!(
         "
 			0000000000000000000000000000000000000000000000000000000000000020
@@ -98,7 +98,7 @@ fn encode_bytes3() {
             2000000000000000000000000000000000000000000000000000000000000000
         "
     )));
-    let encoded = SendTokenPayload::<StaticApi>::raw_abi_encode(&[tokens]);
+    let encoded = InterchainTransferPayload::<StaticApi>::raw_abi_encode(&[tokens]);
     let expected = hex!(
         "
 			0000000000000000000000000000000000000000000000000000000000000020
@@ -118,7 +118,7 @@ fn encode_two_bytes() {
     let token2 = Token::Bytes(ManagedBuffer::from(&hex!(
         "0010000000000000000000000000000000000000000000000000000000000002"
     )));
-    let encoded = SendTokenPayload::<StaticApi>::raw_abi_encode(&[token1, token2]);
+    let encoded = InterchainTransferPayload::<StaticApi>::raw_abi_encode(&[token1, token2]);
     let expected = hex!(
         "
 			0000000000000000000000000000000000000000000000000000000000000040
@@ -134,7 +134,7 @@ fn encode_two_bytes() {
 
 #[test]
 fn encode_send_token_payload() {
-    let data = SendTokenPayload::<StaticApi> {
+    let data = InterchainTransferPayload::<StaticApi> {
         message_type: BigUint::from(11u64),
         token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
         destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
@@ -160,7 +160,7 @@ fn encode_send_token_payload() {
 
 #[test]
 fn encode_send_token_payload_with_data() {
-    let data = SendTokenPayload::<StaticApi> {
+    let data = InterchainTransferPayload::<StaticApi> {
         message_type: BigUint::from(22u64),
         token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
         destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
@@ -193,7 +193,7 @@ fn encode_send_token_payload_with_data() {
 #[test]
 fn encode_deploy_token_manager_payload() {
     let data = DeployTokenManagerPayload::<StaticApi> {
-        selector: BigUint::from(33u64),
+        message_type: BigUint::from(33u64),
         token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
         token_manager_type: TokenManagerType::MintBurnFrom,
         params: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
@@ -217,7 +217,7 @@ fn encode_deploy_token_manager_payload() {
 #[test]
 fn encode_deploy_standardized_token_and_manager_payload() {
     let data = DeployInterchainTokenPayload::<StaticApi> {
-        selector: BigUint::from(44u64),
+        message_type: BigUint::from(44u64),
         token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
         name: ManagedBuffer::from("Name"),
         symbol: ManagedBuffer::from("Symbol"),

@@ -18,7 +18,7 @@ import {
   gasService,
   gateway,
   its,
-  remoteAddressValidator,
+  interchainTokenFactory,
   tokenManagerLockUnlock,
   tokenManagerMintBurn
 } from '../itsHelpers';
@@ -98,7 +98,7 @@ test("Register canonical token", async () => {
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -187,7 +187,7 @@ test("Deploy remote canonical token", async () => {
     kvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -237,7 +237,7 @@ test("Deploy remote canonical token EGLD", async () => {
     kvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -276,7 +276,7 @@ test("Deploy remote canonical token errors", async () => {
     kvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -319,7 +319,7 @@ test("Deploy custom token manager", async () => {
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -367,7 +367,7 @@ test("Deploy custom token manager", async () => {
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -437,7 +437,7 @@ test("Deploy remote custom token manager", async () => {
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -476,7 +476,7 @@ test("Deploy remote custom token manager", async () => {
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -526,7 +526,7 @@ test("Deploy and register remote standardized token", async () => {
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 
@@ -569,7 +569,7 @@ test("Deploy and register remote standardized token", async () => {
     allKvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
 

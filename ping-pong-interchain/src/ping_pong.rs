@@ -1,12 +1,14 @@
 #![no_std]
 
 multiversx_sc::imports!();
+multiversx_sc::derive_imports!();
 
 mod user_status;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use user_status::UserStatus;
 
+#[derive(TypeAbi, TopDecode)]
 pub struct Data<M: ManagedTypeApi> {
     pub function: ManagedBuffer<M>,
     pub address: ManagedAddress<M>,

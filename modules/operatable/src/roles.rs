@@ -1,12 +1,8 @@
 multiversx_sc::imports!();
 
 use bitflags::bitflags;
-use multiversx_sc::{
-    abi::TypeAbi,
-    codec::{DecodeError, TopDecode, TopEncode},
-};
 bitflags! {
-    #[derive(PartialEq)]
+    #[derive(PartialEq, Copy, Clone)]
     pub struct Roles: u32 {
         const DISTRIBUTOR = 0b00000001;
         const OPERATOR = 0b00000010;
@@ -56,6 +52,10 @@ pub trait AccountRoles {
     }
 
     fn has_role(&self, address: &ManagedAddress, roles: Roles) -> bool {
+        if self.account_roles(address).is_empty() {
+            return false;
+        }
+
         let caller_roles = self.account_roles(address).get();
 
         caller_roles.intersects(roles)

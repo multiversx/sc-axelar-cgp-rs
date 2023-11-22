@@ -3,7 +3,7 @@
 multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use token_manager::TokenManagerType;
+use token_manager::{DeployTokenManagerParams, TokenManagerType};
 
 #[multiversx_sc::contract]
 pub trait TokenManagerLockUnlockContract:
@@ -11,6 +11,7 @@ pub trait TokenManagerLockUnlockContract:
     + token_manager::proxy::ProxyModule
     + flow_limit::FlowLimit
     + operatable::Operatable
+    + operatable::roles::AccountRoles
 {
     #[init]
     fn init(
@@ -92,5 +93,19 @@ pub trait TokenManagerLockUnlockContract:
     #[view(implementationType)]
     fn implementation_type(&self) -> TokenManagerType {
         TokenManagerType::LockUnlock
+    }
+
+
+    // Mainly be used by frontends
+    #[view(params)]
+    fn params(
+        &self,
+        operator: Option<ManagedAddress>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+    ) -> DeployTokenManagerParams<Self::Api> {
+        DeployTokenManagerParams {
+            operator,
+            token_identifier: Some(token_identifier),
+        }
     }
 }

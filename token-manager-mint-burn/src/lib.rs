@@ -1,9 +1,11 @@
 #![no_std]
 
+pub mod distributable;
+
 multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use token_manager::TokenManagerType;
+use token_manager::{DeployTokenManagerParams, TokenManagerType};
 
 // If this needs updating, the TokenManagerMintBurn contract from which deployments are made can be upgraded
 const DEFAULT_ESDT_ISSUE_COST: u64 = 50000000000000000; // 0.05 EGLD
@@ -14,6 +16,8 @@ pub trait TokenManagerMintBurnContract:
     + token_manager::proxy::ProxyModule
     + flow_limit::FlowLimit
     + operatable::Operatable
+    + operatable::roles::AccountRoles
+    + distributable::Distributable
 {
     #[init]
     fn init(
@@ -89,12 +93,10 @@ pub trait TokenManagerMintBurnContract:
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
         &self,
-        _distributor: ManagedAddress, // TODO: What should we use this for? In Sui it is also not used
+        distributor: Option<ManagedAddress>,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
-        mint_amount: BigUint,
-        mint_to: ManagedAddress,
     ) {
         require!(
             self.token_identifier().is_empty(),
@@ -103,10 +105,15 @@ pub trait TokenManagerMintBurnContract:
 
         let caller = self.blockchain().get_caller();
 
+        // Also allow distributor to call this (if set) in case issue esdt fails
         require!(
-            caller == self.interchain_token_service().get(),
-            "Not service"
+            caller == self.interchain_token_service().get() || self.is_distributor(&caller),
+            "Not service or distributor"
         );
+
+        if distributor.is_some() {
+            self.add_distributor(distributor.unwrap());
+        }
 
         let issue_cost = BigUint::from(DEFAULT_ESDT_ISSUE_COST);
 
@@ -120,8 +127,43 @@ pub trait TokenManagerMintBurnContract:
                 decimals as usize,
             )
             .async_call()
-            .with_callback(self.callbacks().deploy_token_callback(mint_amount, mint_to))
+            .with_callback(self.callbacks().deploy_token_callback())
             .call_and_exit();
+    }
+
+    // TODO: Is it fine to handle the distributor like this? Or should we add a function to
+    // change the ESDT owner from the TokenManager to the distributor?
+    #[endpoint]
+    fn mint(&self, address: ManagedAddress, amount: &BigUint) {
+        self.only_distributor();
+
+        require!(
+            self.token_identifier().is_empty(),
+            "Token address not yet set"
+        );
+
+        let token_identifier = self.token_identifier().get().into_esdt_option().unwrap();
+
+        self.send().esdt_local_mint(&token_identifier, 0, amount);
+        self.send()
+            .direct_esdt(&address, &token_identifier, 0, amount)
+    }
+
+    #[payable("*")]
+    #[endpoint]
+    fn burn(&self) {
+        self.only_distributor();
+
+        require!(
+            self.token_identifier().is_empty(),
+            "Token address not yet set"
+        );
+
+        let amount = self.require_correct_token();
+
+        let token_identifier = self.token_identifier().get().into_esdt_option().unwrap();
+
+        self.send().esdt_local_burn(&token_identifier, 0, &amount);
     }
 
     fn take_token_raw(&self, amount: &BigUint) -> BigUint {
@@ -153,40 +195,49 @@ pub trait TokenManagerMintBurnContract:
 
     #[view(implementationType)]
     fn implementation_type(&self) -> TokenManagerType {
-        TokenManagerType::LockUnlock
+        TokenManagerType::MintBurn
+    }
+
+    // Mainly be used by frontends
+    #[view(params)]
+    fn params(
+        &self,
+        operator: Option<ManagedAddress>,
+        token_identifier: Option<EgldOrEsdtTokenIdentifier>,
+    ) -> DeployTokenManagerParams<Self::Api> {
+        DeployTokenManagerParams {
+            operator,
+            token_identifier,
+        }
     }
 
     #[callback]
     fn deploy_token_callback(
         &self,
         #[call_result] result: ManagedAsyncCallResult<TokenIdentifier>,
-        mint_amount: BigUint,
-        mint_to: ManagedAddress,
     ) {
         match result {
             ManagedAsyncCallResult::Ok(token_id_raw) => {
                 let token_identifier = EgldOrEsdtTokenIdentifier::esdt(token_id_raw);
 
-                self.standardized_token_deployed_event(&token_identifier);
+                self.deploy_interchain_token_success_event(&token_identifier);
 
                 self.token_identifier().set(token_identifier);
-
-                // TODO: It seems that this callback can run BEFORE the ESDTRoleLocalMint is set for this address, but this is fixed in rc/v1.6.0
-                if mint_amount > 0 && mint_to != ManagedAddress::zero() {
-                    self.give_token_raw(&mint_to, &mint_amount);
-                }
             }
             ManagedAsyncCallResult::Err(_) => {
-                self.standardized_token_deployment_failed_event();
+                self.deploy_interchain_token_failed_event();
 
-                // Leave issue cost egld payment in contract for use when retrying deployStandardizedToken
+                // Leave issue cost egld payment in contract for use when retrying deployInterchainToken
             }
         }
     }
 
-    #[event("standardized_token_deployment_failed_event")]
-    fn standardized_token_deployment_failed_event(&self);
+    #[event("deploy_interchain_token_failed_event")]
+    fn deploy_interchain_token_failed_event(&self);
 
-    #[event("standardized_token_deployed_event")]
-    fn standardized_token_deployed_event(&self, #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier);
+    #[event("deploy_interchain_token_success_event")]
+    fn deploy_interchain_token_success_event(
+        &self,
+        #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier,
+    );
 }

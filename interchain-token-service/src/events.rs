@@ -1,15 +1,15 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-use crate::constants::{TokenId, TokenManagerType};
+use crate::constants::{DeployTokenManagerParams, TokenId, TokenManagerType};
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[derive(TypeAbi, TopEncode)]
 pub struct TokenManagerDeployedEventData<M: ManagedTypeApi> {
+    token_manager: ManagedAddress<M>,
     token_manager_type: TokenManagerType,
-    contract_address: ManagedAddress<M>,
-    arguments: ManagedArgBuffer<M>,
+    params: DeployTokenManagerParams<M>,
 }
 
 #[derive(TypeAbi, TopEncode)]
@@ -22,9 +22,8 @@ pub struct InterchainTokenDeploymentStartedEventData<M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-pub struct RemoteTokenManagerDeploymentInitializedEventData<M: ManagedTypeApi> {
+pub struct TokenManagerDeploymentStartedEventData<M: ManagedTypeApi> {
     destination_chain: ManagedBuffer<M>,
-    gas_value: BigUint<M>,
     token_manager_type: TokenManagerType,
     params: ManagedBuffer<M>,
 }
@@ -39,14 +38,14 @@ pub struct StandardizedTokenDeployedEventData<M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-pub struct TokenSentEventData<M: ManagedTypeApi> {
+pub struct InterchainTransferEventData<M: ManagedTypeApi> {
     destination_chain: ManagedBuffer<M>,
     destination_address: ManagedBuffer<M>,
     amount: BigUint<M>,
 }
 
 #[derive(TypeAbi, TopEncode)]
-pub struct TokenSentWithDataEventData<M: ManagedTypeApi> {
+pub struct InterchainTransferWithDataEventData<M: ManagedTypeApi> {
     destination_chain: ManagedBuffer<M>,
     destination_address: ManagedBuffer<M>,
     amount: BigUint<M>,
@@ -54,28 +53,21 @@ pub struct TokenSentWithDataEventData<M: ManagedTypeApi> {
     metadata: ManagedBuffer<M>,
 }
 
-#[derive(TypeAbi, TopEncode)]
-pub struct TokenReceivedWithDataEventData<M: ManagedTypeApi> {
-    amount: BigUint<M>,
-    source_address: ManagedBuffer<M>,
-    data: ManagedBuffer<M>,
-}
-
 #[multiversx_sc::module]
 pub trait EventsModule {
     fn emit_token_manager_deployed_event(
         &self,
         token_id: &TokenId<Self::Api>,
+        token_manager: ManagedAddress,
         token_manager_type: TokenManagerType,
-        contract_address: ManagedAddress,
-        arguments: ManagedArgBuffer<Self::Api>,
+        params: DeployTokenManagerParams<Self::Api>,
     ) {
         self.token_manager_deployed_event(
             token_id,
             TokenManagerDeployedEventData {
+                token_manager,
                 token_manager_type,
-                contract_address,
-                arguments,
+                params,
             },
         );
     }
@@ -100,22 +92,20 @@ pub trait EventsModule {
         self.interchain_token_deployment_started_event(token_id, data);
     }
 
-    fn emit_remote_token_manager_deployment_initialized(
+    fn emit_token_manager_deployment_started(
         &self,
         token_id: &TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
-        gas_value: BigUint,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) {
-        let data = RemoteTokenManagerDeploymentInitializedEventData {
+        let data = TokenManagerDeploymentStartedEventData {
             destination_chain,
-            gas_value,
             token_manager_type,
             params,
         };
 
-        self.remote_token_manager_deployment_initialized_event(token_id, data);
+        self.token_manager_deployment_started_event(token_id, data);
     }
 
     fn emit_standardized_token_deployed_event(
@@ -139,23 +129,23 @@ pub trait EventsModule {
         self.standardized_token_deployed_event(token_id, distributor, data);
     }
 
-    fn emit_token_sent_event(
+    fn emit_interchain_transfer_event(
         &self,
         token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         amount: BigUint,
     ) {
-        let data = TokenSentEventData {
+        let data = InterchainTransferEventData {
             destination_chain,
             destination_address,
             amount,
         };
 
-        self.token_sent_event(token_id, data);
+        self.interchain_transfer_event(token_id, data);
     }
 
-    fn emit_token_sent_with_data_event(
+    fn emit_interchain_transfer_with_data_event(
         &self,
         token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
@@ -164,7 +154,7 @@ pub trait EventsModule {
         source_address: ManagedAddress,
         metadata: ManagedBuffer,
     ) {
-        let data = TokenSentWithDataEventData {
+        let data = InterchainTransferWithDataEventData {
             destination_chain,
             destination_address,
             amount,
@@ -172,25 +162,7 @@ pub trait EventsModule {
             metadata,
         };
 
-        self.token_sent_with_data_event(token_id, data);
-    }
-
-    fn emit_received_token_with_data_event(
-        &self,
-        token_id: &TokenId<Self::Api>,
-        source_chain: &ManagedBuffer,
-        destination_address: &ManagedAddress,
-        amount: BigUint,
-        source_address: ManagedBuffer,
-        metadata: ManagedBuffer,
-    ) {
-        let data = TokenReceivedWithDataEventData {
-            amount,
-            source_address,
-            data: metadata,
-        };
-
-        self.token_received_with_data_event(token_id, source_chain, destination_address, data);
+        self.interchain_transfer_with_data_event(token_id, data);
     }
 
     #[event("token_manager_deployed_event")]
@@ -215,11 +187,11 @@ pub trait EventsModule {
         data: &ManagedBuffer,
     );
 
-    #[event("remote_token_manager_deployment_initialized_event")]
-    fn remote_token_manager_deployment_initialized_event(
+    #[event("token_manager_deployment_started_event")]
+    fn token_manager_deployment_started_event(
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
-        data: RemoteTokenManagerDeploymentInitializedEventData<Self::Api>,
+        data: TokenManagerDeploymentStartedEventData<Self::Api>,
     );
 
     #[event("standardized_token_deployed_event")]
@@ -230,73 +202,83 @@ pub trait EventsModule {
         data: StandardizedTokenDeployedEventData<Self::Api>,
     );
 
-    #[event("token_sent_event")]
-    fn token_sent_event(
+    #[event("interchain_transfer_event")]
+    fn interchain_transfer_event(
         &self,
         #[indexed] token_id: TokenId<Self::Api>,
-        data: TokenSentEventData<Self::Api>,
+        data: InterchainTransferEventData<Self::Api>,
     );
 
-    #[event("token_sent_with_data_event")]
-    fn token_sent_with_data_event(
+    #[event("interchain_transfer_with_data_event")]
+    fn interchain_transfer_with_data_event(
         &self,
         #[indexed] token_id: TokenId<Self::Api>,
-        data: TokenSentWithDataEventData<Self::Api>,
+        data: InterchainTransferWithDataEventData<Self::Api>,
     );
 
-    #[event("token_received_event")]
-    fn token_received_event(
+    #[event("interchain_transfer_received_event")]
+    fn interchain_transfer_received_event(
         &self,
         #[indexed] token_id: TokenId<Self::Api>,
         #[indexed] source_chain: ManagedBuffer,
+        #[indexed] source_address: ManagedBuffer,
         #[indexed] destination_address: ManagedAddress,
         amount: BigUint,
     );
 
-    #[event("token_received_with_data_event")]
-    fn token_received_with_data_event(
+    #[event("interchain_transfer_received_with_data_event")]
+    fn interchain_transfer_received_with_data_event(
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] source_chain: &ManagedBuffer,
+        #[indexed] source_address: &ManagedBuffer,
         #[indexed] destination_address: &ManagedAddress,
-        data: TokenReceivedWithDataEventData<Self::Api>,
-    );
-
-    #[event("token_received_with_data_success_event")]
-    fn token_received_with_data_success_event(
-        &self,
-        #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[indexed] token_id: TokenId<Self::Api>,
-        #[indexed] token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
-    );
-
-    #[event("token_received_with_data_error_event")]
-    fn token_received_with_data_error_event(
-        &self,
-        #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[indexed] token_id: &TokenId<Self::Api>,
-        #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier,
         amount: &BigUint,
     );
 
-    #[event("express_token_received_with_data_success_event")]
-    fn express_token_received_with_data_success_event(
+    #[event("execute_with_interchain_token_success_event")]
+    fn execute_with_interchain_token_success_event(
         &self,
-        #[indexed] caller: ManagedAddress,
         #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[indexed] token_id: TokenId<Self::Api>,
-        #[indexed] token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
     );
 
-    #[event("express_token_received_with_data_error_event")]
-    fn express_token_received_with_data_error_event(
+    #[event("execute_with_interchain_token_failed_event")]
+    fn execute_with_interchain_token_failed_event(
         &self,
-        #[indexed] caller: &ManagedAddress,
         #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[indexed] token_id: &TokenId<Self::Api>,
-        #[indexed] token_identifier: &EgldOrEsdtTokenIdentifier,
-        amount: &BigUint,
+    );
+
+    #[event("express_executed_event")]
+    fn express_executed_event(
+        &self,
+        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] source_chain: &ManagedBuffer,
+        #[indexed] source_address: &ManagedBuffer,
+        #[indexed] express_executor: &ManagedAddress,
+        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    );
+
+    #[event("express_execution_fulfilled_event")]
+    fn express_execution_fulfilled_event(
+        &self,
+        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] source_chain: &ManagedBuffer,
+        #[indexed] source_address: &ManagedBuffer,
+        #[indexed] express_executor: &ManagedAddress,
+        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    );
+
+    #[event("express_execute_with_interchain_token_success_event")]
+    fn express_execute_with_interchain_token_success_event(
+        &self,
+        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] express_executor: &ManagedAddress,
+    );
+
+    #[event("express_execute_with_interchain_token_failed_event")]
+    fn express_execute_with_interchain_token_failed_event(
+        &self,
+        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] express_executor: &ManagedAddress,
     );
 }

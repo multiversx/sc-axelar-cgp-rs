@@ -2,8 +2,9 @@ import { afterEach, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
+  CHAIN_NAME,
   CHAIN_NAME_HASH,
-  OTHER_CHAIN_ADDRESS,
+  OTHER_CHAIN_ADDRESS, OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
@@ -13,13 +14,13 @@ import {
   deployGasService,
   deployGatewayContract,
   deployIts,
-  deployRemoteAddressValidator,
+  deployInterchainTokenFactory,
   deployTokenManagerLockUnlock,
   deployTokenManagerMintBurn,
   gasService,
   gateway,
   its,
-  remoteAddressValidator,
+  interchainTokenFactory,
   tokenManagerLockUnlock,
   tokenManagerMintBurn
 } from '../itsHelpers';
@@ -61,41 +62,13 @@ afterEach(async () => {
   await world.terminate();
 });
 
-test("Init errors", async () => {
-  const mockTokenId = createKeccakHash('keccak256').update('mockTokenId').digest('hex');
-
-  await deployer.deployContract({
-    code: "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
-    codeMetadata: ["upgradeable"],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      deployer,
-      e.Bytes(mockTokenId),
-      deployer,
-      e.Option(null),
-    ]
-  }).assertFail({ code: 4, message: 'Invalid token address' });
-
-  await deployer.deployContract({
-    code: "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
-    codeMetadata: ["upgradeable"],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      e.Addr('erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu'), // zero address
-      e.Bytes(mockTokenId),
-      deployer,
-      e.Option(e.Str(TOKEN_ID)),
-    ]
-  }).assertFail({ code: 4, message: 'Token linker zero address' });
-});
-
 const deployTokenManager = async (itsAddr: SWallet | null = null) => {
   await deployTokenManagerLockUnlock(deployer);
 
   // Deploy ITS
   await deployGatewayContract(deployer);
   await deployGasService(deployer, deployer);
-  await deployRemoteAddressValidator(deployer);
+  await deployInterchainTokenFactory(deployer);
   await deployTokenManagerMintBurn(deployer);
   await deployIts(deployer);
 
@@ -108,16 +81,97 @@ const deployTokenManager = async (itsAddr: SWallet | null = null) => {
     kvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role
 
       e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+      e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
+
+      e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(OTHER_CHAIN_ADDRESS_HASH)),
+      e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
 
       e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerLockUnlock)
     ]
   });
 }
+
+test("Init errors", async () => {
+  const mockTokenId = createKeccakHash('keccak256').update('mockTokenId').digest('hex');
+
+  await deployer.deployContract({
+    code: "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
+    codeMetadata: ["upgradeable"],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      deployer,
+      e.Bytes(mockTokenId),
+      e.Option(deployer),
+      e.Option(null),
+    ]
+  }).assertFail({ code: 4, message: 'Invalid token address' });
+
+  await deployer.deployContract({
+    code: "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
+    codeMetadata: ["upgradeable"],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      e.Addr('erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu'), // zero address
+      e.Bytes(mockTokenId),
+      e.Option(deployer),
+      e.Option(e.Str(TOKEN_ID)),
+    ]
+  }).assertFail({ code: 4, message: 'Zero address' });
+});
+
+test("Init different arguments", async () => {
+  const { contract } = await deployer.deployContract({
+    code: "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
+    codeMetadata: ["upgradeable"],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      otherUser,
+      e.Bytes(TOKEN_ID_CANONICAL),
+      e.Option(null),
+      e.Option(e.Str(TOKEN_ID)),
+    ]
+  });
+
+  let kvs = await contract.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('interchain_token_service').Value(otherUser),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+    ],
+  });
+
+  const { contract: contract2 } = await deployer.deployContract({
+    code: "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
+    codeMetadata: ["upgradeable"],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      otherUser,
+      e.Bytes(TOKEN_ID_CANONICAL),
+      e.Option(deployer),
+      e.Option(e.Str(TOKEN_ID)),
+    ]
+  });
+
+  kvs = await contract2.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('interchain_token_service').Value(otherUser),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000100)), // flow limiter role
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+    ],
+  });
+});
 
 test("Interchain transfer", async () => {
   await deployTokenManager();
@@ -140,8 +194,9 @@ test("Interchain transfer", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -172,8 +227,9 @@ test("Interchain transfer with data", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -201,7 +257,7 @@ test("Interchain transfer errors", async () => {
   // Deploy ITS
   await deployGatewayContract(deployer);
   await deployGasService(deployer, deployer);
-  await deployRemoteAddressValidator(deployer);
+  await deployInterchainTokenFactory(deployer);
   await deployTokenManagerMintBurn(deployer);
   await deployIts(deployer);
 
@@ -227,11 +283,15 @@ test("Interchain transfer errors", async () => {
     kvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role
 
       e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+      e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
+
+      e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(OTHER_CHAIN_ADDRESS_HASH)),
+      e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
 
       e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerLockUnlock),
     ],
@@ -294,8 +354,9 @@ test("Call contract with interchain token", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -323,7 +384,7 @@ test("Call contract with interchain token errors", async () => {
   // Deploy ITS
   await deployGatewayContract(deployer);
   await deployGasService(deployer, deployer);
-  await deployRemoteAddressValidator(deployer);
+  await deployInterchainTokenFactory(deployer);
   await deployTokenManagerMintBurn(deployer);
   await deployIts(deployer);
 
@@ -349,11 +410,15 @@ test("Call contract with interchain token errors", async () => {
     kvs: [
       e.kvs.Mapper('gateway').Value(gateway),
       e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(remoteAddressValidator),
       e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
       e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role
 
       e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+      e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
+
+      e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(OTHER_CHAIN_ADDRESS_HASH)),
+      e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
 
       e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerLockUnlock),
     ],
@@ -408,8 +473,9 @@ test("Give token", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 0 }]),
@@ -460,8 +526,9 @@ test("Give token flow limit", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -511,8 +578,9 @@ test("Give token flow limit", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -593,8 +661,9 @@ test("Take token", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -629,8 +698,9 @@ test("Take token flow limit", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -669,8 +739,9 @@ test("Take token flow limit", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -730,7 +801,7 @@ test("Set flow limit", async () => {
     funcArgs: [
       e.U(500),
     ],
-  }).assertFail({ code: 4, message: 'Not operator' });
+  }).assertFail({ code: 4, message: 'Missing any of roles' });
 
   await user.callContract({
     callee: tokenManagerLockUnlock,
@@ -747,8 +818,8 @@ test("Set flow limit", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(user),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -766,7 +837,7 @@ test("Transfer operatorship", async () => {
     funcArgs: [
       deployer,
     ],
-  }).assertFail({ code: 4, message: 'Not operator' });
+  }).assertFail({ code: 4, message: 'Missing any of roles' });
 
   await user.callContract({
     callee: tokenManagerLockUnlock,
@@ -777,14 +848,14 @@ test("Transfer operatorship", async () => {
     ],
   });
 
-  // Tokens were sent from contract to otherUser
   let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)), // flow limit role remained
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role was transfered
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
     ],
   });
@@ -810,7 +881,7 @@ test("Propose operatorship", async () => {
     funcArgs: [
       deployer,
     ],
-  }).assertFail({ code: 4, message: 'Not operator' });
+  }).assertFail({ code: 4, message: 'Missing any of roles' });
 
   await user.callContract({
     callee: tokenManagerLockUnlock,
@@ -821,17 +892,16 @@ test("Propose operatorship", async () => {
     ],
   });
 
-  // Tokens were sent from contract to otherUser
   let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(user),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
-      e.kvs.Mapper('proposed_operator').Value(deployer),
+      e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000010)),
     ],
   });
 
@@ -843,9 +913,9 @@ test("Propose operatorship", async () => {
     funcArgs: [
       deployer,
     ],
-  }).assertFail({ code: 4, message: 'Not operator' });
+  }).assertFail({ code: 4, message: 'Missing any of roles' });
 
-  // Proposed operator can change
+  // If called multiple times, multiple entries are added
   await user.callContract({
     callee: tokenManagerLockUnlock,
     funcName: "proposeOperatorship",
@@ -855,17 +925,17 @@ test("Propose operatorship", async () => {
     ],
   });
 
-  // Tokens were sent from contract to otherUser
   kvs = await tokenManagerLockUnlock.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(user),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
-      e.kvs.Mapper('proposed_operator').Value(otherUser),
+      e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000010)),
+      e.kvs.Mapper('proposed_roles', user, otherUser).Value(e.U32(0b00000010)),
     ],
   });
 });
@@ -877,8 +947,10 @@ test("Accept operatorship", async () => {
     callee: tokenManagerLockUnlock,
     funcName: "acceptOperatorship",
     gasLimit: 5_000_000,
-    funcArgs: [],
-  }).assertFail({ code: 4, message: 'Not proposed operator' });
+    funcArgs: [
+      user,
+    ],
+  }).assertFail({ code: 4, message: 'Invalid proposed roles' });
 
   await user.callContract({
     callee: tokenManagerLockUnlock,
@@ -893,14 +965,18 @@ test("Accept operatorship", async () => {
     callee: tokenManagerLockUnlock,
     funcName: "acceptOperatorship",
     gasLimit: 5_000_000,
-    funcArgs: [],
-  }).assertFail({ code: 4, message: 'Not proposed operator' });
+    funcArgs: [
+      user,
+    ],
+  }).assertFail({ code: 4, message: 'Invalid proposed roles' });
 
   await deployer.callContract({
     callee: tokenManagerLockUnlock,
     funcName: "acceptOperatorship",
     gasLimit: 5_000_000,
-    funcArgs: [],
+    funcArgs: [
+      user
+    ],
   })
 
   // Tokens were sent from contract to otherUser
@@ -909,8 +985,9 @@ test("Accept operatorship", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)), // flow limit role remained
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role was changed
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
     ],
   });

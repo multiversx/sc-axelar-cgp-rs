@@ -1096,6 +1096,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "interchain-token-factory"
+version = "0.0.0"
+dependencies = [
+ "multiversx-sc",
+ "multiversx-sc-scenario",
+ "num-bigint",
+]
+
+[[package]]
+name = "interchain-token-factory-meta"
+version = "0.0.0"
+dependencies = [
+ "interchain-token-factory",
+ "multiversx-sc-meta",
+]
+
+[[package]]
 name = "interchain-token-service"
 version = "0.0.0"
 dependencies = [
@@ -1103,6 +1120,7 @@ dependencies = [
  "multiversx-sc-modules",
  "multiversx-sc-scenario",
  "num-bigint",
+ "operatable",
 ]
 
 [[package]]
@@ -1821,23 +1839,6 @@ name = "regex-syntax"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
-
-[[package]]
-name = "remote-address-validator"
-version = "0.0.0"
-dependencies = [
- "multiversx-sc",
- "multiversx-sc-scenario",
- "num-bigint",
-]
-
-[[package]]
-name = "remote-address-validator-meta"
-version = "0.0.0"
-dependencies = [
- "multiversx-sc-meta",
- "remote-address-validator",
-]
 
 [[package]]
 name = "reqwest"

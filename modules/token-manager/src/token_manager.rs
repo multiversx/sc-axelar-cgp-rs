@@ -6,6 +6,7 @@ multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use operatable::roles::Roles;
 
 #[derive(TypeAbi, TopEncode, TopDecode)]
 pub struct Metadata<M: ManagedTypeApi> {
@@ -21,11 +22,20 @@ pub enum TokenManagerType {
     LockUnlockFee,
 }
 
+#[derive(TypeAbi, TopEncode)]
+pub struct DeployTokenManagerParams<M: ManagedTypeApi> {
+    pub operator: Option<ManagedAddress<M>>,
+    pub token_identifier: Option<EgldOrEsdtTokenIdentifier<M>>,
+}
+
 pub const LATEST_METADATA_VERSION: u32 = 0;
 
 #[multiversx_sc::module]
 pub trait TokenManager:
-    proxy::ProxyModule + flow_limit::FlowLimit + operatable::Operatable
+    proxy::ProxyModule
+    + flow_limit::FlowLimit
+    + operatable::Operatable
+    + operatable::roles::AccountRoles
 {
     #[endpoint(addFlowLimiter)]
     fn add_flow_limiter(&self, flow_limiter: ManagedAddress) {
@@ -61,7 +71,7 @@ pub trait TokenManager:
             .set_if_empty(interchain_token_service.clone());
         self.interchain_token_id().set_if_empty(interchain_token_id);
 
-        let mut operator;
+        let operator;
         if operator_opt.is_none() {
             operator = interchain_token_service;
         } else {
@@ -93,10 +103,10 @@ pub trait TokenManager:
 
         self.interchain_token_service_transmit_interchain_transfer(
             self.interchain_token_id().get(),
-            &sender,
+            sender,
             destination_chain,
             destination_address,
-            &amount,
+            amount.clone(),
             metadata,
         );
 
@@ -126,10 +136,10 @@ pub trait TokenManager:
 
         self.interchain_token_service_transmit_interchain_transfer(
             self.interchain_token_id().get(),
-            &sender,
+            sender,
             destination_chain,
             destination_address,
-            &amount,
+            amount.clone(),
             payload,
         );
 
@@ -174,17 +184,6 @@ pub trait TokenManager:
         );
 
         amount
-    }
-
-    #[view(getImplementationTypeAndTokenIdentifier)]
-    fn get_implementation_type_and_token_identifier(&self) -> MultiValue2((TokenManagerType, Option<EgldOrEsdtTokenIdentifier>)) {
-        let token_identifier = None;
-
-        if !self.token_identifier().is_empty() {
-            token_identifier = Some(self.token_identifier().get());
-        }
-
-        (self.implementation_type().get(), token_identifier).into()
     }
 
     #[view(tokenId)]

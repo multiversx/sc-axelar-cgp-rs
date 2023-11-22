@@ -16,4 +16,6 @@ members = [
     "token-manager-lock-unlock/meta",
     "token-manager-mint-burn",
     "token-manager-mint-burn/meta",
+    "interchain-token-factory",
+    "interchain-token-factory/meta"
 ]

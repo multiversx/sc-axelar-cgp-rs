@@ -2,7 +2,7 @@ import { afterEach, assert, beforeEach, test } from "vitest";
 import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import { CHAIN_NAME, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
-import { deployRemoteAddressValidator, remoteAddressValidator } from '../itsHelpers';
+import { deployInterchainTokenFactory, interchainTokenFactory } from '../itsHelpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -86,10 +86,10 @@ test("Init errors", async () => {
 });
 
 test("Add trusted address", async () => {
-  await deployRemoteAddressValidator(deployer);
+  await deployInterchainTokenFactory(deployer);
 
   await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "addTrustedAddress",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -99,7 +99,7 @@ test("Add trusted address", async () => {
   }).assertFail({ code: 4, message: 'Endpoint can only be called by owner' });
 
   await deployer.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "addTrustedAddress",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -112,7 +112,7 @@ test("Add trusted address", async () => {
   const someChainAddress = 'SomeAddress';
 
   await deployer.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "addTrustedAddress",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -124,7 +124,7 @@ test("Add trusted address", async () => {
   const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS.toLowerCase()).digest('hex');
   const someChainAddressHash =  createKeccakHash('keccak256').update(someChainAddress.toLowerCase()).digest('hex');
 
-  const kvs = await remoteAddressValidator.getAccountWithKvs();
+  const kvs = await interchainTokenFactory.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -140,10 +140,10 @@ test("Add trusted address", async () => {
 });
 
 test("Remove trusted address", async () => {
-  await deployRemoteAddressValidator(deployer);
+  await deployInterchainTokenFactory(deployer);
 
   await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "removeTrustedAddress",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -152,7 +152,7 @@ test("Remove trusted address", async () => {
   }).assertFail({ code: 4, message: 'Endpoint can only be called by owner' });
 
   await deployer.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "removeTrustedAddress",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -161,7 +161,7 @@ test("Remove trusted address", async () => {
   }).assertFail({ code: 4, message: 'Zero string length' });
 
   await deployer.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "removeTrustedAddress",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -170,7 +170,7 @@ test("Remove trusted address", async () => {
   });
 
 
-  const kvs = await remoteAddressValidator.getAccountWithKvs();
+  const kvs = await interchainTokenFactory.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -182,10 +182,10 @@ test("Remove trusted address", async () => {
 });
 
 test("Validate sender", async () => {
-  await deployRemoteAddressValidator(deployer);
+  await deployInterchainTokenFactory(deployer);
 
   let result = await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "validateSender",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -197,7 +197,7 @@ test("Validate sender", async () => {
   assert(result.returnData[0] === '01');
 
   result = await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "validateSender",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -209,7 +209,7 @@ test("Validate sender", async () => {
   assert(result.returnData[0] === '01');
 
   result = await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "validateSender",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -221,7 +221,7 @@ test("Validate sender", async () => {
   assert(result.returnData[0] === '');
 
   result = await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "validateSender",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -234,10 +234,10 @@ test("Validate sender", async () => {
 });
 
 test("Get remote address", async () => {
-  await deployRemoteAddressValidator(deployer);
+  await deployInterchainTokenFactory(deployer);
 
   await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "getRemoteAddress",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -246,7 +246,7 @@ test("Get remote address", async () => {
   }).assertFail({ code: 4, message: 'Untrusted chain' });
 
   let result = await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "getRemoteAddress",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -258,10 +258,10 @@ test("Get remote address", async () => {
 });
 
 test("Storage mapper views", async () => {
-  await deployRemoteAddressValidator(deployer);
+  await deployInterchainTokenFactory(deployer);
 
   let result = await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "remote_address_hashes",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -274,7 +274,7 @@ test("Storage mapper views", async () => {
   assert(result.returnData[0] === otherChainAddressHash);
 
   result = await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "remote_addresses",
     gasLimit: 5_000_000,
     funcArgs: [
@@ -285,7 +285,7 @@ test("Storage mapper views", async () => {
   assert(result.returnData[0] === e.Str(OTHER_CHAIN_ADDRESS).toTopHex());
 
   result = await user.callContract({
-    callee: remoteAddressValidator,
+    callee: interchainTokenFactory,
     funcName: "chainName",
     gasLimit: 5_000_000,
     funcArgs: [],
