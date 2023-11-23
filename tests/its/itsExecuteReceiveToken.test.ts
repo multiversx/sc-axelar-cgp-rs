@@ -14,7 +14,7 @@ import {
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
-  computeCustomTokenId,
+  computeInterchainTokenId,
   deployContracts,
   gasService,
   gateway,
@@ -131,7 +131,7 @@ test("Execute receive token mint/burn", async () => {
     ],
   });
 
-  const computedTokenId = computeCustomTokenId(user, TOKEN_ID);
+  const computedTokenId = computeInterchainTokenId(user, TOKEN_ID);
 
   // Set mint/burn role for token
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
@@ -266,7 +266,7 @@ test("Execute receive token flow limit", async () => {
     ],
   });
 
-  const computedTokenId = computeCustomTokenId(user, TOKEN_ID);
+  const computedTokenId = computeInterchainTokenId(user, TOKEN_ID);
 
   // Set mint/burn role for token and flow limit
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
@@ -381,7 +381,7 @@ test("Execute receive token express caller", async () => {
     ],
   });
 
-  const computedTokenId = computeCustomTokenId(user, TOKEN_ID);
+  const computedTokenId = computeInterchainTokenId(user, TOKEN_ID);
 
   // Set mint/burn role for token
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);

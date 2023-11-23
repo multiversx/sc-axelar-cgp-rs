@@ -2,6 +2,7 @@ import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import createKeccakHash from 'keccak';
 import {
+  ADDRESS_ZERO,
   CHAIN_NAME,
   CHAIN_NAME_HASH,
   OTHER_CHAIN_ADDRESS,
@@ -117,7 +118,7 @@ test("Init errors", async () => {
     codeMetadata: ["upgradeable"],
     gasLimit: 100_000_000,
     codeArgs: [
-      e.Addr('erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu'), // zero address
+      e.Addr(ADDRESS_ZERO), // zero address
       e.Bytes(mockTokenId),
       e.Option(deployer),
       e.Option(e.Str(TOKEN_ID)),

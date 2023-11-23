@@ -13,7 +13,7 @@ import {
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
-  computeCustomTokenId,
+  computeInterchainTokenId,
   deployContracts,
   deployPingPongInterchain,
   gasService,
@@ -135,7 +135,7 @@ test("Execute receive token with data", async () => {
     ],
   });
 
-  const computedTokenId = computeCustomTokenId(user, 'EGLD');
+  const computedTokenId = computeInterchainTokenId(user, 'EGLD');
 
   // Set egld balance for token manager
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
@@ -230,7 +230,7 @@ test.skip("Execute receive token with data contract error", async () => {
     ],
   });
 
-  const computedTokenId = computeCustomTokenId(user, 'EGLD');
+  const computedTokenId = computeInterchainTokenId(user, 'EGLD');
 
   // Set egld balance for token manager
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
@@ -317,7 +317,7 @@ test("Execute receive token with data express caller", async () => {
     ],
   });
 
-  const computedTokenId = computeCustomTokenId(user, 'EGLD');
+  const computedTokenId = computeInterchainTokenId(user, 'EGLD');
 
   // Set egld balance for token manager
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);

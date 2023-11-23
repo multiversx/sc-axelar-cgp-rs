@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           34
+// Endpoints:                           33
 // Async Callback:                       1
-// Total number of exported functions:  36
+// Total number of exported functions:  35
 
 #![no_std]
 
@@ -31,7 +31,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         transmitInterchainTransfer => transmit_interchain_transfer
         setFlowLimits => set_flow_limits
         execute => execute
-        get_canonical_token_id => get_canonical_token_id
         interchainTokenId => interchain_token_id
         contractCallValue => contract_call_value
         chainNameHash => chain_name_hash

@@ -11,7 +11,6 @@ use crate::constants::{
     LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
     MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
     MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA, PREFIX_INTERCHAIN_TOKEN_ID,
-    PREFIX_STANDARDIZED_TOKEN_ID,
 };
 
 multiversx_sc::imports!();
@@ -198,14 +197,12 @@ pub trait InterchainTokenServiceContract:
     #[endpoint(deployTokenManager)]
     fn deploy_token_manager(
         &self,
-        token_identifier: EgldOrEsdtTokenIdentifier, // TODO: Change this to salt?
+        salt: ManagedByteArray<KECCAK256_RESULT_LEN>,
         destination_chain: ManagedBuffer,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) -> TokenId<Self::Api> {
         self.require_not_paused();
-
-        self.validate_token(&token_identifier);
 
         let mut deployer = self.blockchain().get_caller();
 
@@ -214,11 +211,9 @@ pub trait InterchainTokenServiceContract:
             deployer = ManagedAddress::zero();
         }
 
-        let token_name = token_identifier.into_name();
+        let token_id = self.interchain_token_id(&deployer, &salt);
 
-        let token_id = self.interchain_token_id(&deployer, &token_name);
-
-        self.interchain_token_id_claimed_event(&token_id, &deployer, &token_name);
+        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
 
         let gas_value = self.call_value().egld_value().clone_value();
 
@@ -245,7 +240,7 @@ pub trait InterchainTokenServiceContract:
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
         &self,
-        salt: ManagedBuffer,
+        salt: ManagedByteArray<KECCAK256_RESULT_LEN>,
         destination_chain: ManagedBuffer,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
@@ -363,53 +358,6 @@ pub trait InterchainTokenServiceContract:
             interchain_transfer_payload,
             express_executor,
             express_hash,
-        );
-    }
-
-    fn express_execute_raw(
-        &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        source_chain: ManagedBuffer,
-        receive_token_payload: InterchainTransferPayload<Self::Api>,
-        express_executor: ManagedAddress,
-        express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) {
-        let token_identifier = self.valid_token_identifier(&receive_token_payload.token_id);
-
-        let destination_address =
-            ManagedAddress::try_from(receive_token_payload.destination_address).unwrap();
-
-        let (sent_token_identifier, sent_amount) = self.call_value().egld_or_single_fungible_esdt();
-
-        require!(
-            sent_token_identifier == token_identifier
-                && sent_amount == receive_token_payload.amount,
-            "Wrong token or amount sent"
-        );
-
-        if receive_token_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA {
-            self.executable_contract_express_execute_with_interchain_token(
-                destination_address,
-                source_chain,
-                receive_token_payload.source_address,
-                receive_token_payload.data.unwrap(),
-                receive_token_payload.token_id,
-                token_identifier,
-                receive_token_payload.amount,
-                express_executor,
-                command_id,
-                express_hash,
-            );
-
-            // Not technically needed, the async call above will end the execution
-            return;
-        }
-
-        self.send().direct(
-            &destination_address,
-            &token_identifier,
-            0,
-            &receive_token_payload.amount,
         );
     }
 
@@ -612,6 +560,55 @@ pub trait InterchainTokenServiceContract:
         }
     }
 
+    /// Private Functions
+
+    fn express_execute_raw(
+        &self,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        source_chain: ManagedBuffer,
+        receive_token_payload: InterchainTransferPayload<Self::Api>,
+        express_executor: ManagedAddress,
+        express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) {
+        let token_identifier = self.valid_token_identifier(&receive_token_payload.token_id);
+
+        let destination_address =
+            ManagedAddress::try_from(receive_token_payload.destination_address).unwrap();
+
+        let (sent_token_identifier, sent_amount) = self.call_value().egld_or_single_fungible_esdt();
+
+        require!(
+            sent_token_identifier == token_identifier
+                && sent_amount == receive_token_payload.amount,
+            "Wrong token or amount sent"
+        );
+
+        if receive_token_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA {
+            self.executable_contract_express_execute_with_interchain_token(
+                destination_address,
+                source_chain,
+                receive_token_payload.source_address,
+                receive_token_payload.data.unwrap(),
+                receive_token_payload.token_id,
+                token_identifier,
+                receive_token_payload.amount,
+                express_executor,
+                command_id,
+                express_hash,
+            );
+
+            // Not technically needed, the async call above will end the execution
+            return;
+        }
+
+        self.send().direct(
+            &destination_address,
+            &token_identifier,
+            0,
+            &receive_token_payload.amount,
+        );
+    }
+
     fn only_token_manager(&self, token_id: &TokenId<Self::Api>) {
         let caller = self.blockchain().get_caller();
 
@@ -621,9 +618,10 @@ pub trait InterchainTokenServiceContract:
         );
     }
 
-    fn validate_token(&self, token_identifier: &EgldOrEsdtTokenIdentifier) {
-        require!(token_identifier.is_valid(), "Invalid token identifier");
-    }
+    // TODO
+    // fn validate_token(&self, token_identifier: &EgldOrEsdtTokenIdentifier) {
+    //     require!(token_identifier.is_valid(), "Invalid token identifier");
+    // }
 
     fn sanitize_token_manager_implementation(
         &self,
@@ -640,29 +638,11 @@ pub trait InterchainTokenServiceContract:
         address
     }
 
-    #[view]
-    fn get_canonical_token_id(
-        &self,
-        token_identifier: &EgldOrEsdtTokenIdentifier,
-    ) -> TokenId<Self::Api> {
-        let prefix_standardized_token_id = self
-            .crypto()
-            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_STANDARDIZED_TOKEN_ID));
-
-        let mut encoded = ManagedBuffer::new();
-
-        encoded.append(prefix_standardized_token_id.as_managed_buffer());
-        encoded.append(self.chain_name_hash().get().as_managed_buffer());
-        encoded.append(&token_identifier.clone().into_name());
-
-        self.crypto().keccak256(encoded)
-    }
-
     #[view(interchainTokenId)]
     fn interchain_token_id(
         &self,
         sender: &ManagedAddress,
-        salt: &ManagedBuffer,
+        salt: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> TokenId<Self::Api> {
         let prefix_interchain_token_id = self
             .crypto()
@@ -672,7 +652,7 @@ pub trait InterchainTokenServiceContract:
 
         encoded.append(prefix_interchain_token_id.as_managed_buffer());
         encoded.append(sender.as_managed_buffer());
-        encoded.append(salt);
+        encoded.append(salt.as_managed_buffer());
 
         self.crypto().keccak256(encoded)
     }

@@ -6,11 +6,12 @@ import {
   MOCK_CONTRACT_ADDRESS_1, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
-  TOKEN_ID2, TOKEN_ID_CANONICAL
+  TOKEN_ID2, TOKEN_ID_CANONICAL, TOKEN_SALT
 } from './helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { Kvs } from 'xsuite/dist/data/kvs';
+import { AddressEncodable } from 'xsuite/dist/data/AddressEncodable';
 
 let address: string;
 export let gateway: SContract;
@@ -59,37 +60,6 @@ export const deployGasService = async (deployer: SWallet, collector: SWallet) =>
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString()))
     ]
   });
-};
-
-// TODO:
-export const deployInterchainTokenFactory = async (deployer: SWallet) => {
-  ({ contract: interchainTokenFactory, address } = await deployer.deployContract({
-    code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      // e.Str(CHAIN_NAME),
-      //
-      // e.U32(1),
-      // e.Str(OTHER_CHAIN_NAME),
-      //
-      // e.U32(1),
-      // e.Str(OTHER_CHAIN_ADDRESS)
-    ]
-  }));
-
-  // const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS.toLowerCase()).digest('hex');
-  //
-  // const kvs = await interchainTokenFactory.getAccountWithKvs();
-  // assertAccount(kvs, {
-  //   balance: 0n,
-  //   allKvs: [
-  //     e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
-  //
-  //     e.kvs.Mapper('remote_address_hashes', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(otherChainAddressHash)),
-  //     e.kvs.Mapper('remote_addresses', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
-  //   ],
-  // });
 };
 
 export const deployTokenManagerMintBurn = async (
@@ -215,22 +185,53 @@ export const deployIts = async (deployer: SWallet) => {
     ]
   }));
 
-  // TODO
-  // await deployer.callContract({
-  //   callee: its,
-  //   funcName: 'setInterchainTokenFactory',
-  //   funcArgs: [
-  //     interchainTokenFactory,
-  //   ],
-  //   gasLimit: 10_000_000,
-  // })
-
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
       ...baseItsKvs(deployer)
     ]
+  });
+};
+
+// TODO:
+export const deployInterchainTokenFactory = async (deployer: SWallet) => {
+  ({ contract: interchainTokenFactory, address } = await deployer.deployContract({
+    code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      // e.Str(CHAIN_NAME),
+      //
+      // e.U32(1),
+      // e.Str(OTHER_CHAIN_NAME),
+      //
+      // e.U32(1),
+      // e.Str(OTHER_CHAIN_ADDRESS)
+    ]
+  }));
+
+  // const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS.toLowerCase()).digest('hex');
+  //
+  // const kvs = await interchainTokenFactory.getAccountWithKvs();
+  // assertAccount(kvs, {
+  //   balance: 0n,
+  //   allKvs: [
+  //     e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
+  //
+  //     e.kvs.Mapper('remote_address_hashes', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(otherChainAddressHash)),
+  //     e.kvs.Mapper('remote_addresses', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
+  //   ],
+  // });
+
+  // Set interchain token factory contract on its
+  await deployer.callContract({
+    callee: its,
+    funcName: 'setInterchainTokenFactory',
+    funcArgs: [
+      interchainTokenFactory,
+    ],
+    gasLimit: 10_000_000,
   });
 };
 
@@ -251,10 +252,10 @@ export const deployPingPongInterchain = async (deployer: SWallet, amount = 1_000
 export const deployContracts = async (deployer: SWallet, collector: SWallet) => {
   await deployGatewayContract(deployer);
   await deployGasService(deployer, collector);
-  await deployInterchainTokenFactory(deployer);
   await deployTokenManagerMintBurn(deployer);
   await deployTokenManagerLockUnlock(deployer);
   await deployIts(deployer);
+  await deployInterchainTokenFactory(deployer);
 };
 
 export const computeStandardizedTokenId = (token = TOKEN_ID) => {
@@ -268,18 +269,18 @@ export const computeStandardizedTokenId = (token = TOKEN_ID) => {
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const computeCustomTokenId = (user: SWallet, token = TOKEN_ID2) => {
-  const prefixCustom = createKeccakHash('keccak256').update('its-custom-token-id').digest('hex');
+export const computeInterchainTokenId = (user: AddressEncodable, salt = TOKEN_SALT) => {
+  const prefix = createKeccakHash('keccak256').update('its-interchain-token-id').digest('hex');
   const buffer = Buffer.concat([
-    Buffer.from(prefixCustom, 'hex'),
+    Buffer.from(prefix, 'hex'),
     Buffer.from(user.toTopHex(), 'hex'),
-    Buffer.from(token)
+    Buffer.from(salt, 'hex')
   ]);
 
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const baseItsKvs = (deployer: SWallet | SContract) => {
+export const baseItsKvs = (deployer: SWallet | SContract, interchainTokenFactory: SContract | null = null) => {
   return [
     e.kvs.Mapper('gateway').Value(gateway),
     e.kvs.Mapper('gas_service').Value(gasService),
@@ -291,6 +292,8 @@ export const baseItsKvs = (deployer: SWallet | SContract) => {
     e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
 
     e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(OTHER_CHAIN_ADDRESS_HASH)),
-    e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS))
+    e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
+
+    ...(interchainTokenFactory ? [e.kvs.Mapper('interchain_token_factory').Value(interchainTokenFactory)] : []),
   ];
 };

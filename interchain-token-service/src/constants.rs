@@ -4,7 +4,6 @@ multiversx_sc::derive_imports!();
 use crate::abi::{AbiEncodeDecode, ParamType, Token};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-pub const PREFIX_STANDARDIZED_TOKEN_ID: &[u8] = b"its-standardized-token-id";
 pub const PREFIX_INTERCHAIN_TOKEN_ID: &[u8] = b"its-interchain-token-id";
 
 pub const MESSAGE_TYPE_INTERCHAIN_TRANSFER: u64 = 0;

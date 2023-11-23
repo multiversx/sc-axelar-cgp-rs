@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, test } from "vitest";
-import { assertAccount, e, SWallet, SWorld } from "xsuite";
-import createKeccakHash from "keccak";
+import { afterEach, beforeEach, test } from 'vitest';
+import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import createKeccakHash from 'keccak';
 import {
   CHAIN_NAME_HASH, COMMAND_ID,
   getCommandId,
@@ -10,7 +10,7 @@ import {
   TOKEN_ID,
   TOKEN_ID2,
   TOKEN_ID_CANONICAL,
-  TOKEN_ID_MANAGER_ADDRESS
+  TOKEN_ID_MANAGER_ADDRESS,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
@@ -23,7 +23,7 @@ import {
   pingPong,
   interchainTokenFactory,
   tokenManagerLockUnlock,
-  tokenManagerMintBurn
+  tokenManagerMintBurn, baseItsKvs, computeInterchainTokenId,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -38,7 +38,7 @@ beforeEach(async () => {
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
-  })
+  });
 
   collector = await world.createWallet();
   deployer = await world.createWallet({
@@ -52,9 +52,9 @@ beforeEach(async () => {
         {
           id: TOKEN_ID2,
           amount: 10_000,
-        }
-      ])
-    ]
+        },
+      ]),
+    ],
   });
   user = await world.createWallet({
     balance: BigInt('10000000000000000'),
@@ -67,9 +67,9 @@ beforeEach(async () => {
         {
           id: TOKEN_ID2,
           amount: 10_000,
-        }
-      ])
-    ]
+        },
+      ]),
+    ],
   });
   otherUser = await world.createWallet({
     balance: BigInt('10000000000000000'),
@@ -82,32 +82,41 @@ afterEach(async () => {
   await world.terminate();
 });
 
-test("Express receive token", async () => {
-  await user.callContract({
-    callee: its,
-    funcName: "registerCanonicalToken",
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(TOKEN_ID)
+test.only('Express receive token', async () => {
+  // Mock token manager exists on source chain
+  await its.setAccount({
+    ...await its.getAccountWithKvs(),
+    kvs: [
+      ...baseItsKvs(deployer, interchainTokenFactory),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
     ],
   });
 
   // Remove '0x' from beginning of hex strings encoded by Ethereum
   const payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'bytes32', 'bytes', 'uint256'],
-    [1, Buffer.from(TOKEN_ID_CANONICAL, 'hex'), Buffer.from(otherUser.toTopBytes()), 100_000]
+    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256'],
+    [
+      0, // message type interchain transfer
+      Buffer.from(computeInterchainTokenId(user), 'hex'),
+      Buffer.from(OTHER_CHAIN_ADDRESS),
+      Buffer.from(otherUser.toTopBytes()),
+      100_000,
+    ],
   ).substring(2);
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      payload,
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
     ],
-    esdts: [{ id: TOKEN_ID, amount: 100_000 }]
+    esdts: [{ id: TOKEN_ID, amount: 100_000 }],
   });
 
   // Assert express receive slot set
@@ -144,15 +153,15 @@ test("Express receive token", async () => {
   });
 });
 
-test("Express receive token with data", async () => {
+test('Express receive token with data', async () => {
   await deployPingPongInterchain(deployer);
 
   await user.callContract({
     callee: its,
-    funcName: "registerCanonicalToken",
+    funcName: 'registerCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('EGLD')
+      e.Str('EGLD'),
     ],
   });
 
@@ -167,13 +176,13 @@ test("Express receive token with data", async () => {
       Buffer.from(pingPong.toTopBytes()),
       1_000,
       Buffer.from(otherUser.toTopBytes()),
-      Buffer.from(e.Str("ping").toTopBytes()) // data passed to contract, in this case the string "ping"
-    ]
+      Buffer.from(e.Str('ping').toTopBytes()), // data passed to contract, in this case the string "ping"
+    ],
   ).substring(2);
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 30_000_000,
     value: 1_000,
     funcArgs: [
@@ -230,15 +239,15 @@ test("Express receive token with data", async () => {
 });
 
 // TODO: This works correctly on Devnet but doesn't work in tests for some reason
-test.skip("Express receive token with data error", async () => {
+test.skip('Express receive token with data error', async () => {
   await deployPingPongInterchain(deployer);
 
   await user.callContract({
     callee: its,
-    funcName: "registerCanonicalToken",
+    funcName: 'registerCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('EGLD')
+      e.Str('EGLD'),
     ],
   });
 
@@ -252,13 +261,13 @@ test.skip("Express receive token with data error", async () => {
       Buffer.from(pingPong.toTopBytes()),
       1_000,
       Buffer.from(otherUser.toTopBytes()),
-      Buffer.from(e.Str("sth").toTopBytes()) // data passed to contract, in this case the string "sth" which will give an error
-    ]
+      Buffer.from(e.Str('sth').toTopBytes()), // data passed to contract, in this case the string "sth" which will give an error
+    ],
   ).substring(2);
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 600_000_000,
     value: 1_000,
     funcArgs: [
@@ -302,10 +311,10 @@ test.skip("Express receive token with data error", async () => {
   const userKvs = await user.getAccountWithKvs();
   assertAccount(userKvs, {
     balance: BigInt('10000000000000000'),
-  })
+  });
 });
 
-test("Express receive token errors", async () => {
+test('Express receive token errors', async () => {
   let payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256', 'bytes32', 'bytes', 'uint256'],
     [
@@ -313,12 +322,12 @@ test("Express receive token errors", async () => {
       Buffer.from(TOKEN_ID_CANONICAL, 'hex'),
       Buffer.from(otherUser.toTopBytes()),
       100_000,
-    ]
+    ],
   ).substring(2);
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
@@ -329,10 +338,10 @@ test("Express receive token errors", async () => {
 
   await user.callContract({
     callee: its,
-    funcName: "registerCanonicalToken",
+    funcName: 'registerCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str(TOKEN_ID)
+      e.Str(TOKEN_ID),
     ],
   });
 
@@ -343,19 +352,19 @@ test("Express receive token errors", async () => {
       Buffer.from(TOKEN_ID_CANONICAL, 'hex'),
       Buffer.from(otherUser.toTopBytes()),
       100_000,
-    ]
+    ],
   ).substring(2);
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
-    esdts: [{ id: TOKEN_ID, amount: 100_000 }]
+    esdts: [{ id: TOKEN_ID, amount: 100_000 }],
   }).assertFail({ code: 4, message: 'Invalid express selector' });
 
   payload = AbiCoder.defaultAbiCoder().encode(
@@ -365,12 +374,12 @@ test("Express receive token errors", async () => {
       Buffer.from(TOKEN_ID_CANONICAL, 'hex'),
       Buffer.from(otherUser.toTopBytes()),
       100_000,
-    ]
+    ],
   ).substring(2);
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 20_000_000,
     value: 100_000,
     funcArgs: [
@@ -382,32 +391,32 @@ test("Express receive token errors", async () => {
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
-    esdts: [{ id: TOKEN_ID, amount: 99_999 }]
+    esdts: [{ id: TOKEN_ID, amount: 99_999 }],
   }).assertFail({ code: 4, message: 'Wrong token or amount sent' });
 
   // Can not call twice for same call
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
-    esdts: [{ id: TOKEN_ID, amount: 100_000 }]
+    esdts: [{ id: TOKEN_ID, amount: 100_000 }],
   });
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 20_000_000,
     funcArgs: [
       payload,
@@ -423,15 +432,15 @@ test("Express receive token errors", async () => {
     ...await gateway.getAccount(),
     codeMetadata: [],
     kvs: [
-      e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
 
-      e.kvs.Mapper("command_executed", e.Bytes(commandIdHash)).Value(e.U8(1)),
-    ]
+      e.kvs.Mapper('command_executed', e.Bytes(commandIdHash)).Value(e.U8(1)),
+    ],
   });
 
   await user.callContract({
     callee: its,
-    funcName: "expressReceiveToken",
+    funcName: 'expressReceiveToken',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(
@@ -440,7 +449,7 @@ test("Express receive token errors", async () => {
           e.Bytes(TOKEN_ID_CANONICAL),
           e.Buffer(otherUser.toTopBytes()),
           e.U(100_000),
-        ).toTopBytes()
+        ).toTopBytes(),
       ),
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
@@ -448,19 +457,19 @@ test("Express receive token errors", async () => {
   }).assertFail({ code: 4, message: 'Already executed' });
 });
 
-test("Interchain transfer", async () => {
+test('Interchain transfer', async () => {
   await user.callContract({
     callee: its,
-    funcName: "registerCanonicalToken",
+    funcName: 'registerCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str(TOKEN_ID)
+      e.Str(TOKEN_ID),
     ],
   });
 
   await user.callContract({
     callee: its,
-    funcName: "interchainTransfer",
+    funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -499,7 +508,7 @@ test("Interchain transfer", async () => {
   // Specify custom metadata
   await user.callContract({
     callee: its,
-    funcName: "interchainTransfer",
+    funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -535,10 +544,10 @@ test("Interchain transfer", async () => {
   });
 });
 
-test("Interchain transfer errors", async () => {
+test('Interchain transfer errors', async () => {
   await user.callContract({
     callee: its,
-    funcName: "interchainTransfer",
+    funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
@@ -551,17 +560,17 @@ test("Interchain transfer errors", async () => {
 
   await user.callContract({
     callee: its,
-    funcName: "registerCanonicalToken",
+    funcName: 'registerCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str(TOKEN_ID)
+      e.Str(TOKEN_ID),
     ],
   });
 
   // Sending wrong token
   await user.callContract({
     callee: its,
-    funcName: "interchainTransfer",
+    funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
@@ -574,7 +583,7 @@ test("Interchain transfer errors", async () => {
 
   await user.callContract({
     callee: its,
-    funcName: "interchainTransfer",
+    funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -591,7 +600,7 @@ test("Interchain transfer errors", async () => {
   // Sending to unsupported chain
   await user.callContract({
     callee: its,
-    funcName: "interchainTransfer",
+    funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -603,19 +612,19 @@ test("Interchain transfer errors", async () => {
   }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 });
 
-test("Send token with data", async () => {
+test('Send token with data', async () => {
   await user.callContract({
     callee: its,
-    funcName: "registerCanonicalToken",
+    funcName: 'registerCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str(TOKEN_ID)
+      e.Str(TOKEN_ID),
     ],
   });
 
   await user.callContract({
     callee: its,
-    funcName: "sendTokenWithData",
+    funcName: 'sendTokenWithData',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
@@ -655,7 +664,7 @@ test("Send token with data", async () => {
   // Specify custom data
   await user.callContract({
     callee: its,
-    funcName: "sendTokenWithData",
+    funcName: 'sendTokenWithData',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -688,10 +697,10 @@ test("Send token with data", async () => {
   });
 });
 
-test("Send token with data errors", async () => {
+test('Send token with data errors', async () => {
   await user.callContract({
     callee: its,
-    funcName: "sendTokenWithData",
+    funcName: 'sendTokenWithData',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
@@ -704,17 +713,17 @@ test("Send token with data errors", async () => {
 
   await user.callContract({
     callee: its,
-    funcName: "registerCanonicalToken",
+    funcName: 'registerCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str(TOKEN_ID)
+      e.Str(TOKEN_ID),
     ],
   });
 
   // Sending wrong token
   await user.callContract({
     callee: its,
-    funcName: "sendTokenWithData",
+    funcName: 'sendTokenWithData',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
@@ -728,7 +737,7 @@ test("Send token with data errors", async () => {
   // Sending to unsupported chain
   await user.callContract({
     callee: its,
-    funcName: "sendTokenWithData",
+    funcName: 'sendTokenWithData',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -740,7 +749,7 @@ test("Send token with data errors", async () => {
   }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 });
 
-test("Transmit send token", async () => {
+test('Transmit send token', async () => {
   // Mock token manager being user to be able to test the transmitSendToken function
   await its.setAccount({
     ...(await its.getAccountWithKvs()),
@@ -759,7 +768,7 @@ test("Transmit send token", async () => {
 
   await user.callContract({
     callee: its,
-    funcName: "transmitSendToken",
+    funcName: 'transmitSendToken',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -776,7 +785,7 @@ test("Transmit send token", async () => {
   // Specify custom metadata
   await user.callContract({
     callee: its,
-    funcName: "transmitSendToken",
+    funcName: 'transmitSendToken',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -789,10 +798,10 @@ test("Transmit send token", async () => {
   });
 });
 
-test("Transmit send token errors", async () => {
+test('Transmit send token errors', async () => {
   await user.callContract({
     callee: its,
-    funcName: "transmitSendToken",
+    funcName: 'transmitSendToken',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -806,16 +815,16 @@ test("Transmit send token errors", async () => {
 
   await user.callContract({
     callee: its,
-    funcName: "registerCanonicalToken",
+    funcName: 'registerCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str(TOKEN_ID)
+      e.Str(TOKEN_ID),
     ],
   });
 
   await user.callContract({
     callee: its,
-    funcName: "transmitSendToken",
+    funcName: 'transmitSendToken',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),
@@ -846,7 +855,7 @@ test("Transmit send token errors", async () => {
   // Specify custom metadata
   await user.callContract({
     callee: its,
-    funcName: "transmitSendToken",
+    funcName: 'transmitSendToken',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(TOKEN_ID_CANONICAL),

@@ -184,7 +184,7 @@ pub trait EventsModule {
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] deployer: &ManagedAddress,
-        data: &ManagedBuffer,
+        data: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     );
 
     #[event("token_manager_deployment_started_event")]
