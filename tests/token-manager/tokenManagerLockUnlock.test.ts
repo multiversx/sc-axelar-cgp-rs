@@ -1,26 +1,27 @@
-import { afterEach, beforeEach, test } from "vitest";
-import { assertAccount, e, SWallet, SWorld } from "xsuite";
-import createKeccakHash from "keccak";
+import { afterEach, beforeEach, test } from 'vitest';
+import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import createKeccakHash from 'keccak';
 import {
   CHAIN_NAME,
   CHAIN_NAME_HASH,
-  OTHER_CHAIN_ADDRESS, OTHER_CHAIN_ADDRESS_HASH,
+  OTHER_CHAIN_ADDRESS,
+  OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
   TOKEN_ID_CANONICAL
 } from '../helpers';
 import {
+  baseItsKvs,
   deployGasService,
   deployGatewayContract,
-  deployIts,
   deployInterchainTokenFactory,
+  deployIts,
   deployTokenManagerLockUnlock,
   deployTokenManagerMintBurn,
   gasService,
   gateway,
   its,
-  interchainTokenFactory,
   tokenManagerLockUnlock,
   tokenManagerMintBurn
 } from '../itsHelpers';
@@ -143,7 +144,7 @@ test("Init different arguments", async () => {
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(otherUser),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
     ],
   });
@@ -166,8 +167,8 @@ test("Init different arguments", async () => {
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(otherUser),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000100)), // flow limiter role
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles for operator
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000100)), // flow limiter role for its
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
     ],
   });
@@ -281,17 +282,7 @@ test("Interchain transfer errors", async () => {
   await its.setAccount({
     ...(await its.getAccountWithKvs()),
     kvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-      e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
-
-      e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(OTHER_CHAIN_ADDRESS_HASH)),
-      e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
+      ...baseItsKvs(deployer),
 
       e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerLockUnlock),
     ],
@@ -408,17 +399,7 @@ test("Call contract with interchain token errors", async () => {
   await its.setAccount({
     ...(await its.getAccountWithKvs()),
     kvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-      e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
-
-      e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(OTHER_CHAIN_ADDRESS_HASH)),
-      e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
+      ...baseItsKvs(deployer),
 
       e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerLockUnlock),
     ],
@@ -448,7 +429,7 @@ test("Call contract with interchain token errors", async () => {
 });
 
 test("Give token", async () => {
-  await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user);
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user);
 
   // Ensure token manager has tokens
   await user.transfer({
@@ -472,11 +453,7 @@ test("Give token", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ...baseKvs,
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 0 }]),
     ],
@@ -491,7 +468,7 @@ test("Give token", async () => {
 });
 
 test("Give token flow limit", async () => {
-  await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user);
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user);
 
   // Ensure token manager has tokens
   await user.transfer({
@@ -525,11 +502,7 @@ test("Give token flow limit", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ...baseKvs,
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
       e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
@@ -577,11 +550,7 @@ test("Give token flow limit", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ...baseKvs,
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
       e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
@@ -645,7 +614,7 @@ test("Give token errors", async () => {
 });
 
 test("Take token", async () => {
-  await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user);
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user);
 
   await user.callContract({
     callee: tokenManagerLockUnlock,
@@ -660,11 +629,7 @@ test("Take token", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ...baseKvs,
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ],
@@ -672,7 +637,7 @@ test("Take token", async () => {
 });
 
 test("Take token flow limit", async () => {
-  await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user);
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user);
 
   // Set flow limit
   await deployer.callContract({
@@ -697,11 +662,7 @@ test("Take token flow limit", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ...baseKvs,
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
       e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
@@ -738,11 +699,7 @@ test("Take token flow limit", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ...baseKvs,
 
       e.kvs.Mapper('flow_limit').Value(e.U(500)),
       e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
@@ -791,44 +748,8 @@ test("Take token errors", async () => {
   }).assertFail({ code: 4, message: 'Flow limit exceeded' });
 });
 
-test("Set flow limit", async () => {
-  await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
-
-  await deployer.callContract({
-    callee: tokenManagerLockUnlock,
-    funcName: "setFlowLimit",
-    gasLimit: 5_000_000,
-    funcArgs: [
-      e.U(500),
-    ],
-  }).assertFail({ code: 4, message: 'Missing any of roles' });
-
-  await user.callContract({
-    callee: tokenManagerLockUnlock,
-    funcName: "setFlowLimit",
-    gasLimit: 5_000_000,
-    funcArgs: [
-      e.U(500),
-    ],
-  });
-
-  // Tokens were sent from contract to otherUser
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0n,
-    allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-
-      e.kvs.Mapper('flow_limit').Value(e.U(500)),
-    ],
-  });
-});
-
 test("Transfer operatorship", async () => {
-  await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
 
   await deployer.callContract({
     callee: tokenManagerLockUnlock,
@@ -852,11 +773,10 @@ test("Transfer operatorship", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      ...baseKvs,
+
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)), // flow limit role remained
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role was transfered
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role was transferred
     ],
   });
 
@@ -872,7 +792,7 @@ test("Transfer operatorship", async () => {
 });
 
 test("Propose operatorship", async () => {
-  await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
 
   await deployer.callContract({
     callee: tokenManagerLockUnlock,
@@ -896,10 +816,7 @@ test("Propose operatorship", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ...baseKvs,
 
       e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000010)),
     ],
@@ -929,10 +846,7 @@ test("Propose operatorship", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ...baseKvs,
 
       e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000010)),
       e.kvs.Mapper('proposed_roles', user, otherUser).Value(e.U32(0b00000010)),
@@ -941,7 +855,7 @@ test("Propose operatorship", async () => {
 });
 
 test("Accept operatorship", async () => {
-  await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
 
   await deployer.callContract({
     callee: tokenManagerLockUnlock,
@@ -961,6 +875,16 @@ test("Accept operatorship", async () => {
     ],
   });
 
+  // Propose other
+  await user.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "proposeOperatorship",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      otherUser,
+    ],
+  });
+
   await user.callContract({
     callee: tokenManagerLockUnlock,
     funcName: "acceptOperatorship",
@@ -977,18 +901,186 @@ test("Accept operatorship", async () => {
     funcArgs: [
       user
     ],
-  })
+  });
 
-  // Tokens were sent from contract to otherUser
   let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(user),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      ...baseKvs,
+
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)), // flow limit role remained
       e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role was changed
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+
+      e.kvs.Mapper('proposed_roles', user, otherUser).Value(e.U32(0b00000010)),
+    ],
+  });
+
+  // otherUser can no longer accept because user doesn't have operator role anymore
+  await otherUser.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "acceptOperatorship",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      user
+    ],
+  }).assertFail({ code: 4, message: 'Missing all roles' });
+});
+
+test("Add flow limiter", async () => {
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
+
+  await deployer.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "addFlowLimiter",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      deployer,
+    ],
+  }).assertFail({ code: 4, message: 'Missing any of roles' });
+
+  await user.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "addFlowLimiter",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      deployer,
+    ],
+  });
+
+  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      ...baseKvs,
+
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
+    ],
+  });
+});
+
+test("Remove flow limiter", async () => {
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
+
+  await deployer.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "removeFlowLimiter",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      deployer,
+    ],
+  }).assertFail({ code: 4, message: 'Missing any of roles' });
+
+  await user.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "addFlowLimiter",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      deployer,
+    ],
+  });
+
+  await user.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "removeFlowLimiter",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      user,
+    ],
+  });
+
+  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      ...baseKvs,
+
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000010)), // operator role remained
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
+    ],
+  });
+
+  await user.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "removeFlowLimiter",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      deployer,
+    ],
+  });
+
+  kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      ...baseKvs,
+
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000000)), // flow limit role was removed
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000010)), // operator role remained
+    ],
+  });
+});
+
+test("Set flow limit", async () => {
+  const baseKvs = await deployTokenManagerLockUnlock(deployer, TOKEN_ID, user, user);
+
+  await deployer.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "setFlowLimit",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      e.U(100),
+    ],
+  }).assertFail({ code: 4, message: 'Missing any of roles' });
+
+  await user.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "addFlowLimiter",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      deployer,
+    ],
+  });
+
+  await user.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "setFlowLimit",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      e.U(100),
+    ],
+  });
+
+  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      ...baseKvs,
+
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
+
+      e.kvs.Mapper('flow_limit').Value(e.U(100)),
+    ],
+  });
+
+  await deployer.callContract({
+    callee: tokenManagerLockUnlock,
+    funcName: "setFlowLimit",
+    gasLimit: 5_000_000,
+    funcArgs: [
+      e.U(200),
+    ],
+  });
+
+  kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      ...baseKvs,
+
+      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
+
+      e.kvs.Mapper('flow_limit').Value(e.U(200)),
     ],
   });
 });

@@ -89,6 +89,7 @@ pub trait TokenManagerMintBurnContract:
         self.take_token_raw(&amount)
     }
 
+    // Somewhat equivalent to Axelar InterchainToken init method
     #[payable("EGLD")]
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
@@ -138,7 +139,7 @@ pub trait TokenManagerMintBurnContract:
         self.only_distributor();
 
         require!(
-            self.token_identifier().is_empty(),
+            !self.token_identifier().is_empty(),
             "Token address not yet set"
         );
 
@@ -155,7 +156,7 @@ pub trait TokenManagerMintBurnContract:
         self.only_distributor();
 
         require!(
-            self.token_identifier().is_empty(),
+            !self.token_identifier().is_empty(),
             "Token address not yet set"
         );
 
