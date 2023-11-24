@@ -23,7 +23,7 @@ import {
   gasService,
   gateway,
   interchainTokenFactory,
-  its, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+  its, itsDeployTokenManager, LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
   pingPong,
@@ -87,28 +87,15 @@ afterEach(async () => {
   await world.terminate();
 });
 
-test.only('Interchain transfer', async () => {
-  await user.callContract({
-    callee: its,
-    funcName: 'deployTokenManager',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(TOKEN_SALT),
-      e.Str(''), // destination chain empty
-      e.U8(2), // Lock/unlock
-      e.Buffer(e.Tuple(
-        e.Option(user),
-        e.Option(e.Str(TOKEN_ID)),
-      ).toTopBytes()),
-    ],
-  });
+test('Interchain transfer', async () => {
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
 
   await user.callContract({
     callee: its,
     funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''), // No metadata, uses default
@@ -125,21 +112,21 @@ test.only('Interchain transfer', async () => {
     ],
   });
 
-  const tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
   let tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('operator').Value(its),
+      ...baseTokenManagerKvs,
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
     ],
   });
 
   // There are events emitted for the Gateway contract, but there is no way to test those currently...
+});
+
+test('Interchain transfer metadata', async () => {
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
 
   // Specify custom metadata
   await user.callContract({
@@ -147,18 +134,19 @@ test.only('Interchain transfer', async () => {
     funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Tuple(
-        e.U32(0),
+        e.U32(LATEST_METADATA_VERSION),
         e.Str('sth'),
       ),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   });
 
-  kvs = await gasService.getAccountWithKvs();
+  // Assert NO gas was paid for cross chain call
+  const kvs = await gasService.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0,
     allKvs: [
@@ -166,21 +154,20 @@ test.only('Interchain transfer', async () => {
     ],
   });
 
-  tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('operator').Value(its),
+      ...baseTokenManagerKvs,
 
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 2_000 }]),
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ],
   });
 });
 
-test.skip('Interchain transfer errors', async () => {
+test('Interchain transfer errors', async () => {
+  const { computedTokenId } = await itsDeployTokenManager(world, user);
+
   await user.callContract({
     callee: its,
     funcName: 'interchainTransfer',
@@ -194,23 +181,14 @@ test.skip('Interchain transfer errors', async () => {
     ],
   }).assertFail({ code: 4, message: 'Token manager does not exist' });
 
-  await user.callContract({
-    callee: its,
-    funcName: 'registerCanonicalToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(TOKEN_ID),
-    ],
-  });
-
-  // Sending wrong token
+  // Sending wrong token to token manager
   await user.callContract({
     callee: its,
     funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''), // No metadata
@@ -222,7 +200,7 @@ test.skip('Interchain transfer errors', async () => {
     funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Tuple(
@@ -233,38 +211,46 @@ test.skip('Interchain transfer errors', async () => {
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   }).assertFail({ code: 4, message: 'Invalid metadata version' });
 
-  // Sending to unsupported chain
   await user.callContract({
     callee: its,
     funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str('Unsupported-Chain'),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''), // No metadata
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
-});
+  }).assertFail({ code: 4, message: 'Untrusted chain' });
 
-test.skip('Send token with data', async () => {
   await user.callContract({
     callee: its,
-    funcName: 'registerCanonicalToken',
+    funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str(TOKEN_ID),
+      e.Bytes(computedTokenId),
+      e.Str('Unsupported-Chain'),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      e.Tuple(
+        e.U32(LATEST_METADATA_VERSION), // Correct Metadata version,
+        e.Str('sth'),
+      ),
     ],
-  });
+    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+  }).assertFail({ code: 4, message: 'Untrusted chain' });
+});
+
+test('Call contract with interchain token', async () => {
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
 
   await user.callContract({
     callee: its,
-    funcName: 'sendTokenWithData',
+    funcName: 'callContractWithInterchainToken',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''), // No data
@@ -281,29 +267,28 @@ test.skip('Send token with data', async () => {
     ],
   });
 
-  const tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
   let tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('operator').Value(its),
+      ...baseTokenManagerKvs,
 
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
     ],
   });
 
   // There are events emitted for the Gateway contract, but there is no way to test those currently...
+});
 
-  // Specify custom data
+test('Call contract with interchain token metadata', async () => {
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
+
   await user.callContract({
     callee: its,
-    funcName: 'sendTokenWithData',
+    funcName: 'callContractWithInterchainToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Str('sth'),
@@ -311,7 +296,8 @@ test.skip('Send token with data', async () => {
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   });
 
-  kvs = await gasService.getAccountWithKvs();
+  // Assert NO gas was paid for cross chain call
+  const kvs = await gasService.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0,
     allKvs: [
@@ -319,84 +305,68 @@ test.skip('Send token with data', async () => {
     ],
   });
 
-  tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('operator').Value(its),
+      ...baseTokenManagerKvs,
 
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 2_000 }]),
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ],
   });
 });
 
-test.skip('Send token with data errors', async () => {
+test('Send token with data errors', async () => {
+  const { computedTokenId } = await itsDeployTokenManager(world, user);
+
   await user.callContract({
     callee: its,
-    funcName: 'sendTokenWithData',
+    funcName: 'callContractWithInterchainToken',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
       e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''), // No metadata
+      e.Str('sth'),
     ],
   }).assertFail({ code: 4, message: 'Token manager does not exist' });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'registerCanonicalToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(TOKEN_ID),
-    ],
-  });
 
   // Sending wrong token
   await user.callContract({
     callee: its,
-    funcName: 'sendTokenWithData',
+    funcName: 'callContractWithInterchainToken',
     gasLimit: 20_000_000,
     value: 1_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''), // No data
+      e.Str('sth'),
     ],
   }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
   // Sending to unsupported chain
   await user.callContract({
     callee: its,
-    funcName: 'sendTokenWithData',
+    funcName: 'callContractWithInterchainToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       e.Str('Unsupported-Chain'),
       e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''), // No metadata
+      e.Str('sth'),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
+  }).assertFail({ code: 4, message: 'Untrusted chain' });
 });
 
-test.skip('Transmit send token', async () => {
+test('Transmit interchain transfer', async () => {
   // Mock token manager being user to be able to test the transmitSendToken function
   await its.setAccount({
     ...(await its.getAccountWithKvs()),
     kvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+      ...baseItsKvs(deployer, interchainTokenFactory),
 
       e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(user),
     ],
@@ -404,7 +374,7 @@ test.skip('Transmit send token', async () => {
 
   await user.callContract({
     callee: its,
-    funcName: 'transmitSendToken',
+    funcName: 'transmitInterchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(INTERCHAIN_TOKEN_ID),
@@ -421,7 +391,7 @@ test.skip('Transmit send token', async () => {
   // Specify custom metadata
   await user.callContract({
     callee: its,
-    funcName: 'transmitSendToken',
+    funcName: 'transmitInterchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(INTERCHAIN_TOKEN_ID),
@@ -429,15 +399,17 @@ test.skip('Transmit send token', async () => {
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.U(1_000),
-      e.Tuple(e.U32(0), e.Str('')),
+      e.Tuple(e.U32(LATEST_METADATA_VERSION), e.Str('')),
     ],
   });
 });
 
-test.skip('Transmit send token errors', async () => {
+test('Transmit interchain transfer errors', async () => {
+  const { computedTokenId } = await itsDeployTokenManager(world, user);
+
   await user.callContract({
     callee: its,
-    funcName: 'transmitSendToken',
+    funcName: 'transmitInterchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(INTERCHAIN_TOKEN_ID),
@@ -451,19 +423,10 @@ test.skip('Transmit send token errors', async () => {
 
   await user.callContract({
     callee: its,
-    funcName: 'registerCanonicalToken',
+    funcName: 'transmitInterchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str(TOKEN_ID),
-    ],
-  });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'transmitSendToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       user,
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
@@ -476,30 +439,57 @@ test.skip('Transmit send token errors', async () => {
   await its.setAccount({
     ...(await its.getAccountWithKvs()),
     kvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+      ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(user),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(user),
     ],
   });
 
-  // Specify custom metadata
   await user.callContract({
     callee: its,
-    funcName: 'transmitSendToken',
+    funcName: 'transmitInterchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(computedTokenId),
       user,
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.U(1_000),
-      e.Tuple(e.U32(1), e.Str('')),
+      e.Tuple(
+        e.U32(1), // wrong metadata version
+        e.Str('')
+      ),
     ],
   }).assertFail({ code: 4, message: 'Invalid metadata version' });
+
+  await user.callContract({
+    callee: its,
+    funcName: 'transmitInterchainTransfer',
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(computedTokenId),
+      user,
+      e.Str('Unsupported-Chain'),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      e.U(1_000),
+      e.Buffer(''), // No metadata
+    ],
+  }).assertFail({ code: 4, message: 'Untrusted chain' });
+
+  await user.callContract({
+    callee: its,
+    funcName: 'transmitInterchainTransfer',
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(computedTokenId),
+      user,
+      e.Str('Unsupported-Chain'),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      e.U(1_000),
+      e.Tuple(
+        e.U32(LATEST_METADATA_VERSION), // Correct Metadata version,
+        e.Str('sth'),
+      ),
+    ],
+  }).assertFail({ code: 4, message: 'Untrusted chain' });
 });

@@ -6,17 +6,21 @@ import {
   MOCK_CONTRACT_ADDRESS_1, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
-  TOKEN_ID2, INTERCHAIN_TOKEN_ID, TOKEN_SALT
+  TOKEN_ID2, INTERCHAIN_TOKEN_ID, TOKEN_SALT, TOKEN_ID_MANAGER_ADDRESS,
 } from './helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { Kvs } from 'xsuite/dist/data/kvs';
 import { AddressEncodable } from 'xsuite/dist/data/AddressEncodable';
 
+export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
+
 export const MESSAGE_TYPE_INTERCHAIN_TRANSFER = 0;
 export const MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA = 1;
 export const MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN = 2;
 export const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER = 3;
+
+export const LATEST_METADATA_VERSION = 0;
 
 let address: string;
 export let gateway: SContract;
@@ -34,8 +38,8 @@ export const deployGatewayContract = async (deployer: SWallet) => {
     gasLimit: 100_000_000,
     codeArgs: [
       e.Addr(MOCK_CONTRACT_ADDRESS_1),
-      e.Str(CHAIN_ID)
-    ]
+      e.Str(CHAIN_ID),
+    ],
   }));
 
   const kvs = await gateway.getAccountWithKvs();
@@ -43,8 +47,8 @@ export const deployGatewayContract = async (deployer: SWallet) => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID))
-    ]
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+    ],
   });
 };
 
@@ -54,16 +58,16 @@ export const deployGasService = async (deployer: SWallet, collector: SWallet) =>
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
-      e.Addr(collector.toString())
-    ]
+      e.Addr(collector.toString()),
+    ],
   }));
 
   const kvs = await gasService.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString()))
-    ]
+      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+    ],
   });
 };
 
@@ -73,7 +77,7 @@ export const deployTokenManagerMintBurn = async (
   its: SWallet | SContract = operator,
   tokenIdentifier: string | null = null,
   burnRole: boolean = true,
-  distributor: SWallet | null = null
+  distributor: SWallet | null = null,
 ): Promise<Kvs> => {
   ({ contract: tokenManagerMintBurn, address } = await deployer.deployContract({
     code: 'file:token-manager-mint-burn/output/token-manager-mint-burn.wasm',
@@ -83,8 +87,8 @@ export const deployTokenManagerMintBurn = async (
       its,
       e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Option(operator),
-      e.Option(tokenIdentifier ? e.Str(tokenIdentifier) : null)
-    ]
+      e.Option(tokenIdentifier ? e.Str(tokenIdentifier) : null),
+    ],
   }));
 
   let baseKvs = [
@@ -93,13 +97,13 @@ export const deployTokenManagerMintBurn = async (
     e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)),
 
     ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []),
-    ...(tokenIdentifier ? [e.kvs.Mapper('token_identifier').Value(e.Str(tokenIdentifier))] : [])
+    ...(tokenIdentifier ? [e.kvs.Mapper('token_identifier').Value(e.Str(tokenIdentifier))] : []),
   ];
 
   const kvs = await tokenManagerMintBurn.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: baseKvs
+    allKvs: baseKvs,
   });
 
   // Set mint/burn roles if token is set
@@ -112,17 +116,17 @@ export const deployTokenManagerMintBurn = async (
       ...(tokenIdentifier && burnRole ?
         [
           e.kvs.Mapper('token_identifier').Value(e.Str(tokenIdentifier)),
-          e.kvs.Esdts([{ id: tokenIdentifier, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }])
+          e.kvs.Esdts([{ id: tokenIdentifier, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }]),
         ] : []),
 
       ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []), // flow limit role
-      ...(distributor ? [e.kvs.Mapper('account_roles', distributor).Value(e.U32(0b00000001))] : []) // distributor role
+      ...(distributor ? [e.kvs.Mapper('account_roles', distributor).Value(e.U32(0b00000001))] : []), // distributor role
     ];
 
     await tokenManagerMintBurn.setAccount({
       ...(await tokenManagerMintBurn.getAccount()),
       balance: 0n,
-      kvs: baseKvs
+      kvs: baseKvs,
     });
   }
 
@@ -132,7 +136,7 @@ export const deployTokenManagerMintBurn = async (
 export const deployTokenManagerLockUnlock = async (
   deployer: SWallet,
   its: SWallet | SContract = deployer,
-  operator: SWallet = deployer
+  operator: SWallet = deployer,
 ): Promise<Kvs> => {
   ({ contract: tokenManagerLockUnlock, address } = await deployer.deployContract({
     code: 'file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm',
@@ -142,8 +146,8 @@ export const deployTokenManagerLockUnlock = async (
       its,
       e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Option(operator),
-      e.Option(e.Str(TOKEN_ID))
-    ]
+      e.Option(e.Str(TOKEN_ID)),
+    ],
   }));
 
   const baseKvs = [
@@ -152,7 +156,7 @@ export const deployTokenManagerLockUnlock = async (
     e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)),
     e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
 
-    ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : [])
+    ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []),
   ];
 
   const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
@@ -181,16 +185,16 @@ export const deployIts = async (deployer: SWallet) => {
       e.Str(OTHER_CHAIN_NAME),
 
       e.U32(1),
-      e.Str(OTHER_CHAIN_ADDRESS)
-    ]
+      e.Str(OTHER_CHAIN_ADDRESS),
+    ],
   }));
 
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      ...baseItsKvs(deployer)
-    ]
+      ...baseItsKvs(deployer),
+    ],
   });
 };
 
@@ -208,7 +212,7 @@ export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: b
       //
       // e.U32(1),
       // e.Str(OTHER_CHAIN_ADDRESS)
-    ]
+    ],
   }));
 
   // const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS.toLowerCase()).digest('hex');
@@ -246,8 +250,8 @@ export const deployPingPongInterchain = async (deployer: SWallet, amount = 1_000
       its,
       e.U(amount),
       e.U64(10),
-      e.Option(null)
-    ]
+      e.Option(null),
+    ],
   }));
 };
 
@@ -263,12 +267,42 @@ export const deployContracts = async (deployer: SWallet, collector: SWallet, inc
   }
 };
 
+export const itsDeployTokenManager = async (world, user: SWallet) => {
+  const computedTokenId = computeInterchainTokenId(user);
+
+  await user.callContract({
+    callee: its,
+    funcName: 'deployTokenManager',
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(TOKEN_SALT),
+      e.Str(''), // destination chain empty
+      e.U8(2), // Lock/unlock
+      e.Buffer(e.Tuple(
+        e.Option(user),
+        e.Option(e.Str(TOKEN_ID)),
+      ).toTopBytes()),
+    ],
+  });
+
+  const tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  const baseTokenManagerKvs = [
+    e.kvs.Mapper('interchain_token_service').Value(its),
+    e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
+    e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+    e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
+    e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
+  ];
+
+  return { computedTokenId, tokenManager, baseTokenManagerKvs };
+}
+
 export const computeInterchainTokenId = (user: AddressEncodable, salt = TOKEN_SALT) => {
-  const prefix = createKeccakHash('keccak256').update('its-interchain-token-id').digest('hex');
+  const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_ID).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
     Buffer.from(user.toTopHex(), 'hex'),
-    Buffer.from(salt, 'hex')
+    Buffer.from(salt, 'hex'),
   ]);
 
   return createKeccakHash('keccak256').update(buffer).digest('hex');

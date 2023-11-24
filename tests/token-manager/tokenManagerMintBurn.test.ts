@@ -20,7 +20,7 @@ import {
   deployTokenManagerMintBurn,
   gasService,
   gateway, interchainTokenFactory,
-  its,
+  its, LATEST_METADATA_VERSION,
   tokenManagerLockUnlock,
   tokenManagerMintBurn,
 } from '../itsHelpers';
@@ -218,7 +218,7 @@ test("Interchain transfer with data", async () => {
     funcArgs: [
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      e.Tuple(e.U32(0), e.Str('sth')), // Specify custom metadata to send to ITS
+      e.Tuple(e.U32(LATEST_METADATA_VERSION), e.Str('sth')), // Specify custom metadata to send to ITS
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   });
