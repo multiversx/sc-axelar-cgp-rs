@@ -3,14 +3,14 @@ import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
   CHAIN_ID,
-  CHAIN_NAME_HASH, COMMAND_ID,
+  CHAIN_NAME_HASH, COMMAND_ID, INTERCHAIN_TOKEN_ID,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
   TOKEN_ID_CANONICAL,
-  TOKEN_ID_MANAGER_ADDRESS
+  TOKEN_ID_MANAGER_ADDRESS,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
@@ -20,7 +20,7 @@ import {
   its,
   interchainTokenFactory,
   tokenManagerLockUnlock,
-  tokenManagerMintBurn
+  tokenManagerMintBurn, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, baseItsKvs, itsDeployTokenManagerLockUnlock,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -76,17 +76,17 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
+const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
   const payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256', 'bytes32', 'uint8', 'bytes'],
     [
-      MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+      MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
       Buffer.from(tokenId, 'hex'),
       0, // Mint/Burn
       Buffer.from(
         e.Tuple(
-          its,
-          e.Str(TOKEN_ID),
+          e.Option(its),
+          e.Option(e.Str(TOKEN_ID)),
         ).toTopBytes(),
       )
     ]
@@ -138,15 +138,7 @@ test("Execute deploy token manager", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      ...baseItsKvs(deployer, interchainTokenFactory, INTERCHAIN_TOKEN_ID)
     ],
   });
 
@@ -155,14 +147,14 @@ test("Execute deploy token manager", async () => {
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('operator').Value(its),
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
     ],
   });
 
-  // Gateway contract call approaved key was removed
+  // Gateway contract call approved key was removed
   const gatewayKvs = await gateway.getAccountWithKvs();
   assertAccount(gatewayKvs, {
     kvs: [
@@ -176,7 +168,7 @@ test("Execute deploy token manager errors", async () => {
   let payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256'],
     [
-      MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+      MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
     ]
   ).substring(2);
 
@@ -205,16 +197,12 @@ test("Execute deploy token manager errors", async () => {
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
-  await user.callContract({
-    callee: its,
-    funcName: "registerCanonicalToken",
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(TOKEN_ID)
-    ],
-  });
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+    world,
+    user,
+  );
 
-  payload = await mockGatewayCall();
+  payload = await mockGatewayCall(computedTokenId);
 
   await user.callContract({
     callee: its,

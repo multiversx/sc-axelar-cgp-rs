@@ -832,7 +832,7 @@ test("Deploy interchain token", async () => {
 
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000101)), // distributor role was added to user
 
-      // This was tested on Devnet and it works fine
+      // ESDT token deployment was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
         e.Str('deploy_token_callback'),
         e.Bytes('00000000'),
