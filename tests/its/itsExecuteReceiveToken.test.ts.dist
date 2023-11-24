@@ -9,17 +9,16 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
+  TOKEN_ID_CANONICAL,
   TOKEN_ID_MANAGER_ADDRESS
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
   computeInterchainTokenId,
   deployContracts,
-  deployPingPongInterchain,
   gasService,
   gateway,
   its,
-  pingPong,
   interchainTokenFactory,
   tokenManagerLockUnlock,
   tokenManagerMintBurn
@@ -82,18 +81,17 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
+const mockGatewayCall = async (tokenId: string) => {
   const payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'bytes32', 'bytes', 'uint256', 'bytes', 'bytes'],
+    ['uint256', 'bytes32', 'bytes', 'uint256'],
     [
-      2, // selector receive token with data
+      MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(tokenId, 'hex'),
-      Buffer.from(pingPong.toTopBytes()),
-      1_000,
       Buffer.from(otherUser.toTopBytes()),
-      Buffer.from(e.Str(fnc).toTopBytes()) // data passed to contract, in this case the function as a string)
+      1_000,
     ]
   ).substring(2);
+
   const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
 
   // Mock contract call approved by gateway
@@ -121,27 +119,32 @@ const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
   return payload;
 }
 
-test("Execute receive token with data", async () => {
-  await deployPingPongInterchain(deployer);
-
+test("Execute receive token mint/burn", async () => {
   await user.callContract({
     callee: its,
     funcName: "deployCustomTokenManager",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('EGLD'),
-      e.U8(2), // Lock/unlock
+      e.Str(TOKEN_ID),
+      e.U8(0), // Mint/burn
       its,
     ],
   });
 
-  const computedTokenId = computeInterchainTokenId(user, 'EGLD');
+  const computedTokenId = computeInterchainTokenId(user, TOKEN_ID);
 
-  // Set egld balance for token manager
+  // Set mint/burn role for token
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
-  await tokenManager.setAccount({
+  tokenManager.setAccount({
     ...(await tokenManager.getAccountWithKvs()),
-    balance: 1_000,
+    kvs: [
+      e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('operator').Value(its),
+
+      e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
+    ],
   });
 
   const payload = await mockGatewayCall(computedTokenId);
@@ -149,7 +152,7 @@ test("Execute receive token with data", async () => {
   await user.callContract({
     callee: its,
     funcName: "execute",
-    gasLimit: 50_000_000,
+    gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
@@ -158,39 +161,12 @@ test("Execute receive token with data", async () => {
     ],
   });
 
-  const kvs = await its.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0n,
-    allKvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-    ],
-  });
-
-  // Assert ping pong was successfully called
-  const pingPongKvs = await pingPong.getAccountWithKvs();
-  assertAccount(pingPongKvs, {
-    balance: 1_000,
-    allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
-      e.kvs.Mapper('deadline').Value(e.U64(10)),
-      e.kvs.Mapper('activationTimestamp').Value(e.U64(0)),
-      e.kvs.Mapper('maxFunds').Value(e.Option(null)),
-
-      // User mapper
-      e.kvs.Mapper('user_address_to_id', otherUser).Value(e.U32(1)),
-      e.kvs.Mapper('user_id_to_address', e.U32(1)).Value(otherUser),
-      e.kvs.Mapper('user_count').Value(e.U32(1)),
-
-      e.kvs.Mapper('userStatus', e.U32(1)).Value(e.U8(1)),
+  // Tokens should be minted for otherUser and token manager should have flow set
+  const otherUserKvs = await otherUser.getAccountWithKvs();
+  assertAccount(otherUserKvs, {
+    balance: BigInt('10000000000000000'),
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ],
   });
 
@@ -199,9 +175,11 @@ test("Execute receive token with data", async () => {
     balance: 0,
     kvs: [
       e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
-      e.kvs.Mapper('token_identifier').Value(e.Str('EGLD')),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('operator').Value(its),
+
+      e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
     ],
   });
 
@@ -215,36 +193,36 @@ test("Execute receive token with data", async () => {
   });
 });
 
-// TODO: This works correctly on Devnet but doesn't work in tests for some reason
-test.skip("Execute receive token with data contract error", async () => {
-  await deployPingPongInterchain(deployer);
-
+test("Execute receive token lock/unlock", async () => {
   await user.callContract({
     callee: its,
-    funcName: "deployCustomTokenManager",
+    funcName: "registerCanonicalToken",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('EGLD'),
-      e.U8(2), // Lock/unlock
-      its,
+      e.Str(TOKEN_ID)
     ],
   });
 
-  const computedTokenId = computeInterchainTokenId(user, 'EGLD');
-
-  // Set egld balance for token manager
+  // Set token amount
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
   await tokenManager.setAccount({
     ...(await tokenManager.getAccountWithKvs()),
-    balance: 1_000,
+    kvs: [
+      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('operator').Value(its),
+
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+    ],
   });
 
-  const payload = await mockGatewayCall(computedTokenId);
+  const payload = await mockGatewayCall(TOKEN_ID_CANONICAL);
 
   await user.callContract({
     callee: its,
     funcName: "execute",
-    gasLimit: 600_000_000,
+    gasLimit: 20_000_000,
     funcArgs: [
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
@@ -253,77 +231,170 @@ test.skip("Execute receive token with data contract error", async () => {
     ],
   });
 
-  const kvs = await its.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0n,
-    allKvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-    ],
-  });
-
-  // Assert ping pong was NOT called
-  const pingPongKvs = await pingPong.getAccountWithKvs();
-  assertAccount(pingPongKvs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
-      e.kvs.Mapper('deadline').Value(e.U64(10)),
-      e.kvs.Mapper('activationTimestamp').Value(e.U64(0)),
-      e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+  // Tokens should be minted for otherUser and token manager should have flow set
+  const otherUserKvs = await otherUser.getAccountWithKvs();
+  assertAccount(otherUserKvs, {
+    balance: BigInt('10000000000000000'),
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
     ],
   });
 
   const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
-    balance: 1_000,
+    balance: 0,
     kvs: [
-      e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
-      e.kvs.Mapper('token_identifier').Value(e.Str('EGLD')),
+      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('operator').Value(its),
-    ],
-  });
 
-  // Gateway contract call approaved key was removed
-  const gatewayKvs = await gateway.getAccountWithKvs();
-  assertAccount(gatewayKvs, {
-    kvs: [
-      e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
-    ]
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 0 }]),
+    ],
   });
 });
 
-test("Execute receive token with data express caller", async () => {
-  await deployPingPongInterchain(deployer);
-
+test("Execute receive token flow limit", async () => {
   await user.callContract({
     callee: its,
     funcName: "deployCustomTokenManager",
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Str('EGLD'),
-      e.U8(2), // Lock/unlock
+      e.Str(TOKEN_ID),
+      e.U8(0), // Mint/burn
       its,
     ],
   });
 
-  const computedTokenId = computeInterchainTokenId(user, 'EGLD');
+  const computedTokenId = computeInterchainTokenId(user, TOKEN_ID);
 
-  // Set egld balance for token manager
+  // Set mint/burn role for token and flow limit
   let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
   await tokenManager.setAccount({
     ...(await tokenManager.getAccountWithKvs()),
-    balance: 1_000,
+    kvs: [
+      e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('operator').Value(its),
+
+      e.kvs.Mapper('flow_limit').Value(e.U(1_000)),
+      e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
+    ],
+  });
+
+  let payload = await mockGatewayCall(computedTokenId);
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(COMMAND_ID),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  });
+
+  let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  assertAccount(tokenManagerKvs, {
+    balance: 0,
+    kvs: [
+      e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('operator').Value(its),
+
+      e.kvs.Mapper('flow_limit').Value(e.U(1_000)),
+      e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
+
+      e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(1_000)),
+    ],
+  });
+
+  await world.setCurrentBlockInfo({
+    timestamp: 6 * 3600 - 1,
+  });
+
+  // Can not call again because flow limit for this epoch (6 hours) was exceeded
+  payload = await mockGatewayCall(computedTokenId);
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(COMMAND_ID),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
+
+  // After the required time has passed, tokens can flow again
+  await world.setCurrentBlockInfo({
+    timestamp: 6 * 3600,
+  });
+
+  payload = await mockGatewayCall(computedTokenId);
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(COMMAND_ID),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  });
+
+  tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  assertAccount(tokenManagerKvs, {
+    balance: 0,
+    kvs: [
+      e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('operator').Value(its),
+
+      e.kvs.Mapper('flow_limit').Value(e.U(1_000)),
+      e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
+
+      e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(1_000)),
+      e.kvs.Mapper('flow_in_amount', e.U64(1)).Value(e.U(1_000)),
+    ],
+  });
+});
+
+test("Execute receive token express caller", async () => {
+  await user.callContract({
+    callee: its,
+    funcName: "deployCustomTokenManager",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str(TOKEN_ID),
+      e.U8(0), // Mint/burn
+      its,
+    ],
+  });
+
+  const computedTokenId = computeInterchainTokenId(user, TOKEN_ID);
+
+  // Set mint/burn role for token
+  let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  await tokenManager.setAccount({
+    ...(await tokenManager.getAccountWithKvs()),
+    kvs: [
+      e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('operator').Value(its),
+
+      e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
+    ],
   });
 
   let payload = await mockGatewayCall(computedTokenId);
@@ -367,15 +438,18 @@ test("Execute receive token with data express caller", async () => {
   // Tokens should be minted for otherUser
   const otherUserKvs = await otherUser.getAccountWithKvs();
   assertAccount(otherUserKvs, {
-    balance: BigInt('10000000000001000'),
+    balance: BigInt('10000000000000000'),
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+    ],
   });
 
   // Gateway contract call approved key was removed
   const gatewayKvs = await gateway.getAccountWithKvs();
   assertAccount(gatewayKvs, {
-    kvs: [
+    allKvs: [
       e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID))
     ]
   });
 
@@ -396,24 +470,26 @@ test("Execute receive token with data express caller", async () => {
     ],
   });
 
-  // Tokens were moved from token manager
+  // Nothing changed for token manager
   const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [
       e.kvs.Mapper('token_id').Value(e.Bytes(computedTokenId)),
-      e.kvs.Mapper('token_identifier').Value(e.Str('EGLD')),
+      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('operator').Value(its),
+
+      e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
     ],
   });
 });
 
-test("Execute receive token with data errors", async () => {
-  const payload = AbiCoder.defaultAbiCoder().encode(
+test("Execute receive token errors", async () => {
+  let payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256'],
     [
-      1, // selector receive token
+      MESSAGE_TYPE_INTERCHAIN_TRANSFER,
     ]
   ).substring(2);
 
@@ -441,4 +517,45 @@ test("Execute receive token with data errors", async () => {
       payload,
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
+
+  payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256'],
+    [
+      4, // message type unknown
+    ]
+  ).substring(2);
+  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
+
+  // Mock contract call approved by gateway
+  let data = Buffer.concat([
+    Buffer.from(COMMAND_ID, 'hex'),
+    Buffer.from(OTHER_CHAIN_NAME),
+    Buffer.from(OTHER_CHAIN_ADDRESS),
+    its.toTopBytes(),
+    Buffer.from(payloadHash, 'hex'),
+  ]);
+
+  const dataHash = createKeccakHash('keccak256').update(data).digest('hex');
+  await gateway.setAccount({
+    ...await gateway.getAccount(),
+    codeMetadata: [],
+    kvs: [
+      e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+
+      // Manually approve call
+      e.kvs.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
+    ]
+  });
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(COMMAND_ID),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Invalid message type' });
 });

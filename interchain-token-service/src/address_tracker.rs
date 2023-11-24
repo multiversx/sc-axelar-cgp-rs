@@ -46,11 +46,11 @@ pub trait AddressTracker {
     #[storage_mapper("chain_name")]
     fn chain_name(&self) -> SingleValueMapper<ManagedBuffer>;
 
-    #[view]
+    #[view(trustedAddress)]
     #[storage_mapper("trusted_address")]
     fn trusted_address(&self, chain_name: &ManagedBuffer) -> SingleValueMapper<ManagedBuffer>;
 
-    #[view]
+    #[view(trustedAddressHash)]
     #[storage_mapper("trusted_address_hash")]
     fn trusted_address_hash(
         &self,

@@ -318,6 +318,8 @@ pub trait InterchainTokenServiceContract:
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
+        self.require_not_paused();
+
         let interchain_transfer_payload: InterchainTransferPayload<Self::Api> =
             InterchainTransferPayload::<Self::Api>::abi_decode(payload.clone());
 
@@ -566,32 +568,32 @@ pub trait InterchainTokenServiceContract:
         &self,
         command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
-        receive_token_payload: InterchainTransferPayload<Self::Api>,
+        interchain_transfer_payload: InterchainTransferPayload<Self::Api>,
         express_executor: ManagedAddress,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
-        let token_identifier = self.valid_token_identifier(&receive_token_payload.token_id);
+        let token_identifier = self.valid_token_identifier(&interchain_transfer_payload.token_id);
 
         let destination_address =
-            ManagedAddress::try_from(receive_token_payload.destination_address).unwrap();
+            ManagedAddress::try_from(interchain_transfer_payload.destination_address).unwrap();
 
         let (sent_token_identifier, sent_amount) = self.call_value().egld_or_single_fungible_esdt();
 
         require!(
             sent_token_identifier == token_identifier
-                && sent_amount == receive_token_payload.amount,
+                && sent_amount == interchain_transfer_payload.amount,
             "Wrong token or amount sent"
         );
 
-        if receive_token_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA {
+        if interchain_transfer_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA {
             self.executable_contract_express_execute_with_interchain_token(
                 destination_address,
                 source_chain,
-                receive_token_payload.source_address,
-                receive_token_payload.data.unwrap(),
-                receive_token_payload.token_id,
+                interchain_transfer_payload.source_address,
+                interchain_transfer_payload.data.unwrap(),
+                interchain_transfer_payload.token_id,
                 token_identifier,
-                receive_token_payload.amount,
+                interchain_transfer_payload.amount,
                 express_executor,
                 command_id,
                 express_hash,
@@ -605,7 +607,7 @@ pub trait InterchainTokenServiceContract:
             &destination_address,
             &token_identifier,
             0,
-            &receive_token_payload.amount,
+            &interchain_transfer_payload.amount,
         );
     }
 

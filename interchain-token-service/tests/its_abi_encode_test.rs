@@ -4,7 +4,10 @@ use multiversx_sc_scenario::api::StaticApi;
 
 use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::Token;
-use interchain_token_service::constants::{DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, TokenManagerType};
+use interchain_token_service::constants::{
+    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
+    TokenManagerType,
+};
 
 #[test]
 fn encode_uint256() {
@@ -133,13 +136,17 @@ fn encode_two_bytes() {
 }
 
 #[test]
-fn encode_send_token_payload() {
+fn encode_interchain_transfer_payload() {
     let data = InterchainTransferPayload::<StaticApi> {
         message_type: BigUint::from(11u64),
-        token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
-        destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
+        token_id: ManagedByteArray::from(&hex!(
+            "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
+        )),
+        source_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
+        destination_address: ManagedBuffer::from(&hex!(
+            "000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf"
+        )),
         amount: BigUint::from(23456789u64),
-        source_address: None,
         data: None,
     };
 
@@ -149,23 +156,30 @@ fn encode_send_token_payload() {
         "
             000000000000000000000000000000000000000000000000000000000000000b
             131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
-            0000000000000000000000000000000000000000000000000000000000000080
+            00000000000000000000000000000000000000000000000000000000000000a0
+            00000000000000000000000000000000000000000000000000000000000000e0
             000000000000000000000000000000000000000000000000000000000165ec15
             0000000000000000000000000000000000000000000000000000000000000014
             f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
+            0000000000000000000000000000000000000000000000000000000000000020
+            000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf
         "
     );
     assert_eq!(encoded, ManagedBuffer::from(&expected));
 }
 
 #[test]
-fn encode_send_token_payload_with_data() {
+fn encode_interchain_transfer_payload_with_data() {
     let data = InterchainTransferPayload::<StaticApi> {
         message_type: BigUint::from(22u64),
-        token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
+        token_id: ManagedByteArray::from(&hex!(
+            "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
+        )),
+        source_address: ManagedBuffer::from(&hex!(
+            "000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf"
+        )),
         destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
         amount: BigUint::from(23456789u64),
-        source_address: Some(ManagedBuffer::from(&hex!("000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf"))),
         data: Some(ManagedBuffer::from(&hex!("536f6d6544617461"))),
     };
 
@@ -176,13 +190,13 @@ fn encode_send_token_payload_with_data() {
             0000000000000000000000000000000000000000000000000000000000000016
             131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
             00000000000000000000000000000000000000000000000000000000000000c0
-            000000000000000000000000000000000000000000000000000000000165ec15
             0000000000000000000000000000000000000000000000000000000000000100
+            000000000000000000000000000000000000000000000000000000000165ec15
             0000000000000000000000000000000000000000000000000000000000000140
-            0000000000000000000000000000000000000000000000000000000000000014
-            f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
             0000000000000000000000000000000000000000000000000000000000000020
             000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf
+            0000000000000000000000000000000000000000000000000000000000000014
+            f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
             0000000000000000000000000000000000000000000000000000000000000008
             536f6d6544617461000000000000000000000000000000000000000000000000
         "
@@ -194,7 +208,9 @@ fn encode_send_token_payload_with_data() {
 fn encode_deploy_token_manager_payload() {
     let data = DeployTokenManagerPayload::<StaticApi> {
         message_type: BigUint::from(33u64),
-        token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
+        token_id: ManagedByteArray::from(&hex!(
+            "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
+        )),
         token_manager_type: TokenManagerType::MintBurnFrom,
         params: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
     };
@@ -215,17 +231,16 @@ fn encode_deploy_token_manager_payload() {
 }
 
 #[test]
-fn encode_deploy_standardized_token_and_manager_payload() {
+fn encode_deploy_interchain_token_payload() {
     let data = DeployInterchainTokenPayload::<StaticApi> {
         message_type: BigUint::from(44u64),
-        token_id: ManagedByteArray::from(&hex!("131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b")),
+        token_id: ManagedByteArray::from(&hex!(
+            "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
+        )),
         name: ManagedBuffer::from("Name"),
         symbol: ManagedBuffer::from("Symbol"),
         decimals: 18,
         distributor: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
-        mint_to: ManagedBuffer::from(&hex!("")),
-        mint_amount: BigUint::from(1000000000000000000u128),
-        operator: ManagedBuffer::from(&hex!("a786e21509a9d50a9afd033b5940a2b7d872c201")),
     };
 
     let encoded = data.abi_encode();
@@ -234,22 +249,16 @@ fn encode_deploy_standardized_token_and_manager_payload() {
         "
             000000000000000000000000000000000000000000000000000000000000002c
             131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
-            0000000000000000000000000000000000000000000000000000000000000120
-            0000000000000000000000000000000000000000000000000000000000000160
+            00000000000000000000000000000000000000000000000000000000000000c0
+            0000000000000000000000000000000000000000000000000000000000000100
             0000000000000000000000000000000000000000000000000000000000000012
-            00000000000000000000000000000000000000000000000000000000000001a0
-            00000000000000000000000000000000000000000000000000000000000001e0
-            0000000000000000000000000000000000000000000000000de0b6b3a7640000
-            0000000000000000000000000000000000000000000000000000000000000200
+            0000000000000000000000000000000000000000000000000000000000000140
             0000000000000000000000000000000000000000000000000000000000000004
             4e616d6500000000000000000000000000000000000000000000000000000000
             0000000000000000000000000000000000000000000000000000000000000006
             53796d626f6c0000000000000000000000000000000000000000000000000000
             0000000000000000000000000000000000000000000000000000000000000014
             f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
-            0000000000000000000000000000000000000000000000000000000000000000
-            0000000000000000000000000000000000000000000000000000000000000014
-            a786e21509a9d50a9afd033b5940a2b7d872c201000000000000000000000000
         "
     );
     assert_eq!(encoded, ManagedBuffer::from(&expected));

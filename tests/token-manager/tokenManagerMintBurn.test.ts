@@ -8,10 +8,10 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID_CANONICAL
+  INTERCHAIN_TOKEN_ID
 } from '../helpers';
 import {
-  baseItsKvs,
+  baseItsKvs, deployContracts,
   deployGasService,
   deployGatewayContract,
   deployInterchainTokenFactory,
@@ -19,10 +19,10 @@ import {
   deployTokenManagerLockUnlock,
   deployTokenManagerMintBurn,
   gasService,
-  gateway,
+  gateway, interchainTokenFactory,
   its,
   tokenManagerLockUnlock,
-  tokenManagerMintBurn
+  tokenManagerMintBurn,
 } from '../itsHelpers';
 import createKeccakHash from 'keccak';
 
@@ -63,38 +63,23 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const deployTokenManager = async (itsAddr: SWallet | null = null) => {
-  await deployTokenManagerMintBurn(deployer);
-
-  // Deploy ITS
-  await deployGatewayContract(deployer);
-  await deployGasService(deployer, deployer);
-  await deployInterchainTokenFactory(deployer);
-  await deployTokenManagerLockUnlock(deployer);
-  await deployIts(deployer);
+const deployTokenManager = async (itsAddr: SWallet | null = null, mock: boolean = true) => {
+  await deployContracts(deployer, otherUser);
 
   // Re-deploy contract with correct code
   await deployTokenManagerMintBurn(deployer, deployer,itsAddr || its, TOKEN_ID);
 
-  // Mock token manager being known by ITS
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000010)), // operator role
+  if (mock) {
+    // Mock token manager being known by ITS
+    await its.setAccount({
+      ...(await its.getAccountWithKvs()),
+      kvs: [
+        ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-      e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
-
-      e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(OTHER_CHAIN_ADDRESS_HASH)),
-      e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerMintBurn),
-    ]
-  });
+        e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerMintBurn),
+      ]
+    });
+  }
 }
 
 test("Init errors", async () => {
@@ -132,7 +117,7 @@ test("Init different arguments", async () => {
     gasLimit: 100_000_000,
     codeArgs: [
       otherUser,
-      e.Bytes(TOKEN_ID_CANONICAL),
+      e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Option(null),
       e.Option(e.Str(TOKEN_ID)),
     ]
@@ -143,7 +128,7 @@ test("Init different arguments", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(otherUser),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
       e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
     ],
@@ -155,7 +140,7 @@ test("Init different arguments", async () => {
     gasLimit: 100_000_000,
     codeArgs: [
       otherUser,
-      e.Bytes(TOKEN_ID_CANONICAL),
+      e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Option(deployer),
       e.Option(null),
     ]
@@ -166,7 +151,7 @@ test("Init different arguments", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(otherUser),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
       e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles for operator
       e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000100)), // flow limiter role for its
     ],
@@ -194,7 +179,7 @@ test("Interchain transfer", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
       e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
       e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
@@ -244,7 +229,7 @@ test("Interchain transfer with data", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
       e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
       e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
@@ -274,7 +259,10 @@ test("Interchain transfer with data", async () => {
 });
 
 test("Interchain transfer errors", async () => {
-  await deployTokenManagerMintBurn(deployer, deployer, deployer, TOKEN_ID);
+  await deployTokenManager(null, false);
+
+  // Re=deploy contract without burn role
+  await deployTokenManagerMintBurn(deployer, deployer, its, TOKEN_ID, false);
 
   await user.callContract({
     callee: tokenManagerMintBurn,
@@ -287,16 +275,6 @@ test("Interchain transfer errors", async () => {
       e.Buffer(''),
     ],
   }).assertFail({ code: 4, message: 'Wrong token sent' });
-
-  // Deploy ITS
-  await deployGatewayContract(deployer);
-  await deployGasService(deployer, deployer);
-  await deployInterchainTokenFactory(deployer);
-  await deployTokenManagerLockUnlock(deployer);
-  await deployIts(deployer);
-
-  // Re-deploy contract with correct code
-  await deployTokenManagerMintBurn(deployer, deployer, its, TOKEN_ID, false);
 
   // ITS doesn't know about this token manager
   await user.callContract({
@@ -317,7 +295,7 @@ test("Interchain transfer errors", async () => {
     kvs: [
       ...baseItsKvs(deployer),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerMintBurn),
     ],
   });
 
@@ -391,7 +369,7 @@ test("Call contract with interchain token", async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
       e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
       e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
@@ -421,7 +399,10 @@ test("Call contract with interchain token", async () => {
 });
 
 test("Call contract with interchain token errors", async () => {
-  await deployTokenManagerMintBurn(deployer, deployer, deployer, TOKEN_ID);
+  await deployTokenManager(null, false);
+
+  // Re=deploy contract without burn role
+  await deployTokenManagerMintBurn(deployer, deployer, its, TOKEN_ID, false);
 
   await user.callContract({
     callee: tokenManagerMintBurn,
@@ -434,16 +415,6 @@ test("Call contract with interchain token errors", async () => {
       e.Buffer(''),
     ],
   }).assertFail({ code: 4, message: 'Wrong token sent' });
-
-  // Deploy ITS
-  await deployGatewayContract(deployer);
-  await deployGasService(deployer, deployer);
-  await deployInterchainTokenFactory(deployer);
-  await deployTokenManagerLockUnlock(deployer);
-  await deployIts(deployer);
-
-  // Re-deploy contract with correct code
-  await deployTokenManagerMintBurn(deployer, deployer, its, TOKEN_ID, false);
 
   // ITS doesn't know about this token manager
   await user.callContract({
@@ -464,7 +435,7 @@ test("Call contract with interchain token errors", async () => {
     kvs: [
       ...baseItsKvs(deployer),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerMintBurn),
     ],
   });
 

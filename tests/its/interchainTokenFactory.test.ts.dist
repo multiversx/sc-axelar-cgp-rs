@@ -5,11 +5,10 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID_CANONICAL,
+  INTERCHAIN_TOKEN_ID,
   TOKEN_ID_MANAGER_ADDRESS
 } from '../helpers';
 import {
-  computeStandardizedTokenId,
   deployContracts,
   gasService,
   gateway,
@@ -83,8 +82,6 @@ test.skip('Register canonical token', async () => {
       e.Str(TOKEN_ID)
     ]
   });
-
-  const computedTokenId = computeStandardizedTokenId();
 
   assert(result.returnData[0] === computedTokenId);
 
@@ -172,7 +169,7 @@ test.skip('Deploy remote canonical token', async () => {
     gasLimit: 150_000_000,
     value: 100_000_000n,
     funcArgs: [
-      e.Bytes(TOKEN_ID_CANONICAL),
+      e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Str(OTHER_CHAIN_NAME)
     ]
   });
@@ -189,13 +186,13 @@ test.skip('Deploy remote canonical token', async () => {
 
       e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
 
       // This seems to work fine on devnet
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
         e.Str('deploy_remote_token_callback'),
         e.Bytes('0000000500000020'),
-        e.Bytes(TOKEN_ID_CANONICAL),
+        e.Bytes(INTERCHAIN_TOKEN_ID),
         e.Str(TOKEN_ID),
         e.Str(OTHER_CHAIN_NAME),
         e.U(100_000_000n),
@@ -261,7 +258,7 @@ test.skip('Deploy remote canonical token errors', async () => {
     funcName: 'deployRemoteCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(TOKEN_ID_CANONICAL),
+      e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Str(OTHER_CHAIN_NAME)
     ]
   }).assertFail({ code: 4, message: 'Token manager does not exist' });
@@ -278,7 +275,7 @@ test.skip('Deploy remote canonical token errors', async () => {
 
       e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerLockUnlock)
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerLockUnlock)
     ]
   });
 
@@ -287,7 +284,7 @@ test.skip('Deploy remote canonical token errors', async () => {
     funcName: 'deployRemoteCanonicalToken',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(TOKEN_ID_CANONICAL),
+      e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Str(OTHER_CHAIN_NAME)
     ]
   }).assertFail({ code: 4, message: 'Not canonical token manager' });

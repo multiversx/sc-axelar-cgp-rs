@@ -43,8 +43,8 @@ multiversx_sc_wasm_adapter::endpoints! {
         setTrustedAddress => set_trusted_address
         removeTrustedAddress => remove_trusted_address
         chainName => chain_name
-        trusted_address => trusted_address
-        trusted_address_hash => trusted_address_hash
+        trustedAddress => trusted_address
+        trustedAddressHash => trusted_address_hash
         flowLimit => flow_limit
         flowOutAmount => flow_out_amount
         flowInAmount => flow_in_amount

@@ -19,13 +19,11 @@ export const MULTISIG_PROVER_PUB_KEY_2 = 'ef637606f3144ee46343ba4a25c261b5c400ad
 
 export const TOKEN_SALT: string = '91b44915de5f5bb438be952d4cda1bcc08829495e8704e40751dcee97aa83886';
 export const TOKEN_ID: string = 'WEGLD-123456';
-export const TOKEN_ID_CANONICAL: string = '699fcfca47501d1619d08531652f17d000332fbf7bab5f00d7d5746089dc1f43';
+export const INTERCHAIN_TOKEN_ID: string = '01b3d64c8c6530a3aad5909ae7e0985d4438ce8eafd90e51ce48fbc809bced39';
 export const TOKEN_ID_MANAGER_ADDRESS: string = 'erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02';
 
 export const TOKEN_ID2: string = 'OTHER-654321';
 export const TOKEN_ID2_MANAGER_ADDRESS: string = 'erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02';
-
-export const TOKEN_ID2_MOCK: string = '1b5920d64a5c1797d482e549b4c39541f8bfe18c4d3b8c8979339f54115c20ff';
 
 export const ADDRESS_ZERO: string = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu';
 

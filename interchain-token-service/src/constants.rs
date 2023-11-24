@@ -79,7 +79,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for InterchainTransferPayload<M> {
     }
 
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
-        let mut result = ArrayVec::<Token<M>, 4>::new();
+        let mut result = ArrayVec::<Token<M>, 5>::new();
         Self::raw_abi_decode(
             &[
                 ParamType::Uint256,
@@ -101,7 +101,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for InterchainTransferPayload<M> {
 
         let mut data = None;
         if message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA {
-            let mut result = ArrayVec::<Token<M>, 2>::new();
+            let mut result = ArrayVec::<Token<M>, 1>::new();
             Self::raw_abi_decode(
                 &[ParamType::Bytes],
                 &payload,

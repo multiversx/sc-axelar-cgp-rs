@@ -3,7 +3,7 @@ import { assertAccount, e, SWallet, SWorld } from "xsuite";
 import createKeccakHash from "keccak";
 import {
   CHAIN_ID,
-  CHAIN_NAME_HASH, COMMAND_ID,
+  CHAIN_NAME_HASH, COMMAND_ID, getCommandId, getCommandIdHash,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
@@ -15,6 +15,7 @@ import {
 import { Buffer } from 'buffer';
 import {
   deployContracts,
+  deployTokenManagerMintBurn,
   gasService,
   gateway,
   its,
@@ -54,7 +55,7 @@ beforeEach(async () => {
     ]
   });
   user = await world.createWallet({
-    balance: BigInt('10000000000000000'),
+    balance: BigInt('100000000000000000'),
     kvs: [
       e.kvs.Esdts([
         {
@@ -76,19 +77,19 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
+const mockGatewayCall = async () => {
   const payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'bytes32', 'uint8', 'bytes'],
+    ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes', 'bytes', 'uint256', 'bytes'],
     [
-      3, // selector deploy token manager
-      Buffer.from(tokenId, 'hex'),
-      0, // Mint/Burn
-      Buffer.from(
-        e.Tuple(
-          its,
-          e.Str(TOKEN_ID),
-        ).toTopBytes(),
-      )
+      MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+      Buffer.from(TOKEN_ID_CANONICAL, 'hex'),
+      'TokenName',
+      'SYMBOL',
+      18,
+      Buffer.from(user.toTopBytes()),
+      Buffer.from(user.toTopBytes()),
+      1_000_000,
+      Buffer.from(its.toTopBytes()),
     ]
   ).substring(2);
 
@@ -116,16 +117,16 @@ const mockGatewayCall = async (tokenId = TOKEN_ID_CANONICAL) => {
     ]
   });
 
-  return payload;
+  return { payload, dataHash };
 }
 
-test("Execute deploy token manager", async () => {
-  const payload = await mockGatewayCall();
+test("Execute deploy and register standardized token only deploy token manager", async () => {
+  const { payload, dataHash } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
     funcName: "execute",
-    gasLimit: 50_000_000,
+    gasLimit: 100_000_000,
     funcArgs: [
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
@@ -150,19 +151,69 @@ test("Execute deploy token manager", async () => {
     ],
   });
 
-  const tokenManager = world.newContract(TOKEN_ID_MANAGER_ADDRESS);
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  assertAccount(tokenManagerKvs, {
-    balance: 0,
+  // Gateway contract call approved key was NOT removed
+  const gatewayKvs = await gateway.getAccountWithKvs();
+  assertAccount(gatewayKvs, {
     kvs: [
-      e.kvs.Mapper('token_id').Value(e.Bytes(TOKEN_ID_CANONICAL)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('operator').Value(its),
+      e.kvs.Mapper("auth_module").Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+
+      e.kvs.Mapper("contract_call_approved", e.Bytes(dataHash)).Value(e.U8(1)),
+    ]
+  });
+});
+
+test("Execute deploy and register standardized token only issue esdt", async () => {
+  await deployTokenManagerMintBurn(deployer, its);
+
+  // Mock token manager already deployed as not being canonical so contract deployment is not tried again
+  await its.setAccount({
+    ...(await its.getAccountWithKvs()),
+    kvs: [
+      e.kvs.Mapper('gateway').Value(gateway),
+      e.kvs.Mapper('gas_service').Value(gasService),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
+      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
+      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+
+      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerMintBurn),
     ],
   });
 
-  // Gateway contract call approaved key was removed
+  const { payload } = await mockGatewayCall();
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 600_000_000,
+    value: BigInt('50000000000000000'),
+    funcArgs: [
+      e.Bytes(COMMAND_ID),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  });
+
+  const kvs = await its.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('gateway').Value(gateway),
+      e.kvs.Mapper('gas_service').Value(gasService),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
+      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
+      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+
+      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(TOKEN_ID_CANONICAL)).Value(tokenManagerMintBurn),
+    ],
+  });
+
+  // Gateway contract call approved key was removed
   const gatewayKvs = await gateway.getAccountWithKvs();
   assertAccount(gatewayKvs, {
     kvs: [
@@ -172,11 +223,11 @@ test("Execute deploy token manager", async () => {
   });
 });
 
-test("Execute deploy token manager errors", async () => {
+test("Execute receive token with data errors", async () => {
   let payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256'],
     [
-      3, // selector deploy token manager
+      MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
     ]
   ).substring(2);
 
@@ -193,6 +244,34 @@ test("Execute deploy token manager errors", async () => {
     ],
   }).assertFail({ code: 4, message: 'Not remote service' });
 
+  payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes', 'bytes', 'uint256', 'bytes'],
+    [
+      MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+      Buffer.from(TOKEN_ID_CANONICAL, 'hex'),
+      'TokenName',
+      'SYMBOL',
+      18,
+      Buffer.from(user.toTopBytes()),
+      Buffer.from(user.toTopBytes()),
+      1_000_000,
+      Buffer.from(its.toTopBytes()),
+    ]
+  ).substring(2);
+
+  await user.callContract({
+    callee: its,
+    funcName: "execute",
+    gasLimit: 100_000_000,
+    value: BigInt('50000000000000000'),
+    funcArgs: [
+      e.Bytes(COMMAND_ID),
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
+
   await user.callContract({
     callee: its,
     funcName: "execute",
@@ -201,10 +280,11 @@ test("Execute deploy token manager errors", async () => {
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
+      payload
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
+  // Mock token manager exists
   await user.callContract({
     callee: its,
     funcName: "registerCanonicalToken",
@@ -214,17 +294,16 @@ test("Execute deploy token manager errors", async () => {
     ],
   });
 
-  payload = await mockGatewayCall();
-
   await user.callContract({
     callee: its,
     funcName: "execute",
-    gasLimit: 50_000_000,
+    gasLimit: 20_000_000,
+    value: BigInt('50000000000000000'),
     funcArgs: [
       e.Bytes(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
+      payload
     ],
-  }).assertFail({ code: 4, message: 'Token manager already exists' });
+  }).assertFail({ code: 4, message: 'Not approved by gateway' });
 });

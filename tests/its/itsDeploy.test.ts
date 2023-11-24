@@ -1,25 +1,26 @@
 import { afterEach, assert, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import {
-  ADDRESS_ZERO, CHAIN_NAME_HASH,
+  ADDRESS_ZERO,
+  INTERCHAIN_TOKEN_ID,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   OTHER_CHAIN_TOKEN_ADDRESS,
   TOKEN_ID,
   TOKEN_ID2,
   TOKEN_ID2_MANAGER_ADDRESS,
-  TOKEN_ID2_MOCK,
-  TOKEN_ID_CANONICAL,
   TOKEN_ID_MANAGER_ADDRESS,
   TOKEN_SALT,
 } from '../helpers';
 import {
   baseItsKvs,
   computeInterchainTokenId,
-  deployContracts, deployTokenManagerMintBurn,
-  gasService, gateway,
+  deployContracts,
+  deployTokenManagerMintBurn,
+  gasService,
   interchainTokenFactory,
-  its, tokenManagerLockUnlock, tokenManagerMintBurn,
+  its,
+  tokenManagerMintBurn,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -153,7 +154,8 @@ test('Deploy token manager', async () => {
       ...baseItsKvs(deployer, interchainTokenFactory),
 
       e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
-      e.kvs.Mapper('token_manager_address', e.Bytes(result.returnData[0])).Value(e.Addr('erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqpqqqqdz2m2t')),
+      e.kvs.Mapper('token_manager_address', e.Bytes(result.returnData[0])).Value(e.Addr(
+        'erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqpqqqqdz2m2t')),
     ],
   });
 });
@@ -198,8 +200,10 @@ test('Deploy token manager remote', async () => {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(
+        TOKEN_ID2_MANAGER_ADDRESS)),
     ],
   });
 
@@ -233,8 +237,10 @@ test('Deploy token manager remote', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(
+        TOKEN_ID2_MANAGER_ADDRESS)),
     ],
   });
 
@@ -276,8 +282,10 @@ test('Deploy token manager remote', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(
+        TOKEN_ID2_MANAGER_ADDRESS)),
     ],
   });
 });
@@ -302,6 +310,32 @@ test('Deploy token manager remote errors', async () => {
       ),
     ],
   }).assertFail({ code: 4, message: 'Token manager does not exist' });
+
+  // Mock token manager exists on source chain
+  await its.setAccount({
+    ...await its.getAccountWithKvs(),
+    kvs: [
+      ...baseItsKvs(deployer, interchainTokenFactory),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
+    ],
+  });
+
+  await user.callContract({
+    callee: its,
+    funcName: 'deployTokenManager',
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(TOKEN_SALT),
+      e.Str('SomeChain'),
+      e.U8(2), // Lock/unlock
+      e.Buffer(e.Tuple(
+        e.Option(user),
+        e.Option(e.Str(TOKEN_ID2)),
+      ).toTopBytes()),
+    ],
+  }).assertFail({ code: 4, message: 'Untrusted chain' });
 });
 
 test('Deploy token manager interchain token factory', async () => {
@@ -395,7 +429,7 @@ test('Deploy interchain token only deploy token manager distributor', async () =
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)) // flow limit role
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
     ],
   });
 });
@@ -557,14 +591,19 @@ test('Deploy interchain token only issue esdt no distributor', async () => {
 });
 
 test('Deploy interchain token remote', async () => {
+  const computedTokenId = computeInterchainTokenId(user);
+  const computedTokenId2 = computeInterchainTokenId(otherUser);
+
   // Mock token manager exists on source chain
   await its.setAccount({
     ...await its.getAccountWithKvs(),
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId2)).Value(e.Addr(
+        TOKEN_ID2_MANAGER_ADDRESS)),
     ],
   });
 
@@ -590,8 +629,10 @@ test('Deploy interchain token remote', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId2)).Value(e.Addr(
+        TOKEN_ID2_MANAGER_ADDRESS)),
     ],
   });
 
@@ -627,8 +668,10 @@ test('Deploy interchain token remote', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(otherUser))).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId2)).Value(e.Addr(
+        TOKEN_ID2_MANAGER_ADDRESS)),
     ],
   });
 
@@ -656,6 +699,32 @@ test('Deploy interchain token remote errors', async () => {
       e.Str(OTHER_CHAIN_ADDRESS), // distributor
     ],
   }).assertFail({ code: 4, message: 'Token manager does not exist' });
+
+  // Mock token manager exists on source chain
+  await its.setAccount({
+    ...await its.getAccountWithKvs(),
+    kvs: [
+      ...baseItsKvs(deployer, interchainTokenFactory),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(computeInterchainTokenId(user))).Value(e.Addr(
+        TOKEN_ID_MANAGER_ADDRESS)),
+    ],
+  });
+
+  await user.callContract({
+    callee: its,
+    funcName: 'deployInterchainToken',
+    gasLimit: 20_000_000,
+    value: 100_000,
+    funcArgs: [
+      e.Bytes(TOKEN_SALT),
+      e.Str('SomeChain'),
+      e.Str('Token Name'),
+      e.Str('TOKEN-SYMBOL'),
+      e.U8(18),
+      e.Str(OTHER_CHAIN_ADDRESS), // distributor
+    ],
+  }).assertFail({ code: 4, message: 'Untrusted chain' });
 });
 
 test('Deploy interchain token interchain token factory', async () => {
