@@ -415,9 +415,7 @@ test('Deploy interchain token only deploy token manager distributor', async () =
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
     ],
   });
 
@@ -456,9 +454,7 @@ test('Deploy interchain token only deploy token manager no distributor', async (
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
     ],
   });
 
@@ -758,9 +754,7 @@ test('Deploy interchain token interchain token factory', async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      ...baseItsKvs(deployer, user),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      ...baseItsKvs(deployer, user, computedTokenId),
     ],
   });
 });

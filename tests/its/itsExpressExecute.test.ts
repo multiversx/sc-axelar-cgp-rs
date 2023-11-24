@@ -14,12 +14,12 @@ import {
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
-  baseItsKvs, computeInterchainTokenId,
+  baseItsKvs, computeExpressExecuteHash, computeInterchainTokenId,
   deployContracts,
   deployPingPongInterchain,
   gateway,
   interchainTokenFactory,
-  its, itsDeployTokenManager,
+  its, itsDeployTokenManagerLockUnlock,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
@@ -82,20 +82,8 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const computeExpressExecuteHash = (payload: string) => {
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest();
-  const data = Buffer.concat([
-    Buffer.from(COMMAND_ID, 'hex'),
-    Buffer.from(OTHER_CHAIN_NAME),
-    Buffer.from(OTHER_CHAIN_ADDRESS),
-    payloadHash,
-  ]);
-
-  return createKeccakHash('keccak256').update(data).digest('hex');
-};
-
 test('Express execute', async () => {
-  const { computedTokenId } = await itsDeployTokenManager(world, user);
+  const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
 
   // Remove '0x' from beginning of hex strings encoded by Ethereum
   const payload = AbiCoder.defaultAbiCoder().encode(
@@ -129,9 +117,7 @@ test('Express execute', async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
 
       e.kvs.Mapper('express_execute', e.Bytes(expressExecuteHash)).Value(user),
     ],
@@ -200,9 +186,7 @@ test('Express execute with data', async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
 
       e.kvs.Mapper('express_execute', e.Bytes(expressExecuteHash)).Value(user),
     ],
@@ -283,9 +267,7 @@ test('Express execute with data error', async () => {
   assertAccount(kvs, {
     // balance: 0n,
     allKvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
 
       // These keys should not have been set
       e.kvs.Mapper('express_execute', e.Bytes(expressExecuteHash)).Value(user),

@@ -23,7 +23,7 @@ import {
   gasService,
   gateway,
   interchainTokenFactory,
-  its, itsDeployTokenManager, LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+  its, itsDeployTokenManagerLockUnlock, LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
   pingPong,
@@ -88,7 +88,7 @@ afterEach(async () => {
 });
 
 test('Interchain transfer', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
 
   await user.callContract({
     callee: its,
@@ -126,7 +126,7 @@ test('Interchain transfer', async () => {
 });
 
 test('Interchain transfer metadata', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
 
   // Specify custom metadata
   await user.callContract({
@@ -166,7 +166,7 @@ test('Interchain transfer metadata', async () => {
 });
 
 test('Interchain transfer errors', async () => {
-  const { computedTokenId } = await itsDeployTokenManager(world, user);
+  const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
 
   await user.callContract({
     callee: its,
@@ -242,7 +242,7 @@ test('Interchain transfer errors', async () => {
 });
 
 test('Call contract with interchain token', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
 
   await user.callContract({
     callee: its,
@@ -281,7 +281,7 @@ test('Call contract with interchain token', async () => {
 });
 
 test('Call contract with interchain token metadata', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
 
   await user.callContract({
     callee: its,
@@ -317,7 +317,7 @@ test('Call contract with interchain token metadata', async () => {
 });
 
 test('Send token with data errors', async () => {
-  const { computedTokenId } = await itsDeployTokenManager(world, user);
+  const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
 
   await user.callContract({
     callee: its,
@@ -405,7 +405,7 @@ test('Transmit interchain transfer', async () => {
 });
 
 test('Transmit interchain transfer errors', async () => {
-  const { computedTokenId } = await itsDeployTokenManager(world, user);
+  const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
 
   await user.callContract({
     callee: its,
