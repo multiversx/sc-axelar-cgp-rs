@@ -7,11 +7,12 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::constants::{
-    DeployTokenManagerParams, InterchainTransferPayload, Metadata, TokenId, TokenManagerType,
+    DeployTokenManagerParams, InterchainTransferPayload, Metadata, TokenId,
     LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
     MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
     MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA, PREFIX_INTERCHAIN_TOKEN_ID,
 };
+use token_manager::TokenManagerType;
 
 multiversx_sc::imports!();
 
@@ -94,104 +95,6 @@ pub trait InterchainTokenServiceContract:
     }
 
     /// User Functions
-
-    // #[endpoint(registerCanonicalToken)]
-    // fn register_canonical_token(
-    //     &self,
-    //     token_identifier: EgldOrEsdtTokenIdentifier,
-    // ) -> TokenId<Self::Api> {
-    //     self.require_not_paused();
-    //
-    //     self.validate_token(&token_identifier);
-    //
-    //     let token_id = self.get_canonical_token_id(&token_identifier);
-    //
-    //     self.deploy_token_manager(
-    //         &token_id,
-    //         TokenManagerType::LockUnlock,
-    //         self.blockchain().get_sc_address(),
-    //         Some(token_identifier),
-    //     );
-    //
-    //     token_id
-    // }
-
-    // #[payable("EGLD")]
-    // #[endpoint(deployRemoteCanonicalToken)]
-    // fn deploy_remote_canonical_token(
-    //     &self,
-    //     token_id: TokenId<Self::Api>,
-    //     destination_chain: ManagedBuffer,
-    // ) {
-    //     self.require_not_paused();
-    //
-    //     let token_identifier = self.valid_token_identifier(&token_id);
-    //
-    //     require!(
-    //         self.get_canonical_token_id(&token_identifier) == token_id,
-    //         "Not canonical token manager"
-    //     );
-    //
-    //     let gas_value = self.call_value().egld_value().clone_value();
-    //
-    //     // We can only fetch token properties from esdt contract if it is not EGLD not
-    //     if token_identifier.is_egld() {
-    //         self.deploy_remote_standardized_token(
-    //             token_id,
-    //             token_identifier.clone().into_name(),
-    //             token_identifier.into_name(),
-    //             18, // EGLD token has 18 decimals
-    //             ManagedBuffer::new(),
-    //             ManagedBuffer::new(),
-    //             BigUint::zero(),
-    //             ManagedBuffer::new(),
-    //             destination_chain,
-    //             gas_value,
-    //         );
-    //
-    //         return;
-    //     }
-    //
-    //     self.esdt_get_token_properties(
-    //         token_identifier.clone(),
-    //         self.callbacks().deploy_remote_token_callback(
-    //             token_id,
-    //             token_identifier,
-    //             destination_chain,
-    //             gas_value,
-    //             self.blockchain().get_caller(),
-    //         ),
-    //     );
-    // }
-
-    // #[endpoint(deployCustomTokenManager)]
-    // fn deploy_custom_token_manager(
-    //     &self,
-    //     token_identifier: EgldOrEsdtTokenIdentifier,
-    //     token_manager_type: TokenManagerType,
-    //     operator: ManagedAddress,
-    // ) -> TokenId<Self::Api> {
-    //     self.require_not_paused();
-    //
-    //     self.validate_token(&token_identifier);
-    //
-    //     let deployer = self.blockchain().get_caller();
-    //
-    //     let token_name = token_identifier.clone().into_name();
-    //
-    //     let token_id = self.interchain_token_id(&deployer, &token_name);
-    //
-    //     self.deploy_token_manager(
-    //         &token_id,
-    //         token_manager_type,
-    //         operator,
-    //         Some(token_identifier),
-    //     );
-    //
-    //     self.custom_token_id_claimed_event(&token_id, deployer, token_name);
-    //
-    //     token_id
-    // }
 
     #[payable("EGLD")]
     #[endpoint(deployTokenManager)]
@@ -405,7 +308,7 @@ pub trait InterchainTokenServiceContract:
 
         let mut raw_metadata = ManagedBuffer::new();
 
-        let _ = Metadata {
+        Metadata {
             version: LATEST_METADATA_VERSION,
             metadata: data,
         }
@@ -619,11 +522,6 @@ pub trait InterchainTokenServiceContract:
             "Not token manager"
         );
     }
-
-    // TODO
-    // fn validate_token(&self, token_identifier: &EgldOrEsdtTokenIdentifier) {
-    //     require!(token_identifier.is_valid(), "Invalid token identifier");
-    // }
 
     fn sanitize_token_manager_implementation(
         &self,

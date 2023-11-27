@@ -35,6 +35,7 @@ pub trait Distributable: operatable::roles::AccountRoles {
         self.only_role(Roles::DISTRIBUTOR);
     }
 
+    #[view(isDistributor)]
     fn is_distributor(&self, address: &ManagedAddress) -> bool {
         self.has_role(address, Roles::DISTRIBUTOR)
     }

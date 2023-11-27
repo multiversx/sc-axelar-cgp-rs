@@ -209,7 +209,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
 
     #[view(isCommandExecuted)]
     fn is_command_executed(&self, command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> bool {
-        self.command_executed().contains(&command_id)
+        self.command_executed().contains(command_id)
     }
 
     #[view(isContractCallApproved)]

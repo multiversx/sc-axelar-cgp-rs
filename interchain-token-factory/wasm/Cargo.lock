@@ -33,6 +33,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "bitflags"
+version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -43,6 +49,13 @@ name = "endian-type"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
+
+[[package]]
+name = "flow-limit"
+version = "0.0.0"
+dependencies = [
+ "multiversx-sc",
+]
 
 [[package]]
 name = "hashbrown"
@@ -69,7 +82,11 @@ checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 name = "interchain-token-factory"
 version = "0.0.0"
 dependencies = [
+ "interchain-token-service",
  "multiversx-sc",
+ "operatable",
+ "token-manager",
+ "token-manager-mint-burn",
 ]
 
 [[package]]
@@ -81,12 +98,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "interchain-token-service"
+version = "0.0.0"
+dependencies = [
+ "flow-limit",
+ "multiversx-sc",
+ "multiversx-sc-modules",
+ "operatable",
+ "token-manager",
+ "token-manager-mint-burn",
+]
+
+[[package]]
 name = "multiversx-sc"
 version = "0.43.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adbdd41a744caa562646c6d593df35caed84889e0d35df8b9ad8efc45457b5bd"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "hashbrown",
  "hex-literal",
  "multiversx-sc-codec",
@@ -130,6 +159,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "multiversx-sc-modules"
+version = "0.43.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45a02a1c14d05986661eff35beab26f5e72cdc44753b1f415eff64d6c4e4bc98"
+dependencies = [
+ "multiversx-sc",
+]
+
+[[package]]
 name = "multiversx-sc-wasm-adapter"
 version = "0.43.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -161,6 +199,14 @@ name = "once_cell"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
+
+[[package]]
+name = "operatable"
+version = "0.0.0"
+dependencies = [
+ "bitflags 2.4.1",
+ "multiversx-sc",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -216,6 +262,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "token-manager"
+version = "0.0.0"
+dependencies = [
+ "flow-limit",
+ "multiversx-sc",
+ "operatable",
+]
+
+[[package]]
+name = "token-manager-mint-burn"
+version = "0.0.0"
+dependencies = [
+ "flow-limit",
+ "multiversx-sc",
+ "operatable",
+ "token-manager",
 ]
 
 [[package]]

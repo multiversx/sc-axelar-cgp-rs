@@ -3,6 +3,7 @@ multiversx_sc::derive_imports!();
 
 use crate::abi::{AbiEncodeDecode, ParamType, Token};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use token_manager::TokenManagerType;
 
 pub const PREFIX_INTERCHAIN_TOKEN_ID: &[u8] = b"its-interchain-token-id";
 
@@ -14,38 +15,6 @@ pub const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER: u64 = 3;
 pub const LATEST_METADATA_VERSION: u32 = 0;
 
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
-
-// Enum has same types as on EVM for compatibility
-#[derive(
-    TypeAbi, Debug, PartialEq, TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, Copy,
-)]
-pub enum TokenManagerType {
-    MintBurn,
-    MintBurnFrom,
-    LockUnlock,
-    LockUnlockFee,
-}
-
-impl TokenManagerType {
-    fn to_u8(self) -> u8 {
-        match self {
-            TokenManagerType::MintBurn => 0,
-            TokenManagerType::MintBurnFrom => 1,
-            TokenManagerType::LockUnlock => 2,
-            TokenManagerType::LockUnlockFee => 3,
-        }
-    }
-
-    fn from_u8(value: u8) -> Self {
-        match value {
-            0 => TokenManagerType::MintBurn,
-            1 => TokenManagerType::MintBurnFrom,
-            2 => TokenManagerType::LockUnlock,
-            3 => TokenManagerType::LockUnlockFee,
-            _ => panic!("Unsupported type"),
-        }
-    }
-}
 
 pub struct InterchainTransferPayload<M: ManagedTypeApi> {
     pub message_type: BigUint<M>,
@@ -234,28 +203,5 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
             decimals,
             distributor,
         }
-    }
-}
-
-pub trait ManagedBufferAscii<M: ManagedTypeApi> {
-    fn ascii_to_u8(&self) -> u8;
-}
-
-impl<M: ManagedTypeApi> ManagedBufferAscii<M> for ManagedBuffer<M> {
-    fn ascii_to_u8(&self) -> u8 {
-        let mut result: u8 = 0;
-
-        self.for_each_batch::<32, _>(|batch| {
-            for &byte in batch {
-                if byte == 0 {
-                    break;
-                }
-
-                result *= 10;
-                result += (byte as char).to_digit(16).unwrap() as u8;
-            }
-        });
-
-        result
     }
 }

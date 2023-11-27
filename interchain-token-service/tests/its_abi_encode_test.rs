@@ -6,8 +6,8 @@ use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::Token;
 use interchain_token_service::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
-    TokenManagerType,
 };
+use token_manager::TokenManagerType;
 
 #[test]
 fn encode_uint256() {

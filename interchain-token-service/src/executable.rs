@@ -3,12 +3,13 @@ multiversx_sc::imports!();
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerParams, DeployTokenManagerPayload,
-    InterchainTransferPayload, TokenId, TokenManagerType, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    InterchainTransferPayload, TokenId, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
 use crate::{events, proxy, express_executor_tracker, address_tracker};
 use core::convert::TryFrom;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use token_manager::TokenManagerType;
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:

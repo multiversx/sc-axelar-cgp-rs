@@ -1,8 +1,13 @@
 multiversx_sc::imports!();
 
 use crate::abi::AbiEncodeDecode;
-use crate::constants::{DeployTokenManagerPayload, Metadata, InterchainTransferPayload, TokenId, TokenManagerType, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER, MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA, LATEST_METADATA_VERSION};
-use crate::{events, proxy, express_executor_tracker, address_tracker};
+use crate::constants::{
+    DeployTokenManagerPayload, InterchainTransferPayload, Metadata, TokenId,
+    LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
+};
+use crate::{address_tracker, events, express_executor_tracker, proxy};
+use token_manager::TokenManagerType;
 
 #[multiversx_sc::module]
 pub trait RemoteModule:
@@ -20,7 +25,7 @@ pub trait RemoteModule:
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) {
-        let _ = self.valid_token_manager_address(&token_id);
+        let _ = self.valid_token_manager_address(token_id);
 
         let data = DeployTokenManagerPayload {
             message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER),
@@ -67,12 +72,20 @@ pub trait RemoteModule:
             // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
             self.call_contract(&destination_chain, &payload, &BigUint::zero());
 
-            self.emit_interchain_transfer_event(token_id, destination_chain, destination_address, amount);
+            self.emit_interchain_transfer_event(
+                token_id,
+                destination_chain,
+                destination_address,
+                amount,
+            );
 
             return;
         }
 
-        require!(version == LATEST_METADATA_VERSION, "Invalid metadata version");
+        require!(
+            version == LATEST_METADATA_VERSION,
+            "Invalid metadata version"
+        );
 
         let data = InterchainTransferPayload {
             message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA),
@@ -118,6 +131,9 @@ pub trait RemoteModule:
     }
 
     fn only_remote_service(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
-        require!(self.is_trusted_address(source_chain, source_address), "Not remote service");
+        require!(
+            self.is_trusted_address(source_chain, source_address),
+            "Not remote service"
+        );
     }
 }

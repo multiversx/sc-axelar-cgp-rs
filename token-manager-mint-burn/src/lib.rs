@@ -132,8 +132,6 @@ pub trait TokenManagerMintBurnContract:
             .call_and_exit();
     }
 
-    // TODO: Is it fine to handle the distributor like this? Or should we add a function to
-    // change the ESDT owner from the TokenManager to the distributor?
     #[endpoint]
     fn mint(&self, address: ManagedAddress, amount: &BigUint) {
         self.only_distributor();

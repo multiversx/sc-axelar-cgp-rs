@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           33
+// Endpoints:                           36
 // Async Callback:                       1
-// Total number of exported functions:  35
+// Total number of exported functions:  38
 
 #![no_std]
 
@@ -50,7 +50,10 @@ multiversx_sc_wasm_adapter::endpoints! {
         flowInAmount => flow_in_amount
         validTokenIdentifier => valid_token_identifier
         validTokenManagerAddress => valid_token_manager_address
-        token_manager_address => token_manager_address
+        invalidTokenManagerAddress => invalid_token_manager_address
+        gateway => gateway
+        gasService => gas_service
+        tokenManagerAddress => token_manager_address
         tokenManagerImplementation => token_manager_implementation
         pause => pause_endpoint
         unpause => unpause_endpoint

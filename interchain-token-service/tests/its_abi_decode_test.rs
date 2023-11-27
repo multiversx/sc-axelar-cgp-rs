@@ -8,8 +8,8 @@ use interchain_token_service::abi::ParamType;
 use interchain_token_service::abi::Token;
 use interchain_token_service::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
-    TokenManagerType,
 };
+use token_manager::TokenManagerType;
 
 #[test]
 #[should_panic]

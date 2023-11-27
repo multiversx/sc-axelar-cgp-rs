@@ -14,12 +14,36 @@ pub struct Metadata<M: ManagedTypeApi> {
     pub metadata: ManagedBuffer<M>,
 }
 
-#[derive(TypeAbi, TopEncode, TopDecode)]
+// Enum has same types as on EVM for compatibility
+#[derive(
+TypeAbi, Debug, PartialEq, TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, Copy,
+)]
 pub enum TokenManagerType {
     MintBurn,
     MintBurnFrom,
     LockUnlock,
     LockUnlockFee,
+}
+
+impl TokenManagerType {
+    pub fn to_u8(self) -> u8 {
+        match self {
+            TokenManagerType::MintBurn => 0,
+            TokenManagerType::MintBurnFrom => 1,
+            TokenManagerType::LockUnlock => 2,
+            TokenManagerType::LockUnlockFee => 3,
+        }
+    }
+
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            0 => TokenManagerType::MintBurn,
+            1 => TokenManagerType::MintBurnFrom,
+            2 => TokenManagerType::LockUnlock,
+            3 => TokenManagerType::LockUnlockFee,
+            _ => panic!("Unsupported type"),
+        }
+    }
 }
 
 #[derive(TypeAbi, TopEncode)]
@@ -184,6 +208,17 @@ pub trait TokenManager:
         );
 
         amount
+    }
+
+    #[view(invalidTokenIdentifier)]
+    fn invalid_token_identifier(&self) -> Option<EgldOrEsdtTokenIdentifier> {
+        let token_identifier_mapper = self.token_identifier();
+
+        if token_identifier_mapper.is_empty() {
+            return None;
+        }
+
+        Some(token_identifier_mapper.get())
     }
 
     #[view(tokenId)]

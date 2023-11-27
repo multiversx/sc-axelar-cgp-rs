@@ -198,35 +198,15 @@ export const deployIts = async (deployer: SWallet) => {
   });
 };
 
-// TODO:
 export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: boolean = true) => {
   ({ contract: interchainTokenFactory, address } = await deployer.deployContract({
     code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
-      // e.Str(CHAIN_NAME),
-      //
-      // e.U32(1),
-      // e.Str(OTHER_CHAIN_NAME),
-      //
-      // e.U32(1),
-      // e.Str(OTHER_CHAIN_ADDRESS)
+      its,
     ],
   }));
-
-  // const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS.toLowerCase()).digest('hex');
-  //
-  // const kvs = await interchainTokenFactory.getAccountWithKvs();
-  // assertAccount(kvs, {
-  //   balance: 0n,
-  //   allKvs: [
-  //     e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
-  //
-  //     e.kvs.Mapper('remote_address_hashes', e.Str(OTHER_CHAIN_NAME)).Value(e.Bytes(otherChainAddressHash)),
-  //     e.kvs.Mapper('remote_addresses', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
-  //   ],
-  // });
 
   if (callIts) {
     // Set interchain token factory contract on its

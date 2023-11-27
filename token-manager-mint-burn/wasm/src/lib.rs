@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           25
+// Endpoints:                           27
 // Async Callback:                       1
-// Total number of exported functions:  27
+// Total number of exported functions:  29
 
 #![no_std]
 
@@ -34,6 +34,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         addFlowLimiter => add_flow_limiter
         removeFlowLimiter => remove_flow_limiter
         setFlowLimit => set_flow_limit
+        invalidTokenIdentifier => invalid_token_identifier
         tokenId => interchain_token_id
         tokenIdentifier => token_identifier
         flowOutAmount => get_flow_out_amount
@@ -47,6 +48,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         transferDistributorship => transfer_distributorship
         proposeDistributorship => propose_distributorship
         acceptDistributorship => accept_distributorship
+        isDistributor => is_distributor
     )
 }
 

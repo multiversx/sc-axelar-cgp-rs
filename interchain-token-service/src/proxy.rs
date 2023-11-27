@@ -2,12 +2,15 @@ multiversx_sc::imports!();
 
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
-    DeployInterchainTokenPayload, ManagedBufferAscii, TokenId, TokenManagerType,
-    MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+    DeployInterchainTokenPayload, TokenId, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
 };
 use crate::{address_tracker, events, express_executor_tracker};
-use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
+
+use token_manager::TokenManagerType;
+use token_manager_mint_burn::ProxyTrait as _;
+use token_manager::ProxyTrait as _;
+use flow_limit::ProxyTrait as _;
 
 pub mod gas_service_proxy {
     multiversx_sc::imports!();
@@ -62,55 +65,6 @@ pub mod gateway_proxy {
             contract_address: &ManagedAddress,
             payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         ) -> bool;
-    }
-}
-
-pub mod token_manager_proxy {
-    multiversx_sc::imports!();
-
-    use crate::constants::TokenManagerType;
-
-    #[multiversx_sc::proxy]
-    pub trait TokenManagerProxy {
-        #[payable("*")]
-        #[endpoint(takeToken)]
-        fn take_token(&self);
-
-        #[endpoint(giveToken)]
-        fn give_token(
-            &self,
-            destination_address: &ManagedAddress,
-            amount: &BigUint,
-        ) -> MultiValue2<EgldOrEsdtTokenIdentifier, BigUint>;
-
-        #[endpoint(setFlowLimit)]
-        fn set_flow_limit(&self, flow_limit: &BigUint);
-
-        // Endpoint only available on MintBurn TokenManager
-        #[payable("EGLD")]
-        #[endpoint(deployInterchainToken)]
-        fn deploy_interchain_token(
-            &self,
-            distributor: Option<ManagedAddress>,
-            name: ManagedBuffer,
-            symbol: ManagedBuffer,
-            decimals: u8,
-        );
-
-        #[view(tokenIdentifier)]
-        fn token_identifier(&self) -> EgldOrEsdtTokenIdentifier;
-
-        #[view(getFlowLimit)]
-        fn flow_limit(&self) -> BigUint;
-
-        #[view(flowOutAmount)]
-        fn get_flow_out_amount(&self) -> BigUint;
-
-        #[view(flowInAmount)]
-        fn get_flow_in_amount(&self) -> BigUint;
-
-        #[view(implementationType)]
-        fn implementation_type(&self) -> TokenManagerType;
     }
 }
 
@@ -325,26 +279,6 @@ pub trait ProxyModule:
             .call_and_exit();
     }
 
-    fn esdt_get_token_properties(
-        &self,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        callback: CallbackClosure<Self::Api>,
-    ) {
-        let esdt_system_sc_address =
-            ESDTSystemSmartContractProxy::<Self::Api>::new_proxy_obj().esdt_system_sc_address();
-
-        let mut contract_call = self.send().contract_call::<()>(
-            esdt_system_sc_address,
-            ManagedBuffer::from("getTokenProperties"),
-        );
-        contract_call.push_raw_argument(token_identifier.into_name());
-
-        contract_call
-            .async_call()
-            .with_callback(callback)
-            .call_and_exit();
-    }
-
     fn deploy_remote_interchain_token(
         &self,
         token_id: TokenId<Self::Api>,
@@ -445,13 +379,26 @@ pub trait ProxyModule:
         token_manager_address_mapper.get()
     }
 
+    #[view(invalidTokenManagerAddress)]
+    fn invalid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
+        let token_manager_address_mapper = self.token_manager_address(token_id);
+
+        if token_manager_address_mapper.is_empty() {
+            return ManagedAddress::zero();
+        }
+
+        token_manager_address_mapper.get()
+    }
+
+    #[view]
     #[storage_mapper("gateway")]
     fn gateway(&self) -> SingleValueMapper<ManagedAddress>;
 
+    #[view(gasService)]
     #[storage_mapper("gas_service")]
     fn gas_service(&self) -> SingleValueMapper<ManagedAddress>;
 
-    #[view]
+    #[view(tokenManagerAddress)]
     #[storage_mapper("token_manager_address")]
     fn token_manager_address(
         &self,
@@ -466,7 +413,7 @@ pub trait ProxyModule:
 
     #[proxy]
     fn token_manager_proxy(&self, address: ManagedAddress)
-        -> token_manager_proxy::Proxy<Self::Api>;
+        -> token_manager_mint_burn::Proxy<Self::Api>;
 
     #[proxy]
     fn executable_contract_proxy(
@@ -524,64 +471,6 @@ pub trait ProxyModule:
                     &command_id,
                     &express_executor,
                 );
-            }
-        }
-    }
-
-    // This seems to work fine on Devnet
-    #[callback]
-    fn deploy_remote_token_callback(
-        &self,
-        token_id: TokenId<Self::Api>,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        destination_chain: ManagedBuffer,
-        gas_value: BigUint,
-        caller: ManagedAddress,
-        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
-    ) {
-        match result {
-            ManagedAsyncCallResult::Ok(values) => {
-                let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
-
-                let token_name = vec.get(0).clone_value();
-                let token_type = vec.get(1);
-                let decimals_buffer_ref = vec.get(5);
-
-                if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
-                    // Send back payed cross chain gas value to initial caller if token is non fungible
-                    self.send().direct_non_zero_egld(&caller, &gas_value);
-
-                    return;
-                }
-
-                let decimals_buffer = decimals_buffer_ref.deref();
-                // num decimals is in format string NumDecimals-DECIMALS
-                // skip `NumDecimals-` part and convert to number
-                let token_decimals_buf: ManagedBuffer = decimals_buffer
-                    .copy_slice(12, decimals_buffer.len() - 12)
-                    .unwrap();
-                let token_decimals = token_decimals_buf.ascii_to_u8();
-
-                let token_identifier_name = token_identifier.into_name();
-                // Leave the symbol be the beginning of the indentifier before `-`
-                let token_symbol = token_identifier_name
-                    .copy_slice(0, token_identifier_name.len() - 7)
-                    .unwrap();
-
-                // TODO:
-                self.deploy_remote_interchain_token(
-                    token_id,
-                    token_name,
-                    token_symbol,
-                    token_decimals,
-                    ManagedBuffer::new(),
-                    destination_chain,
-                    gas_value,
-                );
-            }
-            ManagedAsyncCallResult::Err(_) => {
-                // Send back payed gas value to initial caller
-                self.send().direct_non_zero_egld(&caller, &gas_value);
             }
         }
     }

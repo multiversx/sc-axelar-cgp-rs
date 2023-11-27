@@ -1099,9 +1099,13 @@ dependencies = [
 name = "interchain-token-factory"
 version = "0.0.0"
 dependencies = [
+ "interchain-token-service",
  "multiversx-sc",
  "multiversx-sc-scenario",
  "num-bigint",
+ "operatable",
+ "token-manager",
+ "token-manager-mint-burn",
 ]
 
 [[package]]
@@ -1116,11 +1120,14 @@ dependencies = [
 name = "interchain-token-service"
 version = "0.0.0"
 dependencies = [
+ "flow-limit",
  "multiversx-sc",
  "multiversx-sc-modules",
  "multiversx-sc-scenario",
  "num-bigint",
  "operatable",
+ "token-manager",
+ "token-manager-mint-burn",
 ]
 
 [[package]]

@@ -1,7 +1,8 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-use crate::constants::{DeployTokenManagerParams, TokenId, TokenManagerType};
+use crate::constants::{DeployTokenManagerParams, TokenId};
+use token_manager::TokenManagerType;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
