@@ -1,12 +1,12 @@
 #![no_std]
 
-use core::convert::TryInto;
 use crate::constants::{Hash, TokenId, PREFIX_CANONICAL_TOKEN_SALT, PREFIX_INTERCHAIN_TOKEN_SALT};
 use crate::proxy::CallbackProxy as _;
+use core::convert::TryInto;
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use token_manager::TokenManagerType;
 use token_manager::DeployTokenManagerParams;
+use token_manager::TokenManagerType;
 
 multiversx_sc::imports!();
 
@@ -28,7 +28,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
     }
 
     // Needs to be payable because it issues ESDT token through the TokenManager
-    #[payable("EGLD")]
+    #[payable("*")]
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
         &self,
@@ -37,16 +37,16 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         symbol: ManagedBuffer,
         decimals: u8,
         mint_amount: BigUint,
-        distributor: ManagedAddress,
+        distributor_address: ManagedAddress,
     ) {
         let sender = self.blockchain().get_caller();
         let salt = self.interchain_token_salt(&self.chain_name_hash().get(), &sender, &salt);
 
         let own_address = self.blockchain().get_sc_address();
-        let distributor_buffer = if mint_amount > 0 {
+        let distributor = if mint_amount > 0 {
             own_address.as_managed_buffer()
         } else {
-            distributor.as_managed_buffer()
+            distributor_address.as_managed_buffer()
         };
 
         let token_id = self.service_interchain_token_id(&ManagedAddress::zero(), &salt);
@@ -76,7 +76,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
                 name,
                 symbol,
                 decimals,
-                distributor_buffer,
+                distributor,
                 gas_value,
             );
 
@@ -90,17 +90,18 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
 
         // 3rd transaction - mint token if needed
         if mint_amount > 0 {
-            self.token_manager_mint(token_manager.clone(), distributor.clone(), mint_amount);
+            // TODO: This mints tokens to this contract, and tokens will be stuck here, is this right?
+            self.token_manager_mint(token_manager.clone(), own_address.clone(), mint_amount);
 
-            self.token_manager_transfer_distributorship(token_manager.clone(), distributor.clone());
+            self.token_manager_transfer_distributorship(token_manager.clone(), distributor_address.clone());
 
             self.token_manager_remove_flow_limiter(token_manager.clone(), own_address);
 
-            if !distributor.is_zero() {
-                self.token_manager_add_flow_limiter(token_manager.clone(), distributor.clone());
+            if !distributor_address.is_zero() {
+                self.token_manager_add_flow_limiter(token_manager.clone(), distributor_address.clone());
             }
 
-            self.token_manager_transfer_operatorship(token_manager, distributor);
+            self.token_manager_transfer_operatorship(token_manager, distributor_address);
         }
     }
 
@@ -213,7 +214,10 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         original_token_identifier: EgldOrEsdtTokenIdentifier,
         destination_chain: ManagedBuffer,
     ) {
-        require!(original_token_identifier.is_valid(), "Invalid token identifier");
+        require!(
+            original_token_identifier.is_valid(),
+            "Invalid token identifier"
+        );
 
         let chain_name_hash = if original_chain_name.is_empty() {
             self.chain_name_hash().get()
@@ -221,7 +225,8 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             self.crypto().keccak256(original_chain_name)
         };
 
-        let salt = self.canonical_interchain_token_salt(&chain_name_hash, original_token_identifier);
+        let salt =
+            self.canonical_interchain_token_salt(&chain_name_hash, original_token_identifier);
         let token_id = self.service_interchain_token_id(&ManagedAddress::zero(), &salt);
 
         let token_manager = self.service_interchain_valid_token_manager_address(&token_id);
@@ -270,7 +275,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         &self,
         token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer
+        destination_address: ManagedBuffer,
     ) {
         let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
@@ -278,7 +283,10 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             let token_manager = self.service_interchain_valid_token_manager_address(&token_id);
             let correct_token_identifier = self.token_manager_token_identifier(token_manager);
 
-            require!(token_identifier == correct_token_identifier, "Invalid token sent");
+            require!(
+                token_identifier == correct_token_identifier,
+                "Invalid token sent"
+            );
 
             self.send().direct(
                 &destination_address.try_into().unwrap(),
@@ -290,7 +298,13 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             return;
         }
 
-        self.service_interchain_transfer(token_id, destination_chain, destination_address, token_identifier, amount);
+        self.service_interchain_transfer(
+            token_id,
+            destination_chain,
+            destination_address,
+            token_identifier,
+            amount,
+        );
     }
 
     #[view(interchainTokenSalt)]

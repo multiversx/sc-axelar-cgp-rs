@@ -485,6 +485,22 @@ test('Deploy interchain token only issue esdt distributor', async () => {
     ],
   });
 
+  // Insufficient funds for issuing ESDT
+  await user.callContract({
+    callee: its,
+    funcName: 'deployInterchainToken',
+    gasLimit: 200_000_000, // needs to be above 100_000_000
+    value: 0,
+    funcArgs: [
+      e.Bytes(TOKEN_SALT),
+      e.Str(''),
+      e.Str('Token Name'),
+      e.Str('TOKEN-SYMBOL'),
+      e.U8(18),
+      e.Bytes(user.toTopBytes()), // distributor
+    ],
+  }).assertFail({ code: 10, message: 'failed transfer (insufficient funds)' });
+
   await user.callContract({
     callee: its,
     funcName: 'deployInterchainToken',

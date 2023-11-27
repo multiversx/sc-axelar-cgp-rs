@@ -15,6 +15,9 @@ import { AddressEncodable } from 'xsuite/dist/data/AddressEncodable';
 
 export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
 
+export const PREFIX_CANONICAL_TOKEN_SALT = 'canonical-token-salt';
+export const PREFIX_INTERCHAIN_TOKEN_SALT = 'interchain-token-salt';
+
 export const MESSAGE_TYPE_INTERCHAIN_TRANSFER = 0;
 export const MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA = 1;
 export const MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN = 2;
@@ -77,7 +80,7 @@ export const deployTokenManagerMintBurn = async (
   its: SWallet | SContract = operator,
   tokenIdentifier: string | null = null,
   burnRole: boolean = true,
-  distributor: SWallet | null = null,
+  distributor: SWallet | SContract | null = null,
 ): Promise<Kvs> => {
   ({ contract: tokenManagerMintBurn, address } = await deployer.deployContract({
     code: 'file:token-manager-mint-burn/output/token-manager-mint-burn.wasm',
@@ -111,7 +114,8 @@ export const deployTokenManagerMintBurn = async (
     baseKvs = [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)), // flow limit & operator roles
+
+      ...(operator !== distributor ? [e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110))] : []), // flow limit & operator roles
 
       ...(tokenIdentifier && burnRole ?
         [
@@ -120,7 +124,10 @@ export const deployTokenManagerMintBurn = async (
         ] : []),
 
       ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []), // flow limit role
-      ...(distributor ? [e.kvs.Mapper('account_roles', distributor).Value(e.U32(0b00000001))] : []), // distributor role
+      ...(distributor ? [e.kvs.Mapper(
+        'account_roles',
+        distributor,
+      ).Value(e.U32(operator === distributor ? 0b00000111 : 0b00000001))] : []), // all roles OR distributor role
     ];
 
     await tokenManagerMintBurn.setAccount({
@@ -207,6 +214,15 @@ export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: b
       its,
     ],
   }));
+
+  const kvs = await interchainTokenFactory.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
+    ],
+  });
 
   if (callIts) {
     // Set interchain token factory contract on its
@@ -359,6 +375,19 @@ export const computeExpressExecuteHash = (payload: string) => {
   ]);
 
   return createKeccakHash('keccak256').update(data).digest('hex');
+};
+
+export const computeInterchainTokenSalt = (chain_name: string, user: AddressEncodable, salt = TOKEN_SALT) => {
+  const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_SALT).digest('hex');
+  const chain_name_hash = createKeccakHash('keccak256').update(chain_name).digest('hex');
+  const buffer = Buffer.concat([
+    Buffer.from(prefix, 'hex'),
+    Buffer.from(chain_name_hash, 'hex'),
+    Buffer.from(user.toTopHex(), 'hex'),
+    Buffer.from(salt, 'hex'),
+  ]);
+
+  return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
 export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory: SContract | null = null, computedTokenId: string | null = null) => {
