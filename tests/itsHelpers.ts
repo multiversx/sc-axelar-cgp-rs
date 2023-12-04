@@ -144,6 +144,7 @@ export const deployTokenManagerLockUnlock = async (
   deployer: SWallet,
   its: SWallet | SContract = deployer,
   operator: SWallet = deployer,
+  tokenId: string = TOKEN_ID,
 ): Promise<Kvs> => {
   ({ contract: tokenManagerLockUnlock, address } = await deployer.deployContract({
     code: 'file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm',
@@ -153,7 +154,7 @@ export const deployTokenManagerLockUnlock = async (
       its,
       e.Bytes(INTERCHAIN_TOKEN_ID),
       e.Option(operator),
-      e.Option(e.Str(TOKEN_ID)),
+      e.Option(e.Str(tokenId)),
     ],
   }));
 
@@ -161,7 +162,7 @@ export const deployTokenManagerLockUnlock = async (
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
     e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)),
-    e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+    e.kvs.Mapper('token_identifier').Value(e.Str(tokenId)),
 
     ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []),
   ];

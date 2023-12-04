@@ -11,11 +11,11 @@ import {
 import {
   baseItsKvs,
   computeInterchainTokenId, computeInterchainTokenSalt,
-  deployContracts, deployInterchainTokenFactory, deployIts, deployTokenManagerMintBurn,
+  deployContracts, deployInterchainTokenFactory, deployIts, deployTokenManagerLockUnlock, deployTokenManagerMintBurn,
   gasService,
   gateway,
   interchainTokenFactory,
-  its,
+  its, itsDeployTokenManagerLockUnlock,
   tokenManagerLockUnlock,
   tokenManagerMintBurn,
 } from '../itsHelpers';
@@ -72,6 +72,51 @@ beforeEach(async () => {
 afterEach(async () => {
   await world.terminate();
 });
+
+const deployAndMockTokenManagerMintBurn = async (burnRole: boolean = false) => {
+  await deployContracts(deployer, collector);
+
+  let baseTokenManagerKvs;
+  if (!burnRole) {
+    baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
+  } else {
+    baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, interchainTokenFactory, its, TOKEN_ID, true, interchainTokenFactory);
+  }
+
+  const salt = computeInterchainTokenSalt(CHAIN_NAME, user);
+  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), salt);
+
+  // Mock token manager already deployed as not being canonical so contract deployment is not tried again
+  await its.setAccount({
+    ...(await its.getAccountWithKvs()),
+    kvs: [
+      ...baseItsKvs(deployer, interchainTokenFactory),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
+    ],
+  });
+  return { baseTokenManagerKvs, computedTokenId };
+}
+
+const deployAndMockTokenManagerLockUnlock = async (tokenId: string = TOKEN_ID) => {
+  await deployContracts(deployer, collector);
+
+  let baseTokenManagerKvs = await deployTokenManagerLockUnlock(deployer, its, deployer, tokenId);
+
+  const salt = computeInterchainTokenSalt(CHAIN_NAME, user);
+  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), salt);
+
+  // Mock token manager already deployed as not being canonical so contract deployment is not tried again
+  await its.setAccount({
+    ...(await its.getAccountWithKvs()),
+    kvs: [
+      ...baseItsKvs(deployer, interchainTokenFactory),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerLockUnlock),
+    ],
+  });
+  return { baseTokenManagerKvs, computedTokenId };
+}
 
 test('Init', async () => {
   await deployContracts(deployer, collector, false);
@@ -209,22 +254,7 @@ test('Deploy interchain token only deploy token manager distributor no mint', as
 });
 
 test('Deploy interchain token only issue esdt distributor mint', async () => {
-  await deployContracts(deployer, collector);
-
-  const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
-
-  const salt = computeInterchainTokenSalt(CHAIN_NAME, user);
-  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), salt);
-
-  // Mock token manager already deployed as not being canonical so contract deployment is not tried again
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
-    ],
-  });
+  const { baseTokenManagerKvs, computedTokenId } = await deployAndMockTokenManagerMintBurn();
 
   // Insufficient funds for issuing ESDT
   await user.callContract({
@@ -287,22 +317,7 @@ test('Deploy interchain token only issue esdt distributor mint', async () => {
 });
 
 test('Deploy interchain token only issue esdt distributor no mint', async () => {
-  await deployContracts(deployer, collector);
-
-  const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
-
-  const salt = computeInterchainTokenSalt(CHAIN_NAME, user);
-  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), salt);
-
-  // Mock token manager already deployed as not being canonical so contract deployment is not tried again
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
-    ],
-  });
+  const { baseTokenManagerKvs, computedTokenId } = await deployAndMockTokenManagerMintBurn();
 
   await user.callContract({
     callee: interchainTokenFactory,
@@ -348,22 +363,7 @@ test('Deploy interchain token only issue esdt distributor no mint', async () => 
 });
 
 test('Deploy interchain token only mint distributor', async () => {
-  await deployContracts(deployer, collector);
-
-  const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, interchainTokenFactory, its, TOKEN_ID, true, interchainTokenFactory);
-
-  const salt = computeInterchainTokenSalt(CHAIN_NAME, user);
-  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), salt);
-
-  // Mock token manager already deployed as not being canonical so contract deployment is not tried again
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
-    ],
-  });
+  const { baseTokenManagerKvs } = await deployAndMockTokenManagerMintBurn(true);
 
   await user.callContract({
     callee: interchainTokenFactory,
@@ -424,22 +424,7 @@ test('Deploy interchain token only mint distributor', async () => {
 });
 
 test('Deploy interchain token only mint no distributor', async () => {
-  await deployContracts(deployer, collector);
-
-  const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, interchainTokenFactory, its, TOKEN_ID, true, interchainTokenFactory);
-
-  const salt = computeInterchainTokenSalt(CHAIN_NAME, user);
-  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), salt);
-
-  // Mock token manager already deployed as not being canonical so contract deployment is not tried again
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
-    ],
-  });
+  const { baseTokenManagerKvs } = await deployAndMockTokenManagerMintBurn(true);
 
   await user.callContract({
     callee: interchainTokenFactory,
@@ -484,7 +469,120 @@ test('Deploy interchain token only mint no distributor', async () => {
   });
 });
 
-// TODO: Write tests for deployRemoteInterchainToken etc
+// TODO: Test this on devnet
+test('Deploy remote interchain token no original chain name no distributor', async () => {
+  await deployAndMockTokenManagerMintBurn(true);
+
+  await user.callContract({
+    callee: interchainTokenFactory,
+    funcName: 'deployRemoteInterchainToken',
+    gasLimit: 150_000_000,
+    value: 100_000_000n,
+    funcArgs: [
+      e.Buffer(''),
+      e.Bytes(TOKEN_SALT),
+      e.Addr(ADDRESS_ZERO), // distributor
+      e.Str(OTHER_CHAIN_NAME),
+    ],
+  });
+
+  const kvs = await interchainTokenFactory.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 100_000_000n,
+    kvs: [
+      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
+
+      // This seems to work fine on devnet
+      e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
+        e.Str('deploy_remote_token_callback'),
+        e.U32(6),
+        e.Buffer(computeInterchainTokenSalt(CHAIN_NAME, user)),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(TOKEN_ID.split('-')[0]),
+        e.Buffer(''),
+        e.U(100_000_000n),
+        e.Buffer(user.toTopBytes()),
+      )),
+    ],
+  });
+});
+
+test('Deploy remote interchain token EGLD no original chain name no distributor', async () => {
+  await deployAndMockTokenManagerLockUnlock('EGLD');
+
+  await user.callContract({
+    callee: interchainTokenFactory,
+    funcName: 'deployRemoteInterchainToken',
+    gasLimit: 150_000_000,
+    value: 100_000_000n,
+    funcArgs: [
+      e.Buffer(''),
+      e.Bytes(TOKEN_SALT),
+      e.Addr(ADDRESS_ZERO), // distributor
+      e.Str(OTHER_CHAIN_NAME),
+    ],
+  });
+
+  const kvs = await interchainTokenFactory.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0,
+    kvs: [
+      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
+    ],
+  });
+
+  // Assert gas was paid for cross chain call
+  const gasServiceKvs = await gasService.getAccountWithKvs();
+  assertAccount(gasServiceKvs, {
+    balance: 100_000_000n,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+    ],
+  });
+
+  // There are events emitted for the Gateway contract, but there is no way to test those currently...
+});
+
+// TODO
+test.skip('Deploy remote interchain token errors', async () => {
+  await user.callContract({
+    callee: its,
+    funcName: 'deployRemoteCanonicalToken',
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Str(OTHER_CHAIN_NAME),
+    ],
+  }).assertFail({ code: 4, message: 'Token manager does not exist' });
+
+  // Mock token as not being canonical
+  await its.setAccount({
+    ...(await its.getAccountWithKvs()),
+    kvs: [
+      e.kvs.Mapper('gateway').Value(gateway),
+      e.kvs.Mapper('gas_service').Value(gasService),
+      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
+      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
+      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
+
+      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
+
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerLockUnlock),
+    ],
+  });
+
+  await user.callContract({
+    callee: its,
+    funcName: 'deployRemoteCanonicalToken',
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Str(OTHER_CHAIN_NAME),
+    ],
+  }).assertFail({ code: 4, message: 'Not canonical token manager' });
+});
 
 test.skip('Register canonical token', async () => {
   const result = await user.callContract({
@@ -563,142 +661,4 @@ test.skip('Register canonical token errors', async () => {
       e.Str(TOKEN_ID),
     ],
   }).assertFail({ code: 4, message: 'Token manager already exists' });
-});
-
-test.skip('Deploy remote canonical token', async () => {
-  // Register canonical token first
-  await user.callContract({
-    callee: its,
-    funcName: 'registerCanonicalToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(TOKEN_ID),
-    ],
-  });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'deployRemoteCanonicalToken',
-    gasLimit: 150_000_000,
-    value: 100_000_000n,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Str(OTHER_CHAIN_NAME),
-    ],
-  });
-
-  const kvs = await its.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 100_000_000n,
-    kvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-
-      // This seems to work fine on devnet
-      e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
-        e.Str('deploy_remote_token_callback'),
-        e.Bytes('0000000500000020'),
-        e.Bytes(INTERCHAIN_TOKEN_ID),
-        e.Str(TOKEN_ID),
-        e.Str(OTHER_CHAIN_NAME),
-        e.U(100_000_000n),
-        e.Buffer(user.toTopBytes()),
-      )),
-    ],
-  });
-});
-
-test.skip('Deploy remote canonical token EGLD', async () => {
-  // Register canonical token first
-  const result = await user.callContract({
-    callee: its,
-    funcName: 'registerCanonicalToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str('EGLD'),
-    ],
-  });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'deployRemoteCanonicalToken',
-    gasLimit: 150_000_000,
-    value: 100_000_000n,
-    funcArgs: [
-      e.Bytes(result.returnData[0]),
-      e.Str(OTHER_CHAIN_NAME),
-    ],
-  });
-
-  const kvs = await its.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    kvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(result.returnData[0])).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
-    ],
-  });
-
-  // Assert gas was paid for cross chain call
-  const gasServiceKvs = await gasService.getAccountWithKvs();
-  assertAccount(gasServiceKvs, {
-    balance: 100_000_000n,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-
-  // There are events emitted for the Gateway contract, but there is no way to test those currently...
-});
-
-test.skip('Deploy remote canonical token errors', async () => {
-  await user.callContract({
-    callee: its,
-    funcName: 'deployRemoteCanonicalToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Str(OTHER_CHAIN_NAME),
-    ],
-  }).assertFail({ code: 4, message: 'Token manager does not exist' });
-
-  // Mock token as not being canonical
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      e.kvs.Mapper('gateway').Value(gateway),
-      e.kvs.Mapper('gas_service').Value(gasService),
-      e.kvs.Mapper('remote_address_validator').Value(interchainTokenFactory),
-      e.kvs.Mapper('implementation_mint_burn').Value(tokenManagerMintBurn),
-      e.kvs.Mapper('implementation_lock_unlock').Value(tokenManagerLockUnlock),
-
-      e.kvs.Mapper('chain_name_hash').Value(e.Bytes(CHAIN_NAME_HASH)),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerLockUnlock),
-    ],
-  });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'deployRemoteCanonicalToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Str(OTHER_CHAIN_NAME),
-    ],
-  }).assertFail({ code: 4, message: 'Not canonical token manager' });
 });

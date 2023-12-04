@@ -1,36 +1,15 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
-import createKeccakHash from 'keccak';
-import {
-  CHAIN_NAME_HASH,
-  COMMAND_ID,
-  getCommandId,
-  MOCK_CONTRACT_ADDRESS_1,
-  OTHER_CHAIN_ADDRESS,
-  OTHER_CHAIN_NAME,
-  TOKEN_ID,
-  TOKEN_ID2,
-  INTERCHAIN_TOKEN_ID,
-  TOKEN_ID_MANAGER_ADDRESS,
-  TOKEN_SALT,
-} from '../helpers';
-import { Buffer } from 'buffer';
+import { INTERCHAIN_TOKEN_ID, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
   baseItsKvs,
-  computeInterchainTokenId,
   deployContracts,
-  deployPingPongInterchain,
   gasService,
-  gateway,
   interchainTokenFactory,
-  its, itsDeployTokenManagerLockUnlock, LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-  MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-  MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
-  pingPong,
-  tokenManagerLockUnlock,
-  tokenManagerMintBurn,
+  its,
+  itsDeployTokenManagerLockUnlock,
+  LATEST_METADATA_VERSION,
 } from '../itsHelpers';
-import { AbiCoder } from 'ethers';
 
 let world: SWorld;
 let deployer: SWallet;
