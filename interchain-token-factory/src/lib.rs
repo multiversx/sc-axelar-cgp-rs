@@ -93,12 +93,18 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             // TODO: This mints tokens to this contract, and tokens will be stuck here, is this right?
             self.token_manager_mint(token_manager.clone(), own_address.clone(), mint_amount);
 
-            self.token_manager_transfer_distributorship(token_manager.clone(), distributor_address.clone());
+            self.token_manager_transfer_distributorship(
+                token_manager.clone(),
+                distributor_address.clone(),
+            );
 
             self.token_manager_remove_flow_limiter(token_manager.clone(), own_address);
 
             if !distributor_address.is_zero() {
-                self.token_manager_add_flow_limiter(token_manager.clone(), distributor_address.clone());
+                self.token_manager_add_flow_limiter(
+                    token_manager.clone(),
+                    distributor_address.clone(),
+                );
             }
 
             self.token_manager_transfer_operatorship(token_manager, distributor_address);
@@ -138,41 +144,12 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             distributor_raw = distributor.as_managed_buffer();
         }
 
-        let token_identifier = self.token_manager_token_identifier(token_manager);
-
-        let gas_value = self.call_value().egld_value().clone_value();
-
-        // We can only fetch token properties from esdt contract if it is not EGLD not
-        if token_identifier.is_egld() {
-            self.service_deploy_interchain_token(
-                salt,
-                destination_chain,
-                token_identifier.clone().into_name(),
-                token_identifier.into_name(),
-                18, // EGLD token has 18 decimals
-                distributor_raw,
-                gas_value,
-            );
-
-            return;
-        }
-
-        let token_identifier_name = token_identifier.clone().into_name();
-        // Leave the symbol be the beginning of the indentifier before `-`
-        let token_symbol = token_identifier_name
-            .copy_slice(0, token_identifier_name.len() - 7)
-            .unwrap();
-
-        self.esdt_get_token_properties(
-            token_identifier,
-            self.callbacks().deploy_remote_token_callback(
-                salt,
-                destination_chain,
-                token_symbol,
-                distributor_raw,
-                gas_value,
-                sender,
-            ),
+        self.deploy_remote_interchain_token_raw(
+            destination_chain,
+            distributor_raw,
+            sender,
+            salt,
+            token_manager,
         );
     }
 
@@ -231,41 +208,12 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
 
         let token_manager = self.service_interchain_valid_token_manager_address(&token_id);
 
-        let token_identifier = self.token_manager_token_identifier(token_manager);
-
-        let gas_value = self.call_value().egld_value().clone_value();
-
-        // We can only fetch token properties from esdt contract if it is not EGLD not
-        if token_identifier.is_egld() {
-            self.service_deploy_interchain_token(
-                salt,
-                destination_chain,
-                token_identifier.clone().into_name(),
-                token_identifier.into_name(),
-                18, // EGLD token has 18 decimals
-                &ManagedBuffer::new(),
-                gas_value,
-            );
-
-            return;
-        }
-
-        let token_identifier_name = token_identifier.clone().into_name();
-        // Leave the symbol be the beginning of the indentifier before `-`
-        let token_symbol = token_identifier_name
-            .copy_slice(0, token_identifier_name.len() - 7)
-            .unwrap();
-
-        self.esdt_get_token_properties(
-            token_identifier,
-            self.callbacks().deploy_remote_token_callback(
-                salt,
-                destination_chain,
-                token_symbol,
-                &ManagedBuffer::new(),
-                gas_value,
-                self.blockchain().get_caller(),
-            ),
+        self.deploy_remote_interchain_token_raw(
+            destination_chain,
+            &ManagedBuffer::new(),
+            self.blockchain().get_caller(),
+            salt,
+            token_manager,
         );
     }
 
@@ -304,6 +252,52 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             destination_address,
             token_identifier,
             amount,
+        );
+    }
+
+    fn deploy_remote_interchain_token_raw(
+        &self,
+        destination_chain: ManagedBuffer,
+        distributor_raw: &ManagedBuffer,
+        sender: ManagedAddress,
+        salt: Hash<Self::Api>,
+        token_manager: ManagedAddress,
+    ) {
+        let token_identifier = self.token_manager_token_identifier(token_manager);
+
+        let gas_value = self.call_value().egld_value().clone_value();
+
+        // We can only fetch token properties from esdt contract if it is not EGLD not
+        if token_identifier.is_egld() {
+            self.service_deploy_interchain_token(
+                salt,
+                destination_chain,
+                token_identifier.clone().into_name(),
+                token_identifier.into_name(),
+                18, // EGLD token has 18 decimals
+                distributor_raw,
+                gas_value,
+            );
+
+            return;
+        }
+
+        let token_identifier_name = token_identifier.clone().into_name();
+        // Leave the symbol be the beginning of the indentifier before `-`
+        let token_symbol = token_identifier_name
+            .copy_slice(0, token_identifier_name.len() - 7)
+            .unwrap();
+
+        self.esdt_get_token_properties(
+            token_identifier,
+            self.callbacks().deploy_remote_token_callback(
+                salt,
+                destination_chain,
+                token_symbol,
+                distributor_raw,
+                gas_value,
+                sender,
+            ),
         );
     }
 

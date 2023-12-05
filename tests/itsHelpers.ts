@@ -145,6 +145,7 @@ export const deployTokenManagerLockUnlock = async (
   its: SWallet | SContract = deployer,
   operator: SWallet = deployer,
   tokenId: string = TOKEN_ID,
+  interchainTokenId: string = INTERCHAIN_TOKEN_ID,
 ): Promise<Kvs> => {
   ({ contract: tokenManagerLockUnlock, address } = await deployer.deployContract({
     code: 'file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm',
@@ -152,7 +153,7 @@ export const deployTokenManagerLockUnlock = async (
     gasLimit: 100_000_000,
     codeArgs: [
       its,
-      e.Bytes(INTERCHAIN_TOKEN_ID),
+      e.Bytes(interchainTokenId),
       e.Option(operator),
       e.Option(e.Str(tokenId)),
     ],
@@ -160,11 +161,11 @@ export const deployTokenManagerLockUnlock = async (
 
   const baseKvs = [
     e.kvs.Mapper('interchain_token_service').Value(its),
-    e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-    e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)),
+    e.kvs.Mapper('interchain_token_id').Value(e.Bytes(interchainTokenId)),
+    e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)), // operator & flow limit roles
     e.kvs.Mapper('token_identifier').Value(e.Str(tokenId)),
 
-    ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []),
+    ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []), // flow limit role
   ];
 
   const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
@@ -386,6 +387,18 @@ export const computeInterchainTokenSalt = (chain_name: string, user: AddressEnco
     Buffer.from(chain_name_hash, 'hex'),
     Buffer.from(user.toTopHex(), 'hex'),
     Buffer.from(salt, 'hex'),
+  ]);
+
+  return createKeccakHash('keccak256').update(buffer).digest('hex');
+};
+
+export const computeCanonicalInterchainTokenSalt = (chain_name: string, tokenIdentifier: string = TOKEN_ID) => {
+  const prefix = createKeccakHash('keccak256').update(PREFIX_CANONICAL_TOKEN_SALT).digest('hex');
+  const chain_name_hash = createKeccakHash('keccak256').update(chain_name).digest('hex');
+  const buffer = Buffer.concat([
+    Buffer.from(prefix, 'hex'),
+    Buffer.from(chain_name_hash, 'hex'),
+    Buffer.from(tokenIdentifier),
   ]);
 
   return createKeccakHash('keccak256').update(buffer).digest('hex');
