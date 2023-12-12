@@ -69,6 +69,8 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
 
         if valid {
             self.contract_call_approved().remove(&hash);
+
+            self.contract_call_executed_event(&command_id);
         }
 
         valid
