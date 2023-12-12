@@ -33,6 +33,9 @@ pub trait Events {
         #[indexed] payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     );
 
+    #[event("contract_call_executed_event")]
+    fn contract_call_executed_event(&self, #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>);
+
     #[event("operatorship_transferred_event")]
     fn operatorship_transferred_event(&self, params: &ManagedBuffer);
 }
