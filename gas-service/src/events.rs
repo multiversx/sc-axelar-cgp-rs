@@ -12,27 +12,8 @@ pub struct GasPaidForContractCallData<M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-pub struct GasPaidForContractCallWithTokenData<M: ManagedTypeApi> {
-    pub hash: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
-    pub symbol: ManagedBuffer<M>,
-    pub amount: BigUint<M>,
-    pub gas_token: TokenIdentifier<M>,
-    pub gas_fee_amount: BigUint<M>,
-    pub refund_address: ManagedAddress<M>,
-}
-
-#[derive(TypeAbi, TopEncode)]
 pub struct NativeGasPaidForContractCallData<M: ManagedTypeApi> {
     pub hash: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
-    pub value: BigUint<M>,
-    pub refund_address: ManagedAddress<M>,
-}
-
-#[derive(TypeAbi, TopEncode)]
-pub struct NativeGasPaidForContractCallWithTokenData<M: ManagedTypeApi> {
-    pub hash: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
-    pub symbol: ManagedBuffer<M>,
-    pub amount: BigUint<M>,
     pub value: BigUint<M>,
     pub refund_address: ManagedAddress<M>,
 }
@@ -68,15 +49,6 @@ pub trait Events {
         data: GasPaidForContractCallData<Self::Api>,
     );
 
-    #[event("gas_paid_for_contract_call_with_token_event")]
-    fn gas_paid_for_contract_call_with_token_event(
-        &self,
-        #[indexed] sender: ManagedAddress,
-        #[indexed] destination_chain: ManagedBuffer,
-        #[indexed] destination_contract_address: ManagedBuffer,
-        data: GasPaidForContractCallWithTokenData<Self::Api>,
-    );
-
     #[event("native_gas_paid_for_contract_call_event")]
     fn native_gas_paid_for_contract_call_event(
         &self,
@@ -86,31 +58,22 @@ pub trait Events {
         data: NativeGasPaidForContractCallData<Self::Api>,
     );
 
-    #[event("native_gas_paid_for_contract_call_with_token_event")]
-    fn native_gas_paid_for_contract_call_with_token_event(
-        &self,
-        #[indexed] sender: ManagedAddress,
-        #[indexed] destination_chain: ManagedBuffer,
-        #[indexed] destination_contract_address: ManagedBuffer,
-        data: NativeGasPaidForContractCallWithTokenData<Self::Api>,
-    );
-
     #[event("gas_paid_for_express_call_with_token_event")]
-    fn gas_paid_for_express_call_with_token_event(
+    fn gas_paid_for_express_call(
         &self,
         #[indexed] sender: ManagedAddress,
         #[indexed] destination_chain: ManagedBuffer,
         #[indexed] destination_contract_address: ManagedBuffer,
-        data: GasPaidForContractCallWithTokenData<Self::Api>,
+        data: GasPaidForContractCallData<Self::Api>,
     );
 
     #[event("native_gas_paid_for_express_call_with_token_event")]
-    fn native_gas_paid_for_express_call_with_token_event(
+    fn native_gas_paid_for_express_call(
         &self,
         #[indexed] sender: ManagedAddress,
         #[indexed] destination_chain: ManagedBuffer,
         #[indexed] destination_contract_address: ManagedBuffer,
-        data: NativeGasPaidForContractCallWithTokenData<Self::Api>,
+        data: NativeGasPaidForContractCallData<Self::Api>,
     );
 
     #[event("gas_added_event")]

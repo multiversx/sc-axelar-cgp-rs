@@ -1,14 +1,14 @@
 import { afterEach, assert, beforeEach, test } from 'vitest';
-import { assertAccount } from 'xsuite';
-import { SWorld, SContract, SWallet } from 'xsuite';
-import { e } from 'xsuite';
-import createKeccakHash from 'keccak';
+import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
 import {
   ALICE_PUB_KEY,
-  BOB_PUB_KEY, COMMAND_ID, generateMessageHash,
+  BOB_PUB_KEY,
+  COMMAND_ID,
+  generateMessageHash,
   generateSignature,
-  getOperatorsHash, MULTISIG_PROVER_PUB_KEY, MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2,
-  MULTIVERSX_SIGNED_MESSAGE_PREFIX
+  getOperatorsHash,
+  MULTISIG_PROVER_PUB_KEY_1,
+  MULTISIG_PROVER_PUB_KEY_2,
 } from './helpers';
 
 let world: SWorld;
@@ -20,11 +20,11 @@ beforeEach(async () => {
   world = await SWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
-    epoch: 0
+    epoch: 0,
   });
 
   deployer = await world.createWallet({
-    balance: 10_000_000_000n
+    balance: 10_000_000_000n,
   });
 });
 
@@ -37,13 +37,13 @@ const deployContract = async () => {
     code: 'file:auth/output/auth.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
-    codeArgs: []
+    codeArgs: [],
   }));
 
   const pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0n,
-    allKvs: []
+    allKvs: [],
   });
 };
 
@@ -53,7 +53,7 @@ const getHashAndProof = () => {
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
-    e.List(e.Bytes(signature))
+    e.List(e.Bytes(signature)),
   );
 
   const hash = generateMessageHash(Buffer.from('hash'));
@@ -72,8 +72,8 @@ test('Validate proof no epoch', async () => {
     funcName: 'validateProof',
     funcArgs: [
       hash,
-      data
-    ]
+      data,
+    ],
   }).assertFail({ code: 4, message: 'Invalid operators' });
 });
 
@@ -87,8 +87,8 @@ test('Validate proof old epoch', async () => {
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(17))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(17)),
+    ],
   });
 
   const { hash, data } = getHashAndProof();
@@ -99,8 +99,8 @@ test('Validate proof old epoch', async () => {
     funcName: 'validateProof',
     funcArgs: [
       hash,
-      data
-    ]
+      data,
+    ],
   }).assertFail({ code: 4, message: 'Invalid operators' });
 
   let pairs = await contract.getAccountWithKvs();
@@ -109,11 +109,10 @@ test('Validate proof old epoch', async () => {
     allKvs: [
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(17))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(17)),
+    ],
   });
 });
-
 
 test('Validate proof wrong operators weight', async () => {
   await deployContract();
@@ -125,8 +124,8 @@ test('Validate proof wrong operators weight', async () => {
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 
   const signature = generateSignature(Buffer.from('wrongHash'));
@@ -134,7 +133,7 @@ test('Validate proof wrong operators weight', async () => {
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(9)), // Wrong weight here
     e.U(10),
-    e.List(e.Bytes(signature))
+    e.List(e.Bytes(signature)),
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -144,8 +143,8 @@ test('Validate proof wrong operators weight', async () => {
     funcName: 'validateProof',
     funcArgs: [
       e.Bytes(hash),
-      data
-    ]
+      data,
+    ],
   }).assertFail({ code: 4, message: 'Invalid operators' });
 
   let pairs = await contract.getAccountWithKvs();
@@ -154,8 +153,8 @@ test('Validate proof wrong operators weight', async () => {
     allKvs: [
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 });
 
@@ -169,8 +168,8 @@ test('Validate proof invalid signature', async () => {
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 
   const signature = generateSignature(Buffer.from('wrongHash'));
@@ -178,7 +177,7 @@ test('Validate proof invalid signature', async () => {
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
-    e.List(e.Bytes(signature))
+    e.List(e.Bytes(signature)),
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -188,8 +187,8 @@ test('Validate proof invalid signature', async () => {
     funcName: 'validateProof',
     funcArgs: [
       e.Bytes(hash),
-      data
-    ]
+      data,
+    ],
   }).assertFail({ code: 10, message: 'invalid signature' });
 
   let pairs = await contract.getAccountWithKvs();
@@ -198,8 +197,8 @@ test('Validate proof invalid signature', async () => {
     allKvs: [
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 });
 
@@ -213,8 +212,8 @@ test('Validate proof operators repeat', async () => {
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 
   const signature = generateSignature(Buffer.from('hash'));
@@ -222,7 +221,7 @@ test('Validate proof operators repeat', async () => {
     e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(20),
-    e.List(e.Bytes(signature), e.Bytes(signature))
+    e.List(e.Bytes(signature), e.Bytes(signature)),
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -232,8 +231,8 @@ test('Validate proof operators repeat', async () => {
     funcName: 'validateProof',
     funcArgs: [
       e.Bytes(hash),
-      data
-    ]
+      data,
+    ],
   }).assertFail({ code: 4, message: 'Malformed signers' });
 
   let pairs = await contract.getAccountWithKvs();
@@ -242,8 +241,8 @@ test('Validate proof operators repeat', async () => {
     allKvs: [
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 });
 
@@ -257,8 +256,8 @@ test('Validate proof low signatures weight', async () => {
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 
   const signature = generateSignature(Buffer.from('hash'));
@@ -266,7 +265,7 @@ test('Validate proof low signatures weight', async () => {
     e.List(e.Bytes(ALICE_PUB_KEY)),
     e.List(e.U(9)),
     e.U(10),
-    e.List(e.Bytes(signature))
+    e.List(e.Bytes(signature)),
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -276,8 +275,8 @@ test('Validate proof low signatures weight', async () => {
     funcName: 'validateProof',
     funcArgs: [
       e.Bytes(hash),
-      data
-    ]
+      data,
+    ],
   }).assertFail({ code: 4, message: 'Low signatures weight' });
 
   let pairs = await contract.getAccountWithKvs();
@@ -286,8 +285,8 @@ test('Validate proof low signatures weight', async () => {
     allKvs: [
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 });
 
@@ -301,8 +300,8 @@ test('Validate proof only first operator checked', async () => {
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(1))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(1)),
+    ],
   });
 
   const signature = generateSignature(Buffer.from('hash'));
@@ -310,7 +309,7 @@ test('Validate proof only first operator checked', async () => {
     e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(10),
-    e.List(e.Bytes(signature), e.Bytes(signature)) // wrong signature for bob will not be checked
+    e.List(e.Bytes(signature), e.Bytes(signature)), // wrong signature for bob will not be checked
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -320,8 +319,8 @@ test('Validate proof only first operator checked', async () => {
     funcName: 'validateProof',
     funcArgs: [
       e.Bytes(hash),
-      data
-    ]
+      data,
+    ],
   });
   assert(result.returnData[0] === '01');
 
@@ -331,8 +330,8 @@ test('Validate proof only first operator checked', async () => {
     allKvs: [
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(1))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(1)),
+    ],
   });
 });
 
@@ -346,8 +345,8 @@ test('Validate proof', async () => {
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 
   const signatureData = Buffer.from(COMMAND_ID, 'hex');
@@ -357,7 +356,7 @@ test('Validate proof', async () => {
     e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(20),
-    e.List(e.Bytes(signature), e.Bytes(signatureBob))
+    e.List(e.Bytes(signature), e.Bytes(signatureBob)),
   );
   const hash = generateMessageHash(signatureData);
 
@@ -367,8 +366,8 @@ test('Validate proof', async () => {
     funcName: 'validateProof',
     funcArgs: [
       e.Bytes(hash),
-      data
-    ]
+      data,
+    ],
   });
   assert(result.returnData[0] === '');
 
@@ -378,8 +377,8 @@ test('Validate proof', async () => {
     allKvs: [
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 });
 
@@ -393,8 +392,8 @@ test('Validate proof with multisig prover encoded proof', async () => {
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16))
-    ]
+      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
+    ],
   });
 
   // 00000002 - length of operators
@@ -407,7 +406,10 @@ test('Validate proof with multisig prover encoded proof', async () => {
   // 00000002 - length of signatures
   // fdae22df86f53a39985674072ed1442d08a66683e464134b8d17e373a07e8b82137b96087fa7bbbd2764c4e7658564c32480b2bb31ba70c1225350724494e507 - first signature
   // b054d00827810f8384b85c88352dabf81dcc9be76a77617df942e8bd65ca15fadaef5941a0022f29d86fa5bd33c7fc593580930e521e337544716b5901f8810f - second signature
-  const data = Buffer.from('00000002ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000002000000010a000000010a000000010a00000002fdae22df86f53a39985674072ed1442d08a66683e464134b8d17e373a07e8b82137b96087fa7bbbd2764c4e7658564c32480b2bb31ba70c1225350724494e507b054d00827810f8384b85c88352dabf81dcc9be76a77617df942e8bd65ca15fadaef5941a0022f29d86fa5bd33c7fc593580930e521e337544716b5901f8810f', 'hex');
+  const data = Buffer.from(
+    '00000002ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000002000000010a000000010a000000010a00000002fdae22df86f53a39985674072ed1442d08a66683e464134b8d17e373a07e8b82137b96087fa7bbbd2764c4e7658564c32480b2bb31ba70c1225350724494e507b054d00827810f8384b85c88352dabf81dcc9be76a77617df942e8bd65ca15fadaef5941a0022f29d86fa5bd33c7fc593580930e521e337544716b5901f8810f',
+    'hex',
+  );
 
   const messageHash = Buffer.from('84219fac907aad564fe5f1af58993d1c3f8f288af30b8bff5b50ffb5bba96bc0', 'hex');
 
@@ -419,6 +421,6 @@ test('Validate proof with multisig prover encoded proof', async () => {
     funcArgs: [
       e.Bytes(messageHash),
       e.Bytes(data),
-    ]
+    ],
   }).assertFail({ code: 10, message: 'invalid signature' });
 });
