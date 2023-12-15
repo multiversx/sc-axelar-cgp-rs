@@ -13,8 +13,8 @@ import {
   MULTISIG_PROVER_PUB_KEY_1,
   MULTISIG_PROVER_PUB_KEY_2,
   PAYLOAD_HASH,
-  TOKEN_ID,
-} from './helpers';
+  TOKEN_ID
+} from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -228,7 +228,7 @@ test('Execute approve contract call', async () => {
           e.Str('ethereum'),
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
-          e.Bytes(getKeccak256Hash('payloadHash')),
+          e.Bytes(getKeccak256Hash('payloadHash'))
         ).toTopBytes(),
       ),
     ),
@@ -301,7 +301,7 @@ test('Execute transfer operatorship old proof', async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID))
     ],
   });
 });
@@ -416,7 +416,7 @@ test('Execute multiple commands', async () => {
           e.Str('arbitrum'),
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
-          e.Bytes(getKeccak256Hash('payloadHash2')),
+          e.Bytes(getKeccak256Hash('payloadHash2'))
         ).toTopBytes(),
       ),
       e.Buffer(''),
@@ -425,7 +425,7 @@ test('Execute multiple commands', async () => {
           e.Str('ethereum'),
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
-          e.Bytes(getKeccak256Hash('payloadHash')),
+          e.Bytes(getKeccak256Hash('payloadHash'))
         ).toTopBytes(),
       ),
     ),
@@ -534,7 +534,7 @@ test('Execute approve contract call with multisig prover encoded data', async ()
 
       e.kvs.Mapper('command_executed', e.Bytes(commandId)).Value(e.U8(1)),
 
-      e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash)).Value(e.U8(1)),
+      e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash)).Value(e.U8(1))
     ],
   });
 });

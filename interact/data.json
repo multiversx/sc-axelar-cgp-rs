@@ -2,6 +2,11 @@
   "codeGateway": "file:gateway/output/gateway.wasm",
   "codeAuth": "file:auth/output/auth.wasm",
   "codeGasReceiver": "file:gas-service/output/gas-service.wasm",
+  "codeRemoteAddressValidator": "file:remote-address-validator/output/remote-address-validator.wasm",
+  "codeTokenManagerMintBurn": "file:token-manager-mint-burn/output/token-manager-mint-burn.wasm",
+  "codeTokenManagerLockUnlock": "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
+  "codeIts": "file:interchain-token-service/output/interchain-token-service.wasm",
+  "codePingPongInterchain": "file:ping-pong-interchain/output/ping-ping-interchain.wasm",
   "chainId": {
     "devnet": "D",
     "testnet": "T",
@@ -26,5 +31,52 @@
     "devnet": "erd1qqqqqqqqqqqqqpgqx4cfm0rlj8myv0ft7qs8jvsersfwcm5jkklsn9paj0",
     "testnet": "",
     "mainnet": ""
+  },
+  "addressRemoteAddressValidator": {
+    "devnet": "erd1qqqqqqqqqqqqqpgq7l6ywgz3c830tjc0jn9uuqwcyhgflcwnkklsnlc4ms",
+    "testnet": "erd1qqqqqqqqqqqqqpgqq286gwm3xuuy6e40nnyskrxmh9zgum6pkklsh2h2eg",
+    "mainnet": ""
+  },
+  "addressTokenManagerMintBurn": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqkh3ed4ap7a3hpshnwtgfchejkqknns24kkls8yw9ws",
+    "testnet": "erd1qqqqqqqqqqqqqpgqz60936lzdnt6637r7dfytfz7fuj5dllpkklsgcmylv",
+    "mainnet": ""
+  },
+  "addressTokenManagerLockUnlock": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqew9lsf2y5lxppar3mv70x5rzkljh5z6vkklsmgzrtc",
+    "testnet": "erd1qqqqqqqqqqqqqpgqaqeccuzkazfalwuuwd3smgc8spyax7dkkkls7zs8nm",
+    "mainnet": ""
+  },
+  "addressIts": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqzqvm5ywqqf524efwrhr039tjs29w0qltkklsa05pk7",
+    "testnet": "erd1qqqqqqqqqqqqqpgqp3l44nzrrlx5jgm5umnkndg6c0ucpdyfkklshch74x",
+    "mainnet": ""
+  },
+  "addressPingPongInterchain": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqkv0qr4cqq2uv3yvcs68t9gezsc3x4sthkklsun73vg",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "knownTokens": {
+    "devnet": {
+      "EGLD": {
+        "tokenId": "ce8c950fb8dd7e684c483d9948240b8e8c02b1df5130e91de33e83ae0a9a8623",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqd3kh45y4j5kmlldc9ttvkcrxqrh26j7kkkls0nny32"
+      },
+      "ASH-4ce444": {
+        "tokenId": "22a0fb6f62885ecedd2af9617c755536dd8732bf0b639c5afb6107b99834ce7c",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgq832e73vtkcqnptlrcdlszg6pc3el65jmkklsyksjvd"
+      },
+      "ITST-869e28": {
+        "tokenId": "ebee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2a6",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqwv06n3p2aa6u8pppwze20hgfwzlx5xnlkkls3jqwj6"
+      },
+      "SYMBOL-0d62dc": {
+        "tokenId": "bbee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb",
+        "tokenManager" : "erd1qqqqqqqqqqqqqpgqz95jmztnwpucrm5tmqpxy4vuqlzwnph7kkls85jdd4"
+      }
+    },
+    "testnet": {},
+    "mainnet": {}
   }
 }

@@ -1,0 +1,33 @@
+[package]
+name = "interchain-token-service"
+version = "0.0.0"
+authors = [ "you",]
+edition = "2018"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+num-bigint = "0.4.2"
+
+[dependencies.multiversx-sc]
+version = "0.43.4"
+
+[dependencies.multiversx-sc-modules]
+version = "0.43.4"
+
+[dev-dependencies.multiversx-sc-scenario]
+version = "0.43.4"
+
+[dependencies.operatable]
+path = "../modules/operatable"
+
+[dependencies.flow-limit]
+path = "../modules/flow-limit"
+
+[dependencies.token-manager]
+path = "../modules/token-manager"
+
+[dependencies.token-manager-mint-burn]
+path = "../token-manager-mint-burn"

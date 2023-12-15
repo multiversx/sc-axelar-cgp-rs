@@ -12,6 +12,7 @@ import {
   MOCK_CONTRACT_ADDRESS_2,
 } from '../tests/helpers';
 import { executeGateway } from './generateProofRaw';
+import { setupITSCommands } from './its';
 
 const world = World.new({
   proxyUrl: envChain.publicProxyUrl(),
@@ -21,7 +22,9 @@ const world = World.new({
 
 export const loadWallet = () => world.newWalletFromFile('wallet.json');
 
-const program = new Command();
+export const program = new Command();
+
+setupITSCommands(program);
 
 program.command('deploy').action(async () => {
   const wallet = await loadWallet();

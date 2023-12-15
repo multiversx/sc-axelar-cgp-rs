@@ -9,7 +9,7 @@ import {
   getOperatorsHash,
   MULTISIG_PROVER_PUB_KEY_1,
   MULTISIG_PROVER_PUB_KEY_2,
-} from './helpers';
+} from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -420,7 +420,7 @@ test('Validate proof with multisig prover encoded proof', async () => {
     funcName: 'validateProof',
     funcArgs: [
       e.Bytes(messageHash),
-      e.Bytes(data),
+      e.Bytes(data)
     ],
   }).assertFail({ code: 10, message: 'invalid signature' });
 });
