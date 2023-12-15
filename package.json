@@ -5,8 +5,13 @@
     "build:gateway": "cd gateway && mxpy contract build",
     "build:auth": "cd auth && mxpy contract build",
     "build:gas-service": "cd gas-service && mxpy contract build",
+    "build:ci": "npm run build:ci:gateway && npm run build:ci:auth && npm run build:ci:gas-service",
+    "build:ci:gateway": "cd gateway && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:auth": "cd auth && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:gas-service": "cd gas-service && python3 -m multiversx_sdk_cli.cli contract build",
     "test": "vitest run",
-    "test:all": "npm run build && npm run test",
+    "test:cargo": "cargo test",
+    "test:all": "npm run build && npm run test && npm run test:cargo",
     "typecheck": "tsc --noEmit",
     "interact:devnet": "CHAIN=devnet tsx interact/index.ts",
     "interact:testnet": "CHAIN=testnet tsx interact/index.ts",
@@ -20,7 +25,8 @@
     "tsx": "^3.12.7",
     "typescript": "^5.0.4",
     "vitest": "^0.33.0",
-    "xsuite": "0.0.32",
-    "keccak": "^3.0.3"
+    "xsuite": "0.0.43",
+    "keccak": "^3.0.3",
+    "@types/keccak": "^3.0.3"
   }
 }

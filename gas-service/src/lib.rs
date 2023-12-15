@@ -4,8 +4,12 @@ multiversx_sc::imports!();
 
 mod events;
 
-use crate::events::{AddGasData, AddNativeGasData, GasPaidForContractCallData, GasPaidForContractCallWithTokenData, NativeGasPaidForContractCallData, NativeGasPaidForContractCallWithTokenData, RefundedData};
+use crate::events::{
+    AddGasData, AddNativeGasData, GasPaidForContractCallData, GasPaidForContractCallWithTokenData,
+    NativeGasPaidForContractCallData, NativeGasPaidForContractCallWithTokenData, RefundedData,
+};
 
+// TODO: Do we need all the `with_token` endpoints or the express endpoints?
 #[multiversx_sc::contract]
 pub trait GasService: events::Events {
     #[init]
@@ -306,10 +310,8 @@ pub trait GasService: events::Events {
                 if amount <= balance {
                     self.send().direct_egld(receiver, &amount);
                 }
-            } else {
-                if amount <= balance {
-                    payments.push(EsdtTokenPayment::new(token.unwrap_esdt(), 0, amount));
-                }
+            } else if amount <= balance {
+                payments.push(EsdtTokenPayment::new(token.unwrap_esdt(), 0, amount));
             }
         }
 
@@ -333,11 +335,15 @@ pub trait GasService: events::Events {
 
         self.send().direct(&receiver, &token, 0, &amount);
 
-        self.refunded_event(tx_hash, log_index, RefundedData {
-            receiver,
-            token,
-            amount,
-        });
+        self.refunded_event(
+            tx_hash,
+            log_index,
+            RefundedData {
+                receiver,
+                token,
+                amount,
+            },
+        );
     }
 
     fn require_only_collector(&self) {

@@ -7,7 +7,7 @@
 **/*.interaction.json
 
 # Target
-/target
+**/target/**
 
 # VSCode
 .vscode
