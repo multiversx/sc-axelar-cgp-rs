@@ -25,23 +25,25 @@ pub enum TokenManagerType {
     LockUnlockFee,
 }
 
-impl TokenManagerType {
-    pub fn to_u8(self) -> u8 {
-        match self {
-            TokenManagerType::MintBurn => 0,
-            TokenManagerType::MintBurnFrom => 1,
-            TokenManagerType::LockUnlock => 2,
-            TokenManagerType::LockUnlockFee => 3,
-        }
-    }
-
-    pub fn from_u8(value: u8) -> Self {
+impl From<u8> for TokenManagerType {
+    fn from(value: u8) -> Self {
         match value {
             0 => TokenManagerType::MintBurn,
             1 => TokenManagerType::MintBurnFrom,
             2 => TokenManagerType::LockUnlock,
             3 => TokenManagerType::LockUnlockFee,
             _ => panic!("Unsupported type"),
+        }
+    }
+}
+
+impl Into<u8> for TokenManagerType {
+    fn into(self) -> u8 {
+        match self {
+            TokenManagerType::MintBurn => 0,
+            TokenManagerType::MintBurnFrom => 1,
+            TokenManagerType::LockUnlock => 2,
+            TokenManagerType::LockUnlockFee => 3,
         }
     }
 }

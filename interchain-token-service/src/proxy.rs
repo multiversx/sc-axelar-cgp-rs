@@ -1,77 +1,24 @@
-multiversx_sc::imports!();
-
-use crate::abi::AbiEncodeDecode;
-use crate::constants::{
-    DeployInterchainTokenPayload, TokenId, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-};
-use crate::{address_tracker, events, express_executor_tracker};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use flow_limit::ProxyTrait as _;
+use gas_service::ProxyTrait as _;
+use gateway::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 use token_manager::TokenManagerType;
 use token_manager_mint_burn::ProxyTrait as _;
 
-pub mod gas_service_proxy {
-    multiversx_sc::imports!();
+use crate::{address_tracker, events, express_executor_tracker};
+use crate::abi::AbiEncodeDecode;
+use crate::constants::{
+    DeployInterchainTokenPayload, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MetadataVersion, TokenId,
+};
 
-    #[multiversx_sc::proxy]
-    pub trait GasServiceProxy {
-        #[payable("EGLD")]
-        #[endpoint(payNativeGasForContractCall)]
-        fn pay_native_gas_for_contract_call(
-            &self,
-            destination_chain: &ManagedBuffer,
-            destination_address: &ManagedBuffer,
-            payload: &ManagedBuffer,
-            refund_address: ManagedAddress,
-        );
-    }
-}
-
-pub mod gateway_proxy {
-    multiversx_sc::imports!();
-
-    use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
-    #[multiversx_sc::proxy]
-    pub trait Gateway {
-        #[endpoint(callContract)]
-        fn call_contract(
-            &self,
-            destination_chain: &ManagedBuffer,
-            destination_contract_address: &ManagedBuffer,
-            payload: &ManagedBuffer,
-        );
-
-        #[endpoint(validateContractCall)]
-        fn validate_contract_call(
-            &self,
-            command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-            source_chain: &ManagedBuffer,
-            source_address: &ManagedBuffer,
-            payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-        ) -> bool;
-
-        #[view(isCommandExecuted)]
-        fn is_command_executed(&self, command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> bool;
-
-        #[view(isContractCallApproved)]
-        fn is_contract_call_approved(
-            &self,
-            command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-            source_chain: &ManagedBuffer,
-            source_address: &ManagedBuffer,
-            contract_address: &ManagedAddress,
-            payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-        ) -> bool;
-    }
-}
+multiversx_sc::imports!();
 
 pub mod executable_contract_proxy {
-    multiversx_sc::imports!();
-
     use multiversx_sc::api::KECCAK256_RESULT_LEN;
+
+    multiversx_sc::imports!();
 
     // Contracts having these functions should check that the InterchainTokenService contract called them
     #[multiversx_sc::proxy]
@@ -116,6 +63,24 @@ pub trait ProxyModule:
     ) {
         self.gas_service_proxy(self.gas_service().get())
             .pay_native_gas_for_contract_call(
+                destination_chain,
+                destination_address,
+                payload,
+                self.blockchain().get_caller(),
+            )
+            .with_egld_transfer(gas_value.clone())
+            .execute_on_dest_context::<()>();
+    }
+
+    fn gas_service_pay_native_gas_for_express_call(
+        &self,
+        destination_chain: &ManagedBuffer,
+        destination_address: &ManagedBuffer,
+        payload: &ManagedBuffer,
+        gas_value: &BigUint,
+    ) {
+        self.gas_service_proxy(self.gas_service().get())
+            .pay_native_gas_for_express_call(
                 destination_chain,
                 destination_address,
                 payload,
@@ -316,7 +281,12 @@ pub trait ProxyModule:
 
         let payload = data.abi_encode();
 
-        self.call_contract(&destination_chain, &payload, &gas_value);
+        self.call_contract(
+            &destination_chain,
+            &payload,
+            MetadataVersion::ContractCall,
+            &gas_value,
+        );
 
         self.emit_interchain_token_deployment_started_event(
             token_id,
@@ -332,6 +302,7 @@ pub trait ProxyModule:
         &self,
         destination_chain: &ManagedBuffer,
         payload: &ManagedBuffer,
+        metadata_version: MetadataVersion,
         gas_value: &BigUint,
     ) {
         let destination_address = self.trusted_address(destination_chain);
@@ -342,12 +313,20 @@ pub trait ProxyModule:
 
         // TODO: see how to properly handle the gas here, since on MultiversX we can not send both EGLD and ESDT in the same transaction,
         if gas_value > &BigUint::zero() {
-            self.gas_service_pay_native_gas_for_contract_call(
-                destination_chain,
-                &destination_address,
-                payload,
-                gas_value,
-            );
+            match metadata_version {
+                MetadataVersion::ContractCall => self.gas_service_pay_native_gas_for_contract_call(
+                    destination_chain,
+                    &destination_address,
+                    payload,
+                    gas_value,
+                ),
+                MetadataVersion::ExpressCall => self.gas_service_pay_native_gas_for_express_call(
+                    destination_chain,
+                    destination_address,
+                    payload,
+                    gas_value,
+                ),
+            }
         }
 
         self.gateway_call_contract(destination_chain, &destination_address, payload);
@@ -420,10 +399,10 @@ pub trait ProxyModule:
     ) -> SingleValueMapper<ManagedAddress>;
 
     #[proxy]
-    fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway_proxy::Proxy<Self::Api>;
+    fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway::Proxy<Self::Api>;
 
     #[proxy]
-    fn gas_service_proxy(&self, sc_address: ManagedAddress) -> gas_service_proxy::Proxy<Self::Api>;
+    fn gas_service_proxy(&self, sc_address: ManagedAddress) -> gas_service::Proxy<Self::Api>;
 
     #[proxy]
     fn token_manager_proxy(

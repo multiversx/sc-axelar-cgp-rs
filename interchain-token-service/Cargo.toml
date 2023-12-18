@@ -31,3 +31,9 @@ path = "../modules/token-manager"
 
 [dependencies.token-manager-mint-burn]
 path = "../token-manager-mint-burn"
+
+[dependencies.gas-service]
+path = "../gas-service"
+
+[dependencies.gateway]
+path = "../gateway"

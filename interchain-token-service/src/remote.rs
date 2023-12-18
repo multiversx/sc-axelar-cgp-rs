@@ -1,13 +1,14 @@
-multiversx_sc::imports!();
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use token_manager::TokenManagerType;
 
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
-    DeployTokenManagerPayload, InterchainTransferPayload, Metadata, TokenId,
+    DeployTokenManagerPayload, InterchainTransferPayload, Metadata, MetadataVersion, TokenId,
     LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-    MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
 };
 use crate::{address_tracker, events, express_executor_tracker, proxy};
-use token_manager::TokenManagerType;
+
+multiversx_sc::imports!();
 
 #[multiversx_sc::module]
 pub trait RemoteModule:
@@ -36,7 +37,12 @@ pub trait RemoteModule:
 
         let payload = data.abi_encode();
 
-        self.call_contract(&destination_chain, &payload, &gas_value);
+        self.call_contract(
+            &destination_chain,
+            &payload,
+            MetadataVersion::ContractCall,
+            &gas_value,
+        );
 
         self.emit_token_manager_deployment_started(
             token_id,
@@ -53,81 +59,60 @@ pub trait RemoteModule:
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         amount: BigUint,
-        raw_metadata: ManagedBuffer,
+        metadata_version: MetadataVersion,
+        data: ManagedBuffer,
+        gas_value: BigUint, // TODO: Handle gas
     ) {
-        let (version, metadata, is_err) = self.decode_metadata(raw_metadata);
+        let hash = self.crypto().keccak256(&data);
 
-        if is_err {
-            let data = InterchainTransferPayload {
-                message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER),
-                token_id: token_id.clone(),
-                source_address: source_address.as_managed_buffer().clone(),
-                destination_address: destination_address.clone(),
-                amount: amount.clone(),
-                data: None,
-            };
-
-            let payload = data.abi_encode();
-
-            // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
-            self.call_contract(&destination_chain, &payload, &BigUint::zero());
-
-            self.emit_interchain_transfer_event(
-                token_id,
-                destination_chain,
-                destination_address,
-                amount,
-            );
-
-            return;
-        }
-
-        require!(
-            version == LATEST_METADATA_VERSION,
-            "Invalid metadata version"
-        );
-
-        let data = InterchainTransferPayload {
-            message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA),
+        let payload = InterchainTransferPayload {
+            message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER),
             token_id: token_id.clone(),
             source_address: source_address.as_managed_buffer().clone(),
             destination_address: destination_address.clone(),
             amount: amount.clone(),
-            data: Some(metadata.clone()),
+            data,
         };
 
-        let payload = data.abi_encode();
+        let payload = payload.abi_encode();
 
         // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
-        self.call_contract(&destination_chain, &payload, &BigUint::zero());
+        self.call_contract(
+            &destination_chain,
+            &payload,
+            metadata_version,
+            &BigUint::zero(),
+        );
 
-        self.emit_interchain_transfer_with_data_event(
+        self.emit_interchain_transfer_event(
             token_id,
+            source_address,
             destination_chain,
             destination_address,
             amount,
-            source_address,
-            metadata,
+            if data.len() == 0 {
+                ManagedByteArray::from(&[0; KECCAK256_RESULT_LEN])
+            } else {
+                hash
+            },
         );
     }
 
-    // TODO: Check if this is correct and what this metadata actually is
-    fn decode_metadata(&self, raw_metadata: ManagedBuffer) -> (u32, ManagedBuffer, bool) {
+    fn decode_metadata(&self, raw_metadata: ManagedBuffer) -> (MetadataVersion, ManagedBuffer) {
         let decoded_metadata = Metadata::<Self::Api>::top_decode(raw_metadata);
-        let metadata: Metadata<Self::Api>;
-        let is_err;
+
         if decoded_metadata.is_err() {
-            metadata = Metadata::<Self::Api> {
-                version: 0,
-                metadata: ManagedBuffer::new(),
-            };
-            is_err = true;
-        } else {
-            metadata = decoded_metadata.unwrap();
-            is_err = false;
+            return (MetadataVersion::ContractCall, ManagedBuffer::new());
         }
 
-        (metadata.version, metadata.metadata, is_err)
+        let metadata: Metadata<Self::Api> = decoded_metadata.unwrap();
+
+        require!(
+            metadata.version <= LATEST_METADATA_VERSION,
+            "Invalid metadata version"
+        );
+
+        (MetadataVersion::from(metadata.version), metadata.data)
     }
 
     fn only_remote_service(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {

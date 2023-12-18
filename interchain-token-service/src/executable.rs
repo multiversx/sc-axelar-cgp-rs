@@ -3,7 +3,7 @@ multiversx_sc::imports!();
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerParams, DeployTokenManagerPayload,
-    InterchainTransferPayload, TokenId, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    InterchainTransferPayload, TokenId,
 };
 use crate::{events, proxy, express_executor_tracker, address_tracker};
 use core::convert::TryFrom;
@@ -41,7 +41,7 @@ pub trait ExecutableModule:
         let destination_address =
             ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
 
-        if send_token_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER {
+        if send_token_payload.data.is_empty() {
             let (_, amount) = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -79,7 +79,7 @@ pub trait ExecutableModule:
             destination_address,
             source_chain,
             send_token_payload.source_address,
-            send_token_payload.data.unwrap(),
+            send_token_payload.data,
             send_token_payload.token_id,
             token_identifier,
             amount,

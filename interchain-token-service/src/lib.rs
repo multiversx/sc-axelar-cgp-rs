@@ -5,14 +5,10 @@ use core::ops::Deref;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use crate::abi::{AbiEncodeDecode, ParamType};
-use crate::constants::{
-    DeployTokenManagerParams, InterchainTransferPayload, Metadata, TokenId,
-    LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-    MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA, PREFIX_INTERCHAIN_TOKEN_ID,
-};
 use token_manager::TokenManagerType;
+
+use crate::abi::{AbiEncodeDecode, ParamType};
+use crate::constants::{DeployTokenManagerParams, InterchainTransferPayload, LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER, Metadata, MetadataVersion, PREFIX_INTERCHAIN_TOKEN_ID, TokenId};
 
 multiversx_sc::imports!();
 
@@ -190,13 +186,7 @@ pub trait InterchainTokenServiceContract:
                 return;
             }
 
-            self.token_manager_deploy_interchain_token(
-                &token_id,
-                minter,
-                name,
-                symbol,
-                decimals,
-            );
+            self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);
         } else {
             let gas_value = self.call_value().egld_value().clone_value();
 
@@ -227,9 +217,7 @@ pub trait InterchainTokenServiceContract:
             InterchainTransferPayload::<Self::Api>::abi_decode(payload.clone());
 
         require!(
-            interchain_transfer_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER
-                || interchain_transfer_payload.message_type
-                    == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
+            interchain_transfer_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER,
             "Invalid express message type"
         );
 
@@ -274,12 +262,16 @@ pub trait InterchainTokenServiceContract:
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         metadata: ManagedBuffer,
+        gas_value: BigUint,
     ) {
         self.require_not_paused();
 
         let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
-        self.token_manager_take_token(&token_id, token_identifier, amount.clone());
+        // Send cross chain only the amount which was not used to pay for gas
+        self.token_manager_take_token(&token_id, token_identifier, &amount - &gas_value);
+
+        let (metadata_version, data) = self.decode_metadata(metadata);
 
         self.transmit_interchain_transfer_raw(
             token_id,
@@ -287,7 +279,9 @@ pub trait InterchainTokenServiceContract:
             destination_chain,
             destination_address,
             amount,
-            metadata,
+            metadata_version,
+            data,
+            gas_value
         );
     }
 
@@ -299,21 +293,13 @@ pub trait InterchainTokenServiceContract:
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         data: ManagedBuffer,
+        gas_value: BigUint,
     ) {
         self.require_not_paused();
 
         let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
-        self.token_manager_take_token(&token_id, token_identifier, amount.clone());
-
-        let mut raw_metadata = ManagedBuffer::new();
-
-        Metadata {
-            version: LATEST_METADATA_VERSION,
-            metadata: data,
-        }
-        .top_encode(&mut raw_metadata)
-        .unwrap();
+        self.token_manager_take_token(&token_id, token_identifier, &amount - &gas_value);
 
         self.transmit_interchain_transfer_raw(
             token_id,
@@ -321,12 +307,15 @@ pub trait InterchainTokenServiceContract:
             destination_chain,
             destination_address,
             amount,
-            raw_metadata,
+            MetadataVersion::ContractCall,
+            data,
+            gas_value
         );
     }
 
     /// Token Manager Functions
 
+    #[payable("EGLD")]
     #[endpoint(transmitInterchainTransfer)]
     fn transmit_interchain_transfer(
         &self,
@@ -338,7 +327,11 @@ pub trait InterchainTokenServiceContract:
         metadata: ManagedBuffer,
     ) {
         self.require_not_paused();
-        self.only_token_manager(&token_id);
+
+        // TODO: Add takeToken?
+        // self.only_token_manager(&token_id);
+
+        let (metadata_version, data) = self.decode_metadata(metadata);
 
         self.transmit_interchain_transfer_raw(
             token_id,
@@ -346,7 +339,9 @@ pub trait InterchainTokenServiceContract:
             destination_chain,
             destination_address,
             amount,
-            metadata,
+            metadata_version,
+            data,
+            self.call_value().egld_value().clone_value(),
         );
     }
 
@@ -396,9 +391,7 @@ pub trait InterchainTokenServiceContract:
             .unwrap();
 
         match message_type {
-            MESSAGE_TYPE_INTERCHAIN_TRANSFER
-            | MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA
-            | MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER => {
+            MESSAGE_TYPE_INTERCHAIN_TRANSFER | MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER => {
                 require!(
                     self.call_value().egld_value().deref() == &BigUint::zero(),
                     "Can not send EGLD payment if not issuing ESDT"
@@ -422,7 +415,7 @@ pub trait InterchainTokenServiceContract:
         }
 
         match message_type {
-            MESSAGE_TYPE_INTERCHAIN_TRANSFER | MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA => {
+            MESSAGE_TYPE_INTERCHAIN_TRANSFER => {
                 let express_executor = self.pop_express_executor(
                     &command_id,
                     &source_chain,
@@ -475,10 +468,10 @@ pub trait InterchainTokenServiceContract:
         express_executor: ManagedAddress,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
-        let token_identifier = self.valid_token_identifier(&interchain_transfer_payload.token_id);
-
         let destination_address =
             ManagedAddress::try_from(interchain_transfer_payload.destination_address).unwrap();
+
+        let token_identifier = self.valid_token_identifier(&interchain_transfer_payload.token_id);
 
         let (sent_token_identifier, sent_amount) = self.call_value().egld_or_single_fungible_esdt();
 
@@ -488,12 +481,12 @@ pub trait InterchainTokenServiceContract:
             "Wrong token or amount sent"
         );
 
-        if interchain_transfer_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA {
+        if !interchain_transfer_payload.data.is_empty() {
             self.executable_contract_express_execute_with_interchain_token(
                 destination_address,
                 source_chain,
                 interchain_transfer_payload.source_address,
-                interchain_transfer_payload.data.unwrap(),
+                interchain_transfer_payload.data,
                 interchain_transfer_payload.token_id,
                 token_identifier,
                 interchain_transfer_payload.amount,
@@ -506,6 +499,7 @@ pub trait InterchainTokenServiceContract:
             return;
         }
 
+        // TODO: Use token handler transferTokenFrom here instead?
         self.send().direct(
             &destination_address,
             &token_identifier,
@@ -567,12 +561,11 @@ pub trait InterchainTokenServiceContract:
         self.only_remote_service(&source_chain, &source_address);
         self.require_not_paused();
 
+        // TODO: Is this decoding fine? Since on EVM this structure is slightly different for some reason
         let interchain_transfer_payload = InterchainTransferPayload::abi_decode(payload);
 
         require!(
-            interchain_transfer_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER
-                || interchain_transfer_payload.message_type
-                    == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
+            interchain_transfer_payload.message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER,
             "Invalid express message type"
         );
 
@@ -583,11 +576,11 @@ pub trait InterchainTokenServiceContract:
             .into()
     }
 
-    #[view(chainNameHash)]
-    #[storage_mapper("chain_name_hash")]
-    fn chain_name_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
-
     #[view(interchainTokenFactory)]
     #[storage_mapper("interchain_token_factory")]
     fn interchain_token_factory(&self) -> SingleValueMapper<ManagedAddress>;
+
+    #[view(chainNameHash)]
+    #[storage_mapper("chain_name_hash")]
+    fn chain_name_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 }

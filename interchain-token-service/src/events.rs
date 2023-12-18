@@ -45,15 +45,6 @@ pub struct InterchainTransferEventData<M: ManagedTypeApi> {
     amount: BigUint<M>,
 }
 
-#[derive(TypeAbi, TopEncode)]
-pub struct InterchainTransferWithDataEventData<M: ManagedTypeApi> {
-    destination_chain: ManagedBuffer<M>,
-    destination_address: ManagedBuffer<M>,
-    amount: BigUint<M>,
-    source_address: ManagedAddress<M>,
-    metadata: ManagedBuffer<M>,
-}
-
 #[multiversx_sc::module]
 pub trait EventsModule {
     fn emit_token_manager_deployed_event(
@@ -133,9 +124,11 @@ pub trait EventsModule {
     fn emit_interchain_transfer_event(
         &self,
         token_id: TokenId<Self::Api>,
+        source_address: ManagedAddress,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         amount: BigUint,
+        data_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         let data = InterchainTransferEventData {
             destination_chain,
@@ -143,27 +136,7 @@ pub trait EventsModule {
             amount,
         };
 
-        self.interchain_transfer_event(token_id, data);
-    }
-
-    fn emit_interchain_transfer_with_data_event(
-        &self,
-        token_id: TokenId<Self::Api>,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
-        amount: BigUint,
-        source_address: ManagedAddress,
-        metadata: ManagedBuffer,
-    ) {
-        let data = InterchainTransferWithDataEventData {
-            destination_chain,
-            destination_address,
-            amount,
-            source_address,
-            metadata,
-        };
-
-        self.interchain_transfer_with_data_event(token_id, data);
+        self.interchain_transfer_event(token_id, source_address, data_hash, data);
     }
 
     #[event("token_manager_deployed_event")]
@@ -207,14 +180,9 @@ pub trait EventsModule {
     fn interchain_transfer_event(
         &self,
         #[indexed] token_id: TokenId<Self::Api>,
+        #[indexed] source_address: ManagedAddress,
+        #[indexed] data_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         data: InterchainTransferEventData<Self::Api>,
-    );
-
-    #[event("interchain_transfer_with_data_event")]
-    fn interchain_transfer_with_data_event(
-        &self,
-        #[indexed] token_id: TokenId<Self::Api>,
-        data: InterchainTransferWithDataEventData<Self::Api>,
     );
 
     #[event("interchain_transfer_received_event")]
