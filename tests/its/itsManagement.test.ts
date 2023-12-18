@@ -758,8 +758,8 @@ test('Set flow limits', async () => {
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID2)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit & operator roles
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
       e.kvs.Mapper('flow_limit').Value(e.U(99)),
     ],
@@ -773,8 +773,8 @@ test('Set flow limits', async () => {
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId2)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID2)),
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limit and operator roles
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limit & operator roles
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
       e.kvs.Mapper('flow_limit').Value(e.U(100)),
     ],

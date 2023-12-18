@@ -165,7 +165,7 @@ test('Init', async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
   });
@@ -215,6 +215,7 @@ test('Deploy interchain token only deploy token manager minter mint', async () =
     ],
   });
 
+  // Interchain token factory gets roles over token manager
   const tokenManager = world.newContract(TOKEN_ID_MANAGER_ADDRESS);
   const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
@@ -223,7 +224,7 @@ test('Deploy interchain token only deploy token manager minter mint', async () =
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
       e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000110)), // flow limit and operator roles
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
     ],
   });
 });
@@ -257,6 +258,7 @@ test('Deploy interchain token only deploy token manager minter no mint', async (
     ],
   });
 
+  // Minter gets roles over token manager
   const tokenManager = world.newContract(TOKEN_ID_MANAGER_ADDRESS);
   const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
@@ -265,7 +267,50 @@ test('Deploy interchain token only deploy token manager minter no mint', async (
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit role
+    ],
+  });
+});
+
+test('Deploy interchain token only deploy token manager no minter no mint', async () => {
+  await deployContracts(deployer, collector);
+
+  await user.callContract({
+    callee: interchainTokenFactory,
+    funcName: 'deployInterchainToken',
+    gasLimit: 100_000_000,
+    value: 0,
+    funcArgs: [
+      e.Bytes(TOKEN_SALT),
+      e.Str('Token Name'),
+      e.Str('TOKEN-SYMBOL'),
+      e.U8(18),
+      e.U(0),
+      e.Addr(ADDRESS_ZERO),
+    ],
+  });
+
+  const salt = computeInterchainTokenSalt(CHAIN_NAME, user);
+  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), salt);
+
+  const kvs = await its.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    allKvs: [
+      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
+    ],
+  });
+
+  // Address zero gets roles over token manager
+  const tokenManager = world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  assertAccount(tokenManagerKvs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
+      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit and operator roles
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit role
     ],
   });
 });
@@ -323,6 +368,7 @@ test('Deploy interchain token only issue esdt minter mint', async () => {
       ...baseTokenManagerKvs,
 
       e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000001)), // minter role
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)), // flow limiter & operator & minter roles
 
       // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -369,6 +415,7 @@ test('Deploy interchain token only issue esdt minter no mint', async () => {
       ...baseTokenManagerKvs,
 
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)), // flow limiter & operator & minter roles
 
       // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -424,16 +471,18 @@ test('Deploy interchain token only mint minter', async () => {
   });
 
   // Assert tokens were minted
-  kvs = await interchainTokenFactory.getAccountWithKvs();
+  kvs = await user.getAccountWithKvs();
   assertAccount(kvs, {
+    balance: BigInt('100000000000000000'),
     kvs: [
-      e.kvs.Mapper('service').Value(its),
-      e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
-
       e.kvs.Esdts([
         {
           id: TOKEN_ID,
-          amount: 1_000,
+          amount: 101_000,
+        },
+        {
+          id: TOKEN_ID2,
+          amount: 10_000,
         },
       ]),
     ],
@@ -465,21 +514,23 @@ test('Deploy interchain token only mint no minter', async () => {
       ...baseTokenManagerKvs,
 
       e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000000)), // roles removed
-      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000011)), // operator & minter role
+      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000111)), // operator & flow limiter & minter role
     ],
   });
 
   // Assert tokens were minted
-  kvs = await interchainTokenFactory.getAccountWithKvs();
+  kvs = await user.getAccountWithKvs();
   assertAccount(kvs, {
+    balance: BigInt('100000000000000000'),
     kvs: [
-      e.kvs.Mapper('service').Value(its),
-      e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
-
       e.kvs.Esdts([
         {
           id: TOKEN_ID,
-          amount: 1_000,
+          amount: 101_000,
+        },
+        {
+          id: TOKEN_ID2,
+          amount: 10_000,
         },
       ]),
     ],
@@ -507,7 +558,7 @@ test('Deploy remote interchain token no original chain name no minter', async ()
   assertAccount(kvs, {
     balance: 100_000_000n,
     kvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
 
       // This seems to work fine on devnet
@@ -545,7 +596,7 @@ test('Deploy remote interchain token EGLD no original chain name no minter', asy
   assertAccount(kvs, {
     balance: 0,
     kvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
   });
@@ -582,7 +633,7 @@ test('Deploy remote interchain token no original chain name with minter', async 
   assertAccount(kvs, {
     balance: 100_000_000n,
     kvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
 
       // This seems to work fine on devnet
@@ -620,7 +671,7 @@ test('Deploy remote interchain token EGLD with original chain name no minter', a
   assertAccount(kvs, {
     balance: 0,
     kvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
   });
@@ -743,6 +794,7 @@ test('Register canonical interchain token', async () => {
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit and operator roles
       e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
     ],
   });
@@ -809,7 +861,7 @@ test('Deploy remote canonical interchain token no original chain name', async ()
   assertAccount(kvs, {
     balance: 100_000_000n,
     kvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
 
       // This seems to work fine on devnet
@@ -846,7 +898,7 @@ test('Deploy remote canonical interchain token EGLD no original chain name', asy
   assertAccount(kvs, {
     balance: 0,
     kvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
   });
@@ -882,7 +934,7 @@ test('Deploy remote canonical interchain token EGLD with original chain name', a
   assertAccount(kvs, {
     balance: 0,
     kvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
   });
@@ -948,128 +1000,5 @@ test('Deploy remote canonical interchain token errors', async () => {
       e.Str(TOKEN_ID),
       e.Str(OTHER_CHAIN_NAME),
     ],
-  }).assertFail({ code: 4, message: 'panic occurred' });
-});
-
-test('Interchain transfer other chain', async () => {
-  await deployContracts(deployer, collector);
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
-
-  await user.callContract({
-    callee: interchainTokenFactory,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  });
-
-  // Assert NO gas was paid for cross chain call
-  let kvs = await gasService.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-
-  let tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  assertAccount(tokenManagerKvs, {
-    balance: 0n,
-    allKvs: [
-      ...baseTokenManagerKvs,
-
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
-    ],
-  });
-
-  // There are events emitted for the Gateway contract, but there is no way to test those currently...
-});
-
-
-test('Interchain transfer own chain', async () => {
-  await deployContracts(deployer, collector);
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
-
-  await user.callContract({
-    callee: interchainTokenFactory,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(''),
-      otherUser,
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  });
-
-  // Tokens sent to other user
-  const kvs = await otherUser.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: BigInt('10000000000000000'),
-    kvs: [
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
-    ]
-  });
-});
-
-test('Interchain transfer errors', async () => {
-  await deployContracts(deployer, collector);
-
-  // No token manager for own chain transfer
-  await user.callContract({
-    callee: interchainTokenFactory,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    value: 1_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Str(''),
-      deployer,
-    ],
-  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
-
-  // No token manager for other chain transfer
-  await user.callContract({
-    callee: interchainTokenFactory,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    value: 1_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-    ],
-  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
-
-  const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
-
-  // Sending wrong token for the token id for own chain transfer
-  await user.callContract({
-    callee: interchainTokenFactory,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    value: 1_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(''),
-      deployer,
-    ],
-  }).assertFail({ code: 4, message: 'Invalid token sent' });
-
-  // Wrong destination address for own chain transfer
-  await user.callContract({
-    callee: interchainTokenFactory,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(''),
-      e.Str(OTHER_CHAIN_ADDRESS),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   }).assertFail({ code: 4, message: 'panic occurred' });
 });

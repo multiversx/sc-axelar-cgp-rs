@@ -16,7 +16,7 @@ pub struct Metadata<M: ManagedTypeApi> {
 
 // Enum has same types as on EVM for compatibility
 #[derive(
-TypeAbi, Debug, PartialEq, TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, Copy,
+    TypeAbi, Debug, PartialEq, TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, Copy,
 )]
 pub enum TokenManagerType {
     MintBurn,
@@ -65,14 +65,14 @@ pub trait TokenManager:
     fn add_flow_limiter(&self, flow_limiter: ManagedAddress) {
         self.only_operator();
 
-        self.add_account_roles(flow_limiter, Roles::FLOW_LIMITER);
+        self.add_role(flow_limiter, Roles::FLOW_LIMITER);
     }
 
     #[endpoint(removeFlowLimiter)]
     fn remove_flow_limiter(&self, flow_limiter: ManagedAddress) {
         self.only_operator();
 
-        self.remove_account_roles(flow_limiter, Roles::FLOW_LIMITER);
+        self.remove_role(flow_limiter, Roles::FLOW_LIMITER);
     }
 
     #[endpoint(setFlowLimit)]
@@ -97,21 +97,27 @@ pub trait TokenManager:
 
         let operator;
         if operator_opt.is_none() {
-            operator = interchain_token_service;
+            operator = ManagedAddress::zero();
         } else {
             operator = operator_opt.unwrap();
-
-            // Add flow limiter role to the service by default. The operator can remove this if they so choose.
-            self.add_account_roles(interchain_token_service, Roles::FLOW_LIMITER);
         }
 
-        self.add_account_roles(operator, Roles::FLOW_LIMITER | Roles::OPERATOR);
+        // If an operator is not provided, set zero address as the operator.
+        // This allows anyone to easily check if a custom operator was set on the token manager.
+        self.add_role(operator, Roles::FLOW_LIMITER | Roles::OPERATOR);
+        // Add operator and flow limiter role to the service. The operator can remove the flow limiter role if they so chose and the service has no way to use the operator role for now.
+        self.add_role(
+            interchain_token_service,
+            Roles::FLOW_LIMITER | Roles::OPERATOR,
+        );
 
         if token_identifier.is_some() {
             self.token_identifier()
                 .set_if_empty(token_identifier.unwrap());
         }
     }
+
+    // TODO: Add addFlowIn and addFlowOut endpoints from TokenManager.sol?
 
     fn interchain_transfer_raw(
         &self,
@@ -219,6 +225,11 @@ pub trait TokenManager:
         }
 
         Some(token_identifier_mapper.get())
+    }
+
+    #[view(isFlowLimiter)]
+    fn is_flow_limiter(&self, address: &ManagedAddress) -> bool {
+        self.has_role(address, Roles::FLOW_LIMITER)
     }
 
     #[view(tokenId)]

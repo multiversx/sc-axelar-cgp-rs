@@ -14,23 +14,23 @@ use operatable::ProxyTrait as _;
 
 #[multiversx_sc::module]
 pub trait ProxyModule {
-    fn service_chain_name_hash(&self) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        self.service_proxy(self.service().get())
+    fn its_chain_name_hash(&self) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
             .chain_name_hash()
             .execute_on_dest_context()
     }
 
-    fn service_interchain_token_id(
+    fn its_interchain_token_id(
         &self,
         sender: &ManagedAddress,
         salt: &Hash<Self::Api>,
     ) -> TokenId<Self::Api> {
-        self.service_proxy(self.service().get())
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
             .interchain_token_id(sender, salt)
             .execute_on_dest_context()
     }
 
-    fn service_deploy_interchain_token(
+    fn its_deploy_interchain_token(
         &self,
         salt: ManagedByteArray<KECCAK256_RESULT_LEN>,
         destination_chain: ManagedBuffer,
@@ -41,31 +41,31 @@ pub trait ProxyModule {
         gas_value: BigUint,
     ) {
         self
-            .service_proxy(self.service().get())
+            .interchain_token_service_proxy(self.interchain_token_service().get())
             .deploy_interchain_token(salt, destination_chain, name, symbol, decimals, minter)
             .with_egld_transfer(gas_value)
             .execute_on_dest_context::<()>();
     }
 
-    fn service_invalid_token_manager_address(
+    fn its_invalid_token_manager_address(
         &self,
         token_id: &TokenId<Self::Api>,
     ) -> ManagedAddress {
-        self.service_proxy(self.service().get())
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
             .invalid_token_manager_address(token_id)
             .execute_on_dest_context()
     }
 
-    fn service_interchain_valid_token_manager_address(
+    fn its_valid_token_manager_address(
         &self,
         token_id: &TokenId<Self::Api>,
     ) -> ManagedAddress {
-        self.service_proxy(self.service().get())
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
             .valid_token_manager_address(token_id)
             .execute_on_dest_context()
     }
 
-    fn service_deploy_token_manager(
+    fn its_deploy_token_manager(
         &self,
         salt: ManagedByteArray<KECCAK256_RESULT_LEN>,
         destination_chain: ManagedBuffer,
@@ -74,13 +74,13 @@ pub trait ProxyModule {
         gas_value: BigUint,
     ) -> TokenId<Self::Api> {
         self
-            .service_proxy(self.service().get())
+            .interchain_token_service_proxy(self.interchain_token_service().get())
             .deploy_token_manager(salt, destination_chain, token_manager_type, params)
             .with_egld_transfer(gas_value)
             .execute_on_dest_context()
     }
 
-    fn service_interchain_transfer(
+    fn its_interchain_transfer(
         &self,
         token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
@@ -88,7 +88,7 @@ pub trait ProxyModule {
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
     ) {
-        self.service_proxy(self.service().get())
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
             .interchain_transfer(token_id, destination_chain, destination_address, ManagedBuffer::new())
             .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(
                 token_identifier,
@@ -177,11 +177,11 @@ pub trait ProxyModule {
     }
 
     #[view]
-    #[storage_mapper("service")]
-    fn service(&self) -> SingleValueMapper<ManagedAddress>;
+    #[storage_mapper("interchain_token_service")]
+    fn interchain_token_service(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[proxy]
-    fn service_proxy(
+    fn interchain_token_service_proxy(
         &self,
         sc_address: ManagedAddress,
     ) -> interchain_token_service::Proxy<Self::Api>;
@@ -227,7 +227,7 @@ pub trait ProxyModule {
                     .unwrap();
                 let token_decimals = token_decimals_buf.ascii_to_u8();
 
-                self.service_deploy_interchain_token(
+                self.its_deploy_interchain_token(
                     salt,
                     destination_chain,
                     token_name,

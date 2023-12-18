@@ -116,8 +116,8 @@ test('Deploy token manager', async () => {
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // operator & flow limiter roles
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limiter role
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limiter & operator roles
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID2)),
     ],
   });
@@ -426,8 +426,8 @@ test('Deploy interchain token only deploy token manager minter', async () => {
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit & operator roles
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
     ],
   });
 });
@@ -465,7 +465,8 @@ test('Deploy interchain token only deploy token manager no minter', async () => 
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
+      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit & operator roles added to zero address
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit & operator roles
     ],
   });
 });
@@ -533,7 +534,8 @@ test('Deploy interchain token only issue esdt minter', async () => {
     allKvs: [
       ...baseTokenManagerKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user & its
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)),
 
       // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -591,7 +593,9 @@ test('Deploy interchain token only issue esdt no minter', async () => {
     allKvs: [
       ...baseTokenManagerKvs,
 
-      // no minter role was set
+      // minter role was set for zero address and its
+      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000001)),
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)),
 
       // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(

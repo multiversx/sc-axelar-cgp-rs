@@ -71,7 +71,7 @@ pub trait AccountRoles {
             .set(proposed_roles);
     }
 
-    fn add_account_roles(&self, address: ManagedAddress, new_roles: Roles) {
+    fn add_role(&self, address: ManagedAddress, new_roles: Roles) {
         self.roles_added_event(&address, new_roles);
 
         self.account_roles(&address).update(|roles| {
@@ -79,7 +79,7 @@ pub trait AccountRoles {
         });
     }
 
-    fn remove_account_roles(&self, address: ManagedAddress, new_roles: Roles) {
+    fn remove_role(&self, address: ManagedAddress, new_roles: Roles) {
         self.roles_removed_event(&address, new_roles);
 
         self.account_roles(&address).update(|roles| {
@@ -130,8 +130,8 @@ pub trait AccountRoles {
 
         require!(from_roles.contains(roles), "Missing all roles");
 
-        self.remove_account_roles(from_address, roles);
-        self.add_account_roles(to_address, roles);
+        self.remove_role(from_address, roles);
+        self.add_role(to_address, roles);
     }
 
     #[view(getAccountRoles)]

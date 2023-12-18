@@ -105,15 +105,27 @@ pub trait TokenManagerMintBurnContract:
         );
 
         let caller = self.blockchain().get_caller();
+        let interchain_token_service = self.interchain_token_service().get();
 
         // Also allow minter to call this (if set) in case issue esdt fails
         require!(
-            caller == self.interchain_token_service().get() || self.is_minter(&caller),
+            caller == interchain_token_service || self.is_minter(&caller),
             "Not service or minter"
         );
 
+        require!(!name.is_empty(), "Token name empty");
+        require!(!symbol.is_empty(), "Token symbol empty");
+
+        /*
+         * Set the token service as a minter to allow it to mint and burn tokens.
+         * Also add the provided address as a minter. If zero address was provided,
+         * add it as a minter to allow anyone to easily check that no custom minter was set.
+         */
+        self.add_minter(interchain_token_service);
         if minter.is_some() {
             self.add_minter(minter.unwrap());
+        } else {
+            self.add_minter(ManagedAddress::zero());
         }
 
         let issue_cost = BigUint::from(DEFAULT_ESDT_ISSUE_COST);

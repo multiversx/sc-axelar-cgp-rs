@@ -1,27 +1,20 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import {
-  CHAIN_NAME,
-  CHAIN_NAME_HASH,
+  ADDRESS_ZERO,
+  INTERCHAIN_TOKEN_ID,
   OTHER_CHAIN_ADDRESS,
-  OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  INTERCHAIN_TOKEN_ID
 } from '../helpers';
 import {
-  baseItsKvs, deployContracts,
-  deployGasService,
-  deployGatewayContract,
-  deployInterchainTokenFactory,
-  deployIts,
-  deployTokenManagerLockUnlock,
+  baseItsKvs,
+  deployContracts,
   deployTokenManagerMintBurn,
-  gasService,
-  gateway, interchainTokenFactory,
-  its, LATEST_METADATA_VERSION,
-  tokenManagerLockUnlock,
+  interchainTokenFactory,
+  its,
+  LATEST_METADATA_VERSION,
   tokenManagerMintBurn,
 } from '../itsHelpers';
 import createKeccakHash from 'keccak';
@@ -82,6 +75,18 @@ const deployTokenManager = async (itsAddr: SWallet | null = null, mock: boolean 
   }
 }
 
+const baseKvs = () => {
+  return [
+    e.kvs.Mapper('interchain_token_service').Value(its),
+    e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
+    e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles
+    e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
+    e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+
+    e.kvs.Esdts([{ id: TOKEN_ID, amount: 0, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }]),
+  ];
+}
+
 test("Init errors", async () => {
   const mockTokenId = createKeccakHash('keccak256').update('mockTokenId').digest('hex');
 
@@ -129,7 +134,8 @@ test("Init different arguments", async () => {
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(otherUser),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its & zero address
+      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
     ],
   });
@@ -153,7 +159,7 @@ test("Init different arguments", async () => {
       e.kvs.Mapper('interchain_token_service').Value(otherUser),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
       e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles for operator
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000100)), // flow limiter role for its
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)),
     ],
   });
 });
@@ -178,13 +184,7 @@ test("Interchain transfer", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 0, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }]),
+      ...baseKvs(),
     ],
   });
 
@@ -228,13 +228,7 @@ test("Interchain transfer with data", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 0, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }]),
+      ...baseKvs(),
     ],
   });
 
@@ -368,13 +362,7 @@ test("Call contract with interchain token", async () => {
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 0, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }]),
+      ...baseKvs(),
     ],
   });
 
@@ -830,7 +818,7 @@ test("Deploy interchain token", async () => {
     allKvs: [
       ...baseKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000101)), // minter role was added to user
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // minter role was added to user
 
       // ESDT token deployment was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -869,6 +857,30 @@ test("Deploy interchain token errors", async () => {
       e.U8(18),
     ],
   }).assertFail({ code: 4, message: 'Not service or minter' });
+
+  await user.callContract({
+    callee: tokenManagerMintBurn,
+    funcName: "deployInterchainToken",
+    gasLimit: 200_000_000,
+    funcArgs: [
+      e.Option(user),
+      e.Str(''),
+      e.Str('TOKEN-SYMBOL'),
+      e.U8(18),
+    ],
+  }).assertFail({ code: 4, message: 'Token name empty' });
+
+  await user.callContract({
+    callee: tokenManagerMintBurn,
+    funcName: "deployInterchainToken",
+    gasLimit: 200_000_000,
+    funcArgs: [
+      e.Option(user),
+      e.Str('Token Name'),
+      e.Str(''),
+      e.U8(18),
+    ],
+  }).assertFail({ code: 4, message: 'Token symbol empty' });
 
   // Manually set token identifier
   await tokenManagerMintBurn.setAccount({
@@ -1218,7 +1230,7 @@ test("Transfer mintership", async () => {
       ...baseKvs,
 
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000101)), // flow limit & minter role
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000111)), // flow limit & operator & minter role
     ],
   });
 
@@ -1352,7 +1364,7 @@ test("Accept mintership", async () => {
       ...baseKvs,
 
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000101)), // flow limit & minter role
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000111)), // flow limit & operator & minter role
 
       e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000001)),
     ],

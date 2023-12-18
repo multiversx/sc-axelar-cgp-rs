@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           11
+// Endpoints:                           10
 // Async Callback:                       1
-// Total number of exported functions:  13
+// Total number of exported functions:  12
 
 #![no_std]
 
@@ -26,13 +26,12 @@ multiversx_sc_wasm_adapter::endpoints! {
         deployRemoteInterchainToken => deploy_remote_interchain_token
         registerCanonicalInterchainToken => register_canonical_interchain_token
         deployRemoteCanonicalInterchainToken => deploy_remote_canonical_interchain_token
-        interchainTransfer => interchain_transfer
         interchainTokenSalt => interchain_token_salt
         canonicalInterchainTokenSalt => canonical_interchain_token_salt
         interchainTokenId => interchain_token_id
         canonicalInterchainTokenId => canonical_interchain_token_id
         chainNameHash => chain_name_hash
-        service => service
+        interchain_token_service => interchain_token_service
     )
 }
 

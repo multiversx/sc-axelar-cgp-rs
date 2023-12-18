@@ -147,8 +147,8 @@ test("Execute deploy interchain token only deploy token manager", async () => {
     kvs: [
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit & operator roles
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit & operator role
     ],
   });
 
@@ -209,7 +209,8 @@ test("Execute deploy interchain token only issue esdt", async () => {
     kvs: [
       ...baseTokenManagerKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user & its
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)),
 
       // ESDT token deployment was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(

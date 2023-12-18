@@ -97,9 +97,9 @@ export const deployTokenManagerMintBurn = async (
   let baseKvs = [
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-    e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)),
+    e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)), // flow limit & operator role
 
-    ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []),
+    ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
     ...(tokenIdentifier ? [e.kvs.Mapper('token_identifier').Value(e.Str(tokenIdentifier))] : []),
   ];
 
@@ -123,7 +123,7 @@ export const deployTokenManagerMintBurn = async (
           e.kvs.Esdts([{ id: tokenIdentifier, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }]),
         ] : []),
 
-      ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []), // flow limit role
+      ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
       ...(minter ? [e.kvs.Mapper(
         'account_roles',
         minter,
@@ -162,10 +162,10 @@ export const deployTokenManagerLockUnlock = async (
   const baseKvs = [
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('interchain_token_id').Value(e.Bytes(interchainTokenId)),
-    e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)), // operator & flow limit roles
+    e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110)), // flow limit & operator role
     e.kvs.Mapper('token_identifier').Value(e.Str(tokenId)),
 
-    ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []), // flow limit role
+    ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
   ];
 
   const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
@@ -221,7 +221,7 @@ export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: b
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('service').Value(its),
+      e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
   });
@@ -288,8 +288,8 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addT
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('interchain_token_id').Value(e.Bytes(computedTokenId)),
     e.kvs.Mapper('token_identifier').Value(e.Str(tokenIdentifier)),
-    e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
-    e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
+    e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit & operator roles
+    e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit & operator roles
   ];
 
   if (addTokens) {

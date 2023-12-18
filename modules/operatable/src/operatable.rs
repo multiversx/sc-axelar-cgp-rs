@@ -32,13 +32,14 @@ pub trait Operatable: roles::AccountRoles {
     }
 
     fn add_operator(&self, operator: ManagedAddress) {
-        self.add_account_roles(operator, Roles::OPERATOR);
+        self.add_role(operator, Roles::OPERATOR);
     }
 
     fn only_operator(&self) {
         self.only_role(Roles::OPERATOR);
     }
 
+    #[view(isOperator)]
     fn is_operator(&self, address: &ManagedAddress) -> bool {
         self.has_role(address, Roles::OPERATOR)
     }

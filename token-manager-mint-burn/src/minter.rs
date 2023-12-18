@@ -32,7 +32,7 @@ pub trait Minter: operatable::roles::AccountRoles {
     }
 
     fn add_minter(&self, minter: ManagedAddress) {
-        self.add_account_roles(minter, Roles::MINTER);
+        self.add_role(minter, Roles::MINTER);
     }
 
     fn only_minter(&self) {
