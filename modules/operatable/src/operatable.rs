@@ -12,19 +12,19 @@ pub trait Operatable: roles::AccountRoles {
     fn transfer_operatorship(&self, operator: ManagedAddress) {
         self.only_operator();
 
-        self.transfer_account_roles(self.blockchain().get_caller(), operator, Roles::OPERATOR);
+        self.transfer_role(self.blockchain().get_caller(), operator, Roles::OPERATOR);
     }
 
     #[endpoint(proposeOperatorship)]
     fn propose_operatorship(&self, operator: ManagedAddress) {
         self.only_operator();
 
-        self.propose_account_roles(self.blockchain().get_caller(), operator, Roles::OPERATOR);
+        self.propose_role(self.blockchain().get_caller(), operator, Roles::OPERATOR);
     }
 
     #[endpoint(acceptOperatorship)]
     fn accept_operatorship(&self, from_operator: ManagedAddress) {
-        self.accept_account_roles(
+        self.accept_role(
             from_operator,
             self.blockchain().get_caller(),
             Roles::OPERATOR,

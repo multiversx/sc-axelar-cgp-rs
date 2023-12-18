@@ -4,7 +4,7 @@ use bitflags::bitflags;
 bitflags! {
     #[derive(PartialEq, Copy, Clone)]
     pub struct Roles: u32 {
-        const DISTRIBUTOR = 0b00000001;
+        const MINTER = 0b00000001;
         const OPERATOR = 0b00000010;
         const FLOW_LIMITER = 0b00000100;
     }
@@ -87,7 +87,7 @@ pub trait AccountRoles {
         });
     }
 
-    fn propose_account_roles(
+    fn propose_role(
         &self,
         from_address: ManagedAddress,
         to_address: ManagedAddress,
@@ -102,7 +102,7 @@ pub trait AccountRoles {
         self.set_proposed_roles(from_address, to_address, proposed_roles);
     }
 
-    fn accept_account_roles(
+    fn accept_role(
         &self,
         from_address: ManagedAddress,
         to_address: ManagedAddress,
@@ -117,10 +117,10 @@ pub trait AccountRoles {
 
         proposed_roles_mapper.clear();
 
-        self.transfer_account_roles(from_address, to_address, proposed_roles);
+        self.transfer_role(from_address, to_address, proposed_roles);
     }
 
-    fn transfer_account_roles(
+    fn transfer_role(
         &self,
         from_address: ManagedAddress,
         to_address: ManagedAddress,

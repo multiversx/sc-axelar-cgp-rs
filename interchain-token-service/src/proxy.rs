@@ -7,10 +7,10 @@ use crate::constants::{
 use crate::{address_tracker, events, express_executor_tracker};
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
+use flow_limit::ProxyTrait as _;
+use token_manager::ProxyTrait as _;
 use token_manager::TokenManagerType;
 use token_manager_mint_burn::ProxyTrait as _;
-use token_manager::ProxyTrait as _;
-use flow_limit::ProxyTrait as _;
 
 pub mod gas_service_proxy {
     multiversx_sc::imports!();
@@ -73,13 +73,14 @@ pub mod executable_contract_proxy {
 
     use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
+    // Contracts having these functions should check that the InterchainTokenService contract called them
     #[multiversx_sc::proxy]
     pub trait ExecutableContractProxy {
-        // TODO: Contracts having these functions should check that the InterchainTokenService contract called them
         #[payable("*")]
         #[endpoint(executeWithInterchainToken)]
         fn execute_with_interchain_token(
             &self,
+            command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
             source_chain: ManagedBuffer,
             source_address: ManagedBuffer,
             data: ManagedBuffer,
@@ -90,6 +91,7 @@ pub mod executable_contract_proxy {
         #[endpoint(expressExecuteWithInterchainToken)]
         fn express_execute_with_interchain_token(
             &self,
+            command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
             source_chain: ManagedBuffer,
             source_address: ManagedBuffer,
             data: ManagedBuffer,
@@ -210,13 +212,13 @@ pub trait ProxyModule:
     fn token_manager_deploy_interchain_token(
         &self,
         token_id: &TokenId<Self::Api>,
-        distributor: Option<ManagedAddress>,
+        minter: Option<ManagedAddress>,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
     ) {
         self.token_manager_proxy(self.valid_token_manager_address(token_id))
-            .deploy_interchain_token(distributor, name, symbol, decimals)
+            .deploy_interchain_token(minter, name, symbol, decimals)
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
             .execute_on_dest_context::<()>();
@@ -240,7 +242,13 @@ pub trait ProxyModule:
         command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.executable_contract_proxy(destination_address)
-            .execute_with_interchain_token(source_chain, source_address, data, token_id.clone())
+            .execute_with_interchain_token(
+                &command_id,
+                source_chain,
+                source_address,
+                data,
+                token_id.clone(),
+            )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
             .async_call()
             .with_callback(self.callbacks().execute_with_token_callback(
@@ -266,7 +274,13 @@ pub trait ProxyModule:
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.executable_contract_proxy(destination_address)
-            .express_execute_with_interchain_token(source_chain, source_address, data, token_id)
+            .express_execute_with_interchain_token(
+                &command_id,
+                source_chain,
+                source_address,
+                data,
+                token_id,
+            )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
             .async_call()
             .with_callback(self.callbacks().exp_execute_with_token_callback(
@@ -285,7 +299,7 @@ pub trait ProxyModule:
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
-        distributor: ManagedBuffer,
+        minter: ManagedBuffer,
         destination_chain: ManagedBuffer,
         gas_value: BigUint,
     ) {
@@ -297,7 +311,7 @@ pub trait ProxyModule:
             name: name.clone(),
             symbol: symbol.clone(),
             decimals,
-            distributor: distributor.clone(),
+            minter: minter.clone(),
         };
 
         let payload = data.abi_encode();
@@ -309,7 +323,7 @@ pub trait ProxyModule:
             name,
             symbol,
             decimals,
-            distributor,
+            minter,
             destination_chain,
         );
     }
@@ -412,8 +426,10 @@ pub trait ProxyModule:
     fn gas_service_proxy(&self, sc_address: ManagedAddress) -> gas_service_proxy::Proxy<Self::Api>;
 
     #[proxy]
-    fn token_manager_proxy(&self, address: ManagedAddress)
-        -> token_manager_mint_burn::Proxy<Self::Api>;
+    fn token_manager_proxy(
+        &self,
+        address: ManagedAddress,
+    ) -> token_manager_mint_burn::Proxy<Self::Api>;
 
     #[proxy]
     fn executable_contract_proxy(

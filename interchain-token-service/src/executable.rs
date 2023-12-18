@@ -112,11 +112,11 @@ pub trait ExecutableModule:
     ) {
         let data = DeployInterchainTokenPayload::<Self::Api>::abi_decode(payload);
 
-        let distributor_raw = ManagedAddress::try_from(data.distributor);
-        let distributor = if distributor_raw.is_err() {
+        let minter_raw = ManagedAddress::try_from(data.minter);
+        let minter = if minter_raw.is_err() {
             None
         } else {
-            Some(distributor_raw.unwrap())
+            Some(minter_raw.unwrap())
         };
 
         // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
@@ -142,7 +142,7 @@ pub trait ExecutableModule:
                 &data.token_id,
                 TokenManagerType::MintBurn,
                 DeployTokenManagerParams {
-                    operator: distributor,
+                    operator: minter,
                     token_identifier: None,
                 },
             );
@@ -162,7 +162,7 @@ pub trait ExecutableModule:
 
         self.token_manager_deploy_interchain_token(
             &data.token_id,
-            distributor,
+            minter,
             data.name,
             data.symbol,
             data.decimals,

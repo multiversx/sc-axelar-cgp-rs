@@ -37,16 +37,16 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         symbol: ManagedBuffer,
         decimals: u8,
         mint_amount: BigUint,
-        distributor_address: ManagedAddress,
+        minter_address: ManagedAddress,
     ) {
         let sender = self.blockchain().get_caller();
         let salt = self.interchain_token_salt(&self.chain_name_hash().get(), &sender, &salt);
 
         let own_address = self.blockchain().get_sc_address();
-        let distributor = if mint_amount > 0 {
+        let minter = if mint_amount > 0 {
             own_address.as_managed_buffer()
         } else {
-            distributor_address.as_managed_buffer()
+            minter_address.as_managed_buffer()
         };
 
         let token_id = self.service_interchain_token_id(&ManagedAddress::zero(), &salt);
@@ -76,7 +76,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
                 name,
                 symbol,
                 decimals,
-                distributor,
+                minter,
                 gas_value,
             );
 
@@ -93,21 +93,21 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             // TODO: This mints tokens to this contract, and tokens will be stuck here, is this right?
             self.token_manager_mint(token_manager.clone(), own_address.clone(), mint_amount);
 
-            self.token_manager_transfer_distributorship(
+            self.token_manager_transfer_mintership(
                 token_manager.clone(),
-                distributor_address.clone(),
+                minter_address.clone(),
             );
 
             self.token_manager_remove_flow_limiter(token_manager.clone(), own_address);
 
-            if !distributor_address.is_zero() {
+            if !minter_address.is_zero() {
                 self.token_manager_add_flow_limiter(
                     token_manager.clone(),
-                    distributor_address.clone(),
+                    minter_address.clone(),
                 );
             }
 
-            self.token_manager_transfer_operatorship(token_manager, distributor_address);
+            self.token_manager_transfer_operatorship(token_manager, minter_address);
         }
     }
 
@@ -117,10 +117,10 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         &self,
         original_chain_name: ManagedBuffer,
         salt: Hash<Self::Api>,
-        distributor: ManagedAddress,
+        minter: ManagedAddress,
         destination_chain: ManagedBuffer,
     ) {
-        let mut distributor_raw = &ManagedBuffer::new();
+        let mut minter_raw = &ManagedBuffer::new();
 
         let chain_name_hash = if original_chain_name.is_empty() {
             self.chain_name_hash().get()
@@ -134,19 +134,19 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
 
         let token_manager = self.service_interchain_valid_token_manager_address(&token_id);
 
-        if !distributor.is_zero() {
+        if !minter.is_zero() {
             require!(
-                self.token_manager_is_distributor(token_manager.clone(), &distributor),
-                "Not distributor"
+                self.token_manager_is_minter(token_manager.clone(), &minter),
+                "Not minter"
             );
 
             // TODO: Here the MultiversX address is used as the destination chain address which doesn't seem right...
-            distributor_raw = distributor.as_managed_buffer();
+            minter_raw = minter.as_managed_buffer();
         }
 
         self.deploy_remote_interchain_token_raw(
             destination_chain,
-            distributor_raw,
+            minter_raw,
             sender,
             salt,
             token_manager,
@@ -258,7 +258,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
     fn deploy_remote_interchain_token_raw(
         &self,
         destination_chain: ManagedBuffer,
-        distributor_raw: &ManagedBuffer,
+        minter_raw: &ManagedBuffer,
         sender: ManagedAddress,
         salt: Hash<Self::Api>,
         token_manager: ManagedAddress,
@@ -275,7 +275,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
                 token_identifier.clone().into_name(),
                 token_identifier.into_name(),
                 18, // EGLD token has 18 decimals
-                distributor_raw,
+                minter_raw,
                 gas_value,
             );
 
@@ -294,7 +294,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
                 salt,
                 destination_chain,
                 token_symbol,
-                distributor_raw,
+                minter_raw,
                 gas_value,
                 sender,
             ),

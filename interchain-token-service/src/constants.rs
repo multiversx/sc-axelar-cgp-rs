@@ -71,12 +71,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for InterchainTransferPayload<M> {
         let mut data = None;
         if message_type == MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA {
             let mut result = ArrayVec::<Token<M>, 1>::new();
-            Self::raw_abi_decode(
-                &[ParamType::Bytes],
-                &payload,
-                &mut result,
-                5,
-            );
+            Self::raw_abi_decode(&[ParamType::Bytes], &payload, &mut result, 5);
 
             data = Some(result.pop().unwrap().into_managed_buffer());
         }
@@ -156,7 +151,7 @@ pub struct DeployInterchainTokenPayload<M: ManagedTypeApi> {
     pub name: ManagedBuffer<M>,
     pub symbol: ManagedBuffer<M>,
     pub decimals: u8,
-    pub distributor: ManagedBuffer<M>,
+    pub minter: ManagedBuffer<M>,
 }
 
 impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
@@ -167,7 +162,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
             Token::String(self.name),
             Token::String(self.symbol),
             Token::Uint8(self.decimals),
-            Token::Bytes(self.distributor),
+            Token::Bytes(self.minter),
         ])
     }
 
@@ -188,7 +183,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
             0,
         );
 
-        let distributor = result.pop().unwrap().into_managed_buffer();
+        let minter = result.pop().unwrap().into_managed_buffer();
         let decimals = result.pop().unwrap().into_u8();
         let symbol = result.pop().unwrap().into_managed_buffer();
         let name = result.pop().unwrap().into_managed_buffer();
@@ -201,7 +196,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
             name,
             symbol,
             decimals,
-            distributor,
+            minter,
         }
     }
 }

@@ -9,7 +9,7 @@ use interchain_token_service::ProxyTrait as _;
 use token_manager_mint_burn::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 use interchain_token_service::proxy::ProxyTrait as _;
-use token_manager_mint_burn::distributable::ProxyTrait as _;
+use token_manager_mint_burn::minter::ProxyTrait as _;
 use operatable::ProxyTrait as _;
 
 #[multiversx_sc::module]
@@ -37,12 +37,12 @@ pub trait ProxyModule {
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
-        distributor: &ManagedBuffer,
+        minter: &ManagedBuffer,
         gas_value: BigUint,
     ) {
         self
             .service_proxy(self.service().get())
-            .deploy_interchain_token(salt, destination_chain, name, symbol, decimals, distributor)
+            .deploy_interchain_token(salt, destination_chain, name, symbol, decimals, minter)
             .with_egld_transfer(gas_value)
             .execute_on_dest_context::<()>();
     }
@@ -122,9 +122,9 @@ pub trait ProxyModule {
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_transfer_distributorship(&self, sc_address: ManagedAddress, distributor: ManagedAddress) {
+    fn token_manager_transfer_mintership(&self, sc_address: ManagedAddress, minter: ManagedAddress) {
         self.token_manager_proxy(sc_address)
-            .transfer_distributorship(distributor)
+            .transfer_mintership(minter)
             .execute_on_dest_context::<()>();
     }
 
@@ -146,13 +146,13 @@ pub trait ProxyModule {
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_is_distributor(
+    fn token_manager_is_minter(
         &self,
         sc_address: ManagedAddress,
-        distributor: &ManagedAddress,
+        minter: &ManagedAddress,
     ) -> bool {
         self.token_manager_proxy(sc_address)
-            .is_distributor(distributor)
+            .is_minter(minter)
             .execute_on_dest_context()
     }
 
@@ -199,7 +199,7 @@ pub trait ProxyModule {
         salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         token_symbol: ManagedBuffer,
-        distributor_raw: &ManagedBuffer,
+        minter_raw: &ManagedBuffer,
         gas_value: BigUint,
         caller: ManagedAddress,
         #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
@@ -233,7 +233,7 @@ pub trait ProxyModule {
                     token_name,
                     token_symbol,
                     token_decimals,
-                    distributor_raw,
+                    minter_raw,
                     gas_value,
                 );
             }

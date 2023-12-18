@@ -148,7 +148,7 @@ pub trait InterchainTokenServiceContract:
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
-        distributor: ManagedBuffer,
+        minter: ManagedBuffer,
     ) {
         self.require_not_paused();
 
@@ -162,11 +162,11 @@ pub trait InterchainTokenServiceContract:
         let token_id = self.interchain_token_id(&deployer, &salt);
 
         if destination_chain.is_empty() {
-            let distributor_raw = ManagedAddress::try_from(distributor);
-            let distributor = if distributor_raw.is_err() {
+            let minter_raw = ManagedAddress::try_from(minter);
+            let minter = if minter_raw.is_err() {
                 None
             } else {
-                Some(distributor_raw.unwrap())
+                Some(minter_raw.unwrap())
             };
 
             // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
@@ -182,7 +182,7 @@ pub trait InterchainTokenServiceContract:
                     &token_id,
                     TokenManagerType::MintBurn,
                     DeployTokenManagerParams {
-                        operator: distributor,
+                        operator: minter,
                         token_identifier: None,
                     },
                 );
@@ -192,7 +192,7 @@ pub trait InterchainTokenServiceContract:
 
             self.token_manager_deploy_interchain_token(
                 &token_id,
-                distributor,
+                minter,
                 name,
                 symbol,
                 decimals,
@@ -205,7 +205,7 @@ pub trait InterchainTokenServiceContract:
                 name,
                 symbol,
                 decimals,
-                distributor,
+                minter,
                 destination_chain,
                 gas_value,
             );

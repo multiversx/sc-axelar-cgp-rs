@@ -378,7 +378,7 @@ test('Deploy token manager interchain token factory', async () => {
   });
 });
 
-test('Deploy interchain token only deploy token manager distributor', async () => {
+test('Deploy interchain token only deploy token manager minter', async () => {
   await user.callContract({
     callee: its,
     funcName: 'deployInterchainToken',
@@ -390,7 +390,7 @@ test('Deploy interchain token only deploy token manager distributor', async () =
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Bytes(user.toTopBytes()), // distributor
+      e.Bytes(user.toTopBytes()), // minter
     ],
   }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
 
@@ -405,7 +405,7 @@ test('Deploy interchain token only deploy token manager distributor', async () =
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Bytes(user.toTopBytes()), // distributor
+      e.Bytes(user.toTopBytes()), // minter
     ],
   });
 
@@ -432,7 +432,7 @@ test('Deploy interchain token only deploy token manager distributor', async () =
   });
 });
 
-test('Deploy interchain token only deploy token manager no distributor', async () => {
+test('Deploy interchain token only deploy token manager no minter', async () => {
   await user.callContract({
     callee: its,
     funcName: 'deployInterchainToken',
@@ -444,7 +444,7 @@ test('Deploy interchain token only deploy token manager no distributor', async (
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Str('sth'), // invalid distributor
+      e.Str('sth'), // invalid minter
     ],
   });
 
@@ -470,7 +470,7 @@ test('Deploy interchain token only deploy token manager no distributor', async (
   });
 });
 
-test('Deploy interchain token only issue esdt distributor', async () => {
+test('Deploy interchain token only issue esdt minter', async () => {
   const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
 
   const computedTokenId = computeInterchainTokenId(user);
@@ -497,7 +497,7 @@ test('Deploy interchain token only issue esdt distributor', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Bytes(user.toTopBytes()), // distributor
+      e.Bytes(user.toTopBytes()), // minter
     ],
   }).assertFail({ code: 10, message: 'failed transfer (insufficient funds)' });
 
@@ -512,7 +512,7 @@ test('Deploy interchain token only issue esdt distributor', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Bytes(user.toTopBytes()), // distributor
+      e.Bytes(user.toTopBytes()), // minter
     ],
   });
 
@@ -533,7 +533,7 @@ test('Deploy interchain token only issue esdt distributor', async () => {
     allKvs: [
       ...baseTokenManagerKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // distributor role was added to user
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user
 
       // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -544,7 +544,7 @@ test('Deploy interchain token only issue esdt distributor', async () => {
   });
 });
 
-test('Deploy interchain token only issue esdt no distributor', async () => {
+test('Deploy interchain token only issue esdt no minter', async () => {
   const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
 
   const computedTokenId = computeInterchainTokenId(user);
@@ -570,7 +570,7 @@ test('Deploy interchain token only issue esdt no distributor', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Str('sth'), // invalid distributor
+      e.Str('sth'), // invalid minter
     ],
   });
 
@@ -591,7 +591,7 @@ test('Deploy interchain token only issue esdt no distributor', async () => {
     allKvs: [
       ...baseTokenManagerKvs,
 
-      // no distributor role was set
+      // no minter role was set
 
       // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -630,7 +630,7 @@ test('Deploy interchain token remote', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Str(OTHER_CHAIN_ADDRESS), // distributor
+      e.Str(OTHER_CHAIN_ADDRESS), // minter
     ],
   });
 
@@ -670,7 +670,7 @@ test('Deploy interchain token remote', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Str(OTHER_CHAIN_ADDRESS), // distributor
+      e.Str(OTHER_CHAIN_ADDRESS), // minter
     ],
   });
 
@@ -708,7 +708,7 @@ test('Deploy interchain token remote errors', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Str(OTHER_CHAIN_ADDRESS), // distributor
+      e.Str(OTHER_CHAIN_ADDRESS), // minter
     ],
   }).assertFail({ code: 4, message: 'Token manager does not exist' });
 
@@ -734,7 +734,7 @@ test('Deploy interchain token remote errors', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Str(OTHER_CHAIN_ADDRESS), // distributor
+      e.Str(OTHER_CHAIN_ADDRESS), // minter
     ],
   }).assertFail({ code: 4, message: 'Untrusted chain' });
 });
@@ -759,7 +759,7 @@ test('Deploy interchain token interchain token factory', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Bytes(user.toTopBytes()), // distributor
+      e.Bytes(user.toTopBytes()), // minter
     ],
   });
 

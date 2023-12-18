@@ -830,7 +830,7 @@ test("Deploy interchain token", async () => {
     allKvs: [
       ...baseKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000101)), // distributor role was added to user
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000101)), // minter role was added to user
 
       // ESDT token deployment was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -868,7 +868,7 @@ test("Deploy interchain token errors", async () => {
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
     ],
-  }).assertFail({ code: 4, message: 'Not service or distributor' });
+  }).assertFail({ code: 4, message: 'Not service or minter' });
 
   // Manually set token identifier
   await tokenManagerMintBurn.setAccount({
@@ -896,7 +896,7 @@ test("Deploy interchain token errors", async () => {
 test("Mint", async () => {
   const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, TOKEN_ID, true, user);
 
-  // Only distributor can call this
+  // Only minter can call this
   await otherUser.callContract({
     callee: tokenManagerMintBurn,
     funcName: "mint",
@@ -940,7 +940,7 @@ test("Mint", async () => {
 test("Burn", async () => {
   const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, TOKEN_ID, true, user);
 
-  // Only distributor can call this
+  // Only minter can call this
   await otherUser.callContract({
     callee: tokenManagerMintBurn,
     funcName: "burn",
@@ -1190,12 +1190,12 @@ test("Accept operatorship", async () => {
   }).assertFail({ code: 4, message: 'Missing all roles' });
 });
 
-test("Transfer distributorship", async () => {
+test("Transfer mintership", async () => {
   const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, null, false, user);
 
   await deployer.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "transferDistributorship",
+    funcName: "transferMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       deployer,
@@ -1204,7 +1204,7 @@ test("Transfer distributorship", async () => {
 
   await user.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "transferDistributorship",
+    funcName: "transferMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       otherUser,
@@ -1217,15 +1217,15 @@ test("Transfer distributorship", async () => {
     allKvs: [
       ...baseKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // distributor role was removed
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000101)), // flow limit & distributor role
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000101)), // flow limit & minter role
     ],
   });
 
-  // Check that distributor was changed
+  // Check that minter was changed
   await otherUser.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "transferDistributorship",
+    funcName: "transferMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       otherUser,
@@ -1233,12 +1233,12 @@ test("Transfer distributorship", async () => {
   });
 });
 
-test("Propose distributorship", async () => {
+test("Propose mintership", async () => {
   const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, null, false, user);
 
   await deployer.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "proposeDistributorship",
+    funcName: "proposeMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       otherUser,
@@ -1247,7 +1247,7 @@ test("Propose distributorship", async () => {
 
   await user.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "proposeDistributorship",
+    funcName: "proposeMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       otherUser,
@@ -1267,7 +1267,7 @@ test("Propose distributorship", async () => {
   // Proposed operator can not call this function
   await otherUser.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "proposeDistributorship",
+    funcName: "proposeMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       otherUser,
@@ -1277,7 +1277,7 @@ test("Propose distributorship", async () => {
   // If called multiple times, multiple entries are added
   await user.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "proposeDistributorship",
+    funcName: "proposeMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       deployer,
@@ -1296,12 +1296,12 @@ test("Propose distributorship", async () => {
   });
 });
 
-test("Accept distributorship", async () => {
+test("Accept mintership", async () => {
   const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, null, false, user);
 
   await deployer.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "acceptDistributorship",
+    funcName: "acceptMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       user
@@ -1310,7 +1310,7 @@ test("Accept distributorship", async () => {
 
   await user.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "proposeDistributorship",
+    funcName: "proposeMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       otherUser,
@@ -1320,7 +1320,7 @@ test("Accept distributorship", async () => {
   // Propose other
   await user.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "proposeDistributorship",
+    funcName: "proposeMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       deployer,
@@ -1329,7 +1329,7 @@ test("Accept distributorship", async () => {
 
   await user.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "acceptDistributorship",
+    funcName: "acceptMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       user
@@ -1338,7 +1338,7 @@ test("Accept distributorship", async () => {
 
   await otherUser.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "acceptDistributorship",
+    funcName: "acceptMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       user
@@ -1351,17 +1351,17 @@ test("Accept distributorship", async () => {
     allKvs: [
       ...baseKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // distributor role was removed
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000101)), // flow limit & distributor role
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
+      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000101)), // flow limit & minter role
 
       e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000001)),
     ],
   });
 
-  // deployer can no longer accept because user doesn't have distributor role anymore
+  // deployer can no longer accept because user doesn't have minter role anymore
   await deployer.callContract({
     callee: tokenManagerMintBurn,
-    funcName: "acceptDistributorship",
+    funcName: "acceptMintership",
     gasLimit: 5_000_000,
     funcArgs: [
       user

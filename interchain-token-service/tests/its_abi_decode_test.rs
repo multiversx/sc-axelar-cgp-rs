@@ -370,7 +370,7 @@ fn decode_deploy_interchain_token_payload() {
         name: ManagedBuffer::from("Name"),
         symbol: ManagedBuffer::from("Symbol"),
         decimals: 18,
-        distributor: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
+        minter: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
     };
 
     assert_eq!(result.message_type, expected.message_type);
@@ -378,5 +378,5 @@ fn decode_deploy_interchain_token_payload() {
     assert_eq!(result.name, expected.name);
     assert_eq!(result.symbol, expected.symbol);
     assert_eq!(result.decimals, expected.decimals);
-    assert_eq!(result.distributor, expected.distributor);
+    assert_eq!(result.minter, expected.minter);
 }

@@ -1,6 +1,6 @@
 #![no_std]
 
-pub mod distributable;
+pub mod minter;
 
 multiversx_sc::imports!();
 
@@ -17,7 +17,7 @@ pub trait TokenManagerMintBurnContract:
     + flow_limit::FlowLimit
     + operatable::Operatable
     + operatable::roles::AccountRoles
-    + distributable::Distributable
+    + minter::Minter
 {
     #[init]
     fn init(
@@ -94,7 +94,7 @@ pub trait TokenManagerMintBurnContract:
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
         &self,
-        distributor: Option<ManagedAddress>,
+        minter: Option<ManagedAddress>,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
@@ -106,14 +106,14 @@ pub trait TokenManagerMintBurnContract:
 
         let caller = self.blockchain().get_caller();
 
-        // Also allow distributor to call this (if set) in case issue esdt fails
+        // Also allow minter to call this (if set) in case issue esdt fails
         require!(
-            caller == self.interchain_token_service().get() || self.is_distributor(&caller),
-            "Not service or distributor"
+            caller == self.interchain_token_service().get() || self.is_minter(&caller),
+            "Not service or minter"
         );
 
-        if distributor.is_some() {
-            self.add_distributor(distributor.unwrap());
+        if minter.is_some() {
+            self.add_minter(minter.unwrap());
         }
 
         let issue_cost = BigUint::from(DEFAULT_ESDT_ISSUE_COST);
@@ -134,7 +134,7 @@ pub trait TokenManagerMintBurnContract:
 
     #[endpoint]
     fn mint(&self, address: ManagedAddress, amount: &BigUint) {
-        self.only_distributor();
+        self.only_minter();
 
         require!(
             !self.token_identifier().is_empty(),
@@ -151,7 +151,7 @@ pub trait TokenManagerMintBurnContract:
     #[payable("*")]
     #[endpoint]
     fn burn(&self) {
-        self.only_distributor();
+        self.only_minter();
 
         require!(
             !self.token_identifier().is_empty(),

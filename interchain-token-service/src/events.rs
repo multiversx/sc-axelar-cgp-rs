@@ -18,7 +18,7 @@ pub struct InterchainTokenDeploymentStartedEventData<M: ManagedTypeApi> {
     name: ManagedBuffer<M>,
     symbol: ManagedBuffer<M>,
     decimals: u8,
-    distributor: ManagedBuffer<M>,
+    minter: ManagedBuffer<M>,
     destination_chain: ManagedBuffer<M>,
 }
 
@@ -79,14 +79,14 @@ pub trait EventsModule {
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
-        distributor: ManagedBuffer,
+        minter: ManagedBuffer,
         destination_chain: ManagedBuffer,
     ) {
         let data = InterchainTokenDeploymentStartedEventData {
             name,
             symbol,
             decimals,
-            distributor,
+            minter,
             destination_chain,
         };
 
@@ -112,7 +112,7 @@ pub trait EventsModule {
     fn emit_standardized_token_deployed_event(
         &self,
         token_id: &TokenId<Self::Api>,
-        distributor: ManagedAddress,
+        minter: ManagedAddress,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
@@ -127,7 +127,7 @@ pub trait EventsModule {
             mint_to,
         };
 
-        self.standardized_token_deployed_event(token_id, distributor, data);
+        self.standardized_token_deployed_event(token_id, minter, data);
     }
 
     fn emit_interchain_transfer_event(
@@ -199,7 +199,7 @@ pub trait EventsModule {
     fn standardized_token_deployed_event(
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
-        #[indexed] distributor: ManagedAddress,
+        #[indexed] minter: ManagedAddress,
         data: StandardizedTokenDeployedEventData<Self::Api>,
     );
 

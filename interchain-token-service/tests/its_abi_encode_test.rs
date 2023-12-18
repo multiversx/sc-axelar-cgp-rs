@@ -240,7 +240,7 @@ fn encode_deploy_interchain_token_payload() {
         name: ManagedBuffer::from("Name"),
         symbol: ManagedBuffer::from("Symbol"),
         decimals: 18,
-        distributor: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
+        minter: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
     };
 
     let encoded = data.abi_encode();

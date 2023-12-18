@@ -21,11 +21,11 @@ a new token, as well as register a token remotely for another chain.
   - **params** needs to be in the format accepted by the ITS Token Manager of the other chain
   - it also takes EGLD payment to pay for cross-chain gas costs
   - it will use the token id generated depending on the caller
-- **deployAndRegisterStandardizedToken** (salt, name, symbol, decimals, mint_amount, distributor) - deploys a new ESDT token and a Mint Burn Token Manager
+- **deployAndRegisterStandardizedToken** (salt, name, symbol, decimals, mint_amount, minter) - deploys a new ESDT token and a Mint Burn Token Manager
   - the generated token id depends on the caller and the salt provided
   - it also takes EGLD payment to pay for ESDT issue cost
   - needs to be called twice, first time it will deploy the Token Manager and the second time the ESDT token through the Token Manager
-- **deployAndRegisterRemoteStandardizedToken** (salt, name, symbol, decimals, distributor, mint_to, mint_amount, operator, destination_chain) - deploys a new token and Mint Burn Token Manager on the specified chain
+- **deployAndRegisterRemoteStandardizedToken** (salt, name, symbol, decimals, minters, mint_to, mint_amount, operator, destination_chain) - deploys a new token and Mint Burn Token Manager on the specified chain
   - the generated token id depends on the caller and the salt provided
   - it also takes EGLD payment to pay for cross-chain gas costs
 - **expressReceiveToken** (payload, command_id, source_chain) - can be called by anyone to complete a cross-chain call faster, if they provide the required tokens

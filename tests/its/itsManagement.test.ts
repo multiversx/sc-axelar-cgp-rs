@@ -439,7 +439,7 @@ test('Pause', async () => {
       e.Str('Token Name'),
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
-      e.Bytes(user.toTopBytes()), // distributor
+      e.Bytes(user.toTopBytes()), // minter
     ],
   }).assertFail({ code: 4, message: 'Contract is paused' });
 

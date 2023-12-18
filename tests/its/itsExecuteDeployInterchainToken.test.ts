@@ -86,7 +86,7 @@ const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
       'TokenName',
       'SYMBOL',
       18,
-      Buffer.from(user.toTopBytes()), // distributor
+      Buffer.from(user.toTopBytes()), // minter
     ]
   ).substring(2);
 
@@ -209,7 +209,7 @@ test("Execute deploy interchain token only issue esdt", async () => {
     kvs: [
       ...baseTokenManagerKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // distributor role was added to user
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user
 
       // ESDT token deployment was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(

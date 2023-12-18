@@ -45,10 +45,10 @@ multiversx_sc_wasm_adapter::endpoints! {
         acceptOperatorship => accept_operatorship
         getAccountRoles => account_roles
         getProposedRoles => proposed_roles
-        transferDistributorship => transfer_distributorship
-        proposeDistributorship => propose_distributorship
-        acceptDistributorship => accept_distributorship
-        isDistributor => is_distributor
+        transferMintership => transfer_mintership
+        proposeMintership => propose_mintership
+        acceptMintership => accept_mintership
+        isMinter => is_minter
     )
 }
 

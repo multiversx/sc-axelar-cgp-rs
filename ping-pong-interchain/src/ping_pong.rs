@@ -61,6 +61,7 @@ pub trait PingPong {
     #[endpoint(executeWithInterchainToken)]
     fn execute_with_interchain_token(
         &self,
+        _command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         _source_chain: ManagedBuffer,
         _source_address: ManagedBuffer,
         data: Data<Self::Api>, // this will be automatically decoded from a ManagedBuffer
@@ -84,12 +85,19 @@ pub trait PingPong {
     #[endpoint(expressExecuteWithInterchainToken)]
     fn express_execute_with_interchain_token(
         &self,
+        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
         source_address: ManagedBuffer,
         data: Data<Self::Api>,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
-        self.execute_with_interchain_token(source_chain, source_address, data, token_id);
+        self.execute_with_interchain_token(
+            command_id,
+            source_chain,
+            source_address,
+            data,
+            token_id,
+        );
     }
 
     /// User sends some EGLD to be locked in the contract for a period of time.

@@ -80,7 +80,7 @@ export const deployTokenManagerMintBurn = async (
   its: SWallet | SContract = operator,
   tokenIdentifier: string | null = null,
   burnRole: boolean = true,
-  distributor: SWallet | SContract | null = null,
+  minter: SWallet | SContract | null = null,
 ): Promise<Kvs> => {
   ({ contract: tokenManagerMintBurn, address } = await deployer.deployContract({
     code: 'file:token-manager-mint-burn/output/token-manager-mint-burn.wasm',
@@ -110,12 +110,12 @@ export const deployTokenManagerMintBurn = async (
   });
 
   // Set mint/burn roles if token is set
-  if ((tokenIdentifier && burnRole) || distributor) {
+  if ((tokenIdentifier && burnRole) || minter) {
     baseKvs = [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
 
-      ...(operator !== distributor ? [e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110))] : []), // flow limit & operator roles
+      ...(operator !== minter ? [e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000110))] : []), // flow limit & operator roles
 
       ...(tokenIdentifier && burnRole ?
         [
@@ -124,10 +124,10 @@ export const deployTokenManagerMintBurn = async (
         ] : []),
 
       ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100))] : []), // flow limit role
-      ...(distributor ? [e.kvs.Mapper(
+      ...(minter ? [e.kvs.Mapper(
         'account_roles',
-        distributor,
-      ).Value(e.U32(operator === distributor ? 0b00000111 : 0b00000001))] : []), // all roles OR distributor role
+        minter,
+      ).Value(e.U32(operator === minter ? 0b00000111 : 0b00000001))] : []), // all roles OR minter role
     ];
 
     await tokenManagerMintBurn.setAccount({

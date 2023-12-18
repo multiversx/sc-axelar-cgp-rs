@@ -171,7 +171,7 @@ test('Init', async () => {
   });
 });
 
-test('Deploy interchain token only deploy token manager distributor mint', async () => {
+test('Deploy interchain token only deploy token manager minter mint', async () => {
   await deployContracts(deployer, collector);
 
   await user.callContract({
@@ -185,7 +185,7 @@ test('Deploy interchain token only deploy token manager distributor mint', async
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(1_000),
-      user, // distributor
+      user, // minter
     ],
   }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
 
@@ -200,7 +200,7 @@ test('Deploy interchain token only deploy token manager distributor mint', async
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(1_000),
-      user, // distributor
+      user,
     ],
   });
 
@@ -228,7 +228,7 @@ test('Deploy interchain token only deploy token manager distributor mint', async
   });
 });
 
-test('Deploy interchain token only deploy token manager distributor no mint', async () => {
+test('Deploy interchain token only deploy token manager minter no mint', async () => {
   await deployContracts(deployer, collector);
 
   await user.callContract({
@@ -242,7 +242,7 @@ test('Deploy interchain token only deploy token manager distributor no mint', as
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(0),
-      user, // distributor
+      user,
     ],
   });
 
@@ -270,7 +270,7 @@ test('Deploy interchain token only deploy token manager distributor no mint', as
   });
 });
 
-test('Deploy interchain token only issue esdt distributor mint', async () => {
+test('Deploy interchain token only issue esdt minter mint', async () => {
   const { baseTokenManagerKvs, computedTokenId } = await deployAndMockTokenManagerMintBurn();
 
   // Insufficient funds for issuing ESDT
@@ -285,7 +285,7 @@ test('Deploy interchain token only issue esdt distributor mint', async () => {
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(1_000),
-      user, // distributor
+      user,
     ],
   }).assertFail({ code: 10, message: 'execution failed' });
 
@@ -301,7 +301,7 @@ test('Deploy interchain token only issue esdt distributor mint', async () => {
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(1_000),
-      user, // distributor
+      user,
     ],
   });
 
@@ -322,7 +322,7 @@ test('Deploy interchain token only issue esdt distributor mint', async () => {
     allKvs: [
       ...baseTokenManagerKvs,
 
-      e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000001)), // distributor role
+      e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000001)), // minter role
 
       // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -333,7 +333,7 @@ test('Deploy interchain token only issue esdt distributor mint', async () => {
   });
 });
 
-test('Deploy interchain token only issue esdt distributor no mint', async () => {
+test('Deploy interchain token only issue esdt minter no mint', async () => {
   const { baseTokenManagerKvs, computedTokenId } = await deployAndMockTokenManagerMintBurn();
 
   await user.callContract({
@@ -347,7 +347,7 @@ test('Deploy interchain token only issue esdt distributor no mint', async () => 
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(0),
-      user, // distributor
+      user, // minter
     ],
   });
 
@@ -368,7 +368,7 @@ test('Deploy interchain token only issue esdt distributor no mint', async () => 
     allKvs: [
       ...baseTokenManagerKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // distributor role
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role
 
       // This was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -379,7 +379,7 @@ test('Deploy interchain token only issue esdt distributor no mint', async () => 
   });
 });
 
-test('Deploy interchain token only mint distributor', async () => {
+test('Deploy interchain token only mint minter', async () => {
   const { baseTokenManagerKvs } = await deployAndMockTokenManagerMintBurn(true);
 
   await user.callContract({
@@ -393,7 +393,7 @@ test('Deploy interchain token only mint distributor', async () => {
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(1_000),
-      user, // distributor
+      user,
     ],
   }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
 
@@ -407,7 +407,7 @@ test('Deploy interchain token only mint distributor', async () => {
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(1_000),
-      user, // distributor
+      user,
     ],
   });
 
@@ -440,7 +440,7 @@ test('Deploy interchain token only mint distributor', async () => {
   });
 });
 
-test('Deploy interchain token only mint no distributor', async () => {
+test('Deploy interchain token only mint no minter', async () => {
   const { baseTokenManagerKvs } = await deployAndMockTokenManagerMintBurn(true);
 
   await user.callContract({
@@ -453,7 +453,7 @@ test('Deploy interchain token only mint no distributor', async () => {
       e.Str('TOKEN-SYMBOL'),
       e.U8(18),
       e.U(1_000),
-      e.Addr(ADDRESS_ZERO), // distributor
+      e.Addr(ADDRESS_ZERO),
     ],
   });
 
@@ -465,7 +465,7 @@ test('Deploy interchain token only mint no distributor', async () => {
       ...baseTokenManagerKvs,
 
       e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000000)), // roles removed
-      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000011)), // operator & distributor role
+      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000011)), // operator & minter role
     ],
   });
 
@@ -487,7 +487,7 @@ test('Deploy interchain token only mint no distributor', async () => {
 });
 
 // TODO: Test this on devnet
-test('Deploy remote interchain token no original chain name no distributor', async () => {
+test('Deploy remote interchain token no original chain name no minter', async () => {
   await deployAndMockTokenManagerMintBurn(true);
 
   await user.callContract({
@@ -498,7 +498,7 @@ test('Deploy remote interchain token no original chain name no distributor', asy
     funcArgs: [
       e.Buffer(''),
       e.Bytes(TOKEN_SALT),
-      e.Addr(ADDRESS_ZERO), // distributor
+      e.Addr(ADDRESS_ZERO), // minter
       e.Str(OTHER_CHAIN_NAME),
     ],
   });
@@ -517,7 +517,7 @@ test('Deploy remote interchain token no original chain name no distributor', asy
         e.Buffer(computeInterchainTokenSalt(CHAIN_NAME, user)),
         e.Str(OTHER_CHAIN_NAME),
         e.Str(TOKEN_ID.split('-')[0]),
-        e.Buffer(''), // distributor
+        e.Buffer(''), // minter
         e.U(100_000_000n),
         e.Buffer(user.toTopBytes()),
       )),
@@ -525,7 +525,7 @@ test('Deploy remote interchain token no original chain name no distributor', asy
   });
 });
 
-test('Deploy remote interchain token EGLD no original chain name no distributor', async () => {
+test('Deploy remote interchain token EGLD no original chain name no minter', async () => {
   await deployAndMockTokenManagerLockUnlock('EGLD');
 
   await user.callContract({
@@ -536,7 +536,7 @@ test('Deploy remote interchain token EGLD no original chain name no distributor'
     funcArgs: [
       e.Buffer(''),
       e.Bytes(TOKEN_SALT),
-      e.Addr(ADDRESS_ZERO), // distributor
+      e.Addr(ADDRESS_ZERO), // minter
       e.Str(OTHER_CHAIN_NAME),
     ],
   });
@@ -562,7 +562,7 @@ test('Deploy remote interchain token EGLD no original chain name no distributor'
   // There are events emitted for the Gateway contract, but there is no way to test those currently...
 });
 
-test('Deploy remote interchain token no original chain name with distributor', async () => {
+test('Deploy remote interchain token no original chain name with minter', async () => {
   await deployAndMockTokenManagerMintBurn(true);
 
   await user.callContract({
@@ -573,7 +573,7 @@ test('Deploy remote interchain token no original chain name with distributor', a
     funcArgs: [
       e.Buffer(''),
       e.Bytes(TOKEN_SALT),
-      interchainTokenFactory, // distributor
+      interchainTokenFactory, // minter
       e.Str(OTHER_CHAIN_NAME),
     ],
   });
@@ -592,7 +592,7 @@ test('Deploy remote interchain token no original chain name with distributor', a
         e.Buffer(computeInterchainTokenSalt(CHAIN_NAME, user)),
         e.Str(OTHER_CHAIN_NAME),
         e.Str(TOKEN_ID.split('-')[0]),
-        e.Buffer(interchainTokenFactory.toTopBytes()), // distributor
+        e.Buffer(interchainTokenFactory.toTopBytes()), // minter
         e.U(100_000_000n),
         e.Buffer(user.toTopBytes()),
       )),
@@ -600,7 +600,7 @@ test('Deploy remote interchain token no original chain name with distributor', a
   });
 });
 
-test('Deploy remote interchain token EGLD with original chain name no distributor', async () => {
+test('Deploy remote interchain token EGLD with original chain name no minter', async () => {
   await deployAndMockTokenManagerLockUnlock('EGLD', 'SomeChain');
 
   await user.callContract({
@@ -611,7 +611,7 @@ test('Deploy remote interchain token EGLD with original chain name no distributo
     funcArgs: [
       e.Str('SomeChain'),
       e.Bytes(TOKEN_SALT),
-      e.Addr(ADDRESS_ZERO), // distributor
+      e.Addr(ADDRESS_ZERO), // minter
       e.Str(OTHER_CHAIN_NAME),
     ],
   });
@@ -649,14 +649,14 @@ test('Deploy remote interchain token errors', async () => {
     funcArgs: [
       e.Buffer(''),
       e.Bytes(TOKEN_SALT),
-      e.Addr(ADDRESS_ZERO), // distributor
+      e.Addr(ADDRESS_ZERO), // minter
       e.Str(OTHER_CHAIN_NAME),
     ],
   }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
   await deployAndMockTokenManagerLockUnlock();
 
-  // is_distributor function only exists on mint burn token manager
+  // deployRemoteInterchainToken function only exists on mint burn token manager
   await user.callContract({
     callee: interchainTokenFactory,
     funcName: 'deployRemoteInterchainToken',
@@ -665,14 +665,14 @@ test('Deploy remote interchain token errors', async () => {
     funcArgs: [
       e.Buffer(''),
       e.Bytes(TOKEN_SALT),
-      user, // distributor
+      user,
       e.Str(OTHER_CHAIN_NAME),
     ],
   }).assertFail({ code: 10, message: 'invalid function (not found)' });
 
   const { baseTokenManagerKvs } = await deployAndMockTokenManagerMintBurn(true);
 
-  // Wrong distributor
+  // Wrong minter
   await user.callContract({
     callee: interchainTokenFactory,
     funcName: 'deployRemoteInterchainToken',
@@ -681,10 +681,10 @@ test('Deploy remote interchain token errors', async () => {
     funcArgs: [
       e.Buffer(''),
       e.Bytes(TOKEN_SALT),
-      user, // distributor
+      user, // minter
       e.Str(OTHER_CHAIN_NAME),
     ],
-  }).assertFail({ code: 4, message: 'Not distributor' });
+  }).assertFail({ code: 4, message: 'Not minter' });
 
   await tokenManagerMintBurn.setAccount({
     ...await tokenManagerMintBurn.getAccountWithKvs(),
@@ -704,7 +704,7 @@ test('Deploy remote interchain token errors', async () => {
     funcArgs: [
       e.Buffer(''),
       e.Bytes(TOKEN_SALT),
-      e.Addr(ADDRESS_ZERO), // distributor
+      e.Addr(ADDRESS_ZERO), // minter
       e.Str(OTHER_CHAIN_NAME),
     ],
   }).assertFail({ code: 4, message: 'panic occurred' });
@@ -819,7 +819,7 @@ test('Deploy remote canonical interchain token no original chain name', async ()
         e.Buffer(computeCanonicalInterchainTokenSalt(CHAIN_NAME)),
         e.Str(OTHER_CHAIN_NAME),
         e.Str(TOKEN_ID.split('-')[0]),
-        e.Buffer(''), // distributor
+        e.Buffer(''), // minter
         e.U(100_000_000n),
         e.Buffer(user.toTopBytes()),
       )),
