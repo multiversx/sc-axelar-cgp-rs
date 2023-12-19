@@ -70,7 +70,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
         if valid {
             self.contract_call_approved().remove(&hash);
 
-            self.contract_call_executed_event(&command_id);
+            self.contract_call_executed_event(command_id);
         }
 
         valid
@@ -170,7 +170,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
             params.payload_hash,
         );
 
-        return true;
+        true
     }
 
     fn transfer_operatorship(&self, params: &ManagedBuffer) -> bool {
@@ -178,7 +178,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
 
         self.operatorship_transferred_event(params);
 
-        return true;
+        true
     }
 
     fn get_is_contract_call_approved_key(
@@ -211,7 +211,7 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
 
     #[view(isCommandExecuted)]
     fn is_command_executed(&self, command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> bool {
-        self.command_executed().contains(&command_id)
+        self.command_executed().contains(command_id)
     }
 
     #[view(isContractCallApproved)]

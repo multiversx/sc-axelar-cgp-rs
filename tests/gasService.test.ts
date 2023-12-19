@@ -1,9 +1,6 @@
-import { afterEach, assert, beforeEach, test } from "vitest";
-import { assertAccount } from "xsuite";
-import { SWorld, SContract, SWallet } from "xsuite";
-import { e } from "xsuite";
-import createKeccakHash from "keccak";
-import { ALICE_PUB_KEY, BOB_PUB_KEY, generateSignature, getOperatorsHash, TOKEN_ID, TOKEN_ID2 } from './helpers';
+import { afterEach, beforeEach, test } from 'vitest';
+import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
+import { TOKEN_ID } from './helpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -16,7 +13,7 @@ beforeEach(async () => {
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
-  })
+  });
 
   deployer = await world.createWallet({
     balance: 10_000_000_000n,
@@ -26,8 +23,8 @@ beforeEach(async () => {
           id: TOKEN_ID,
           amount: 100_000,
         },
-      ])
-    ]
+      ]),
+    ],
   });
 
   collector = await world.createWallet();
@@ -39,12 +36,12 @@ afterEach(async () => {
 
 const deployContract = async () => {
   ({ contract, address } = await deployer.deployContract({
-    code: "file:gas-service/output/gas-service.wasm",
-    codeMetadata: ["upgradeable"],
+    code: 'file:gas-service/output/gas-service.wasm',
+    codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
       e.Addr(collector.toString()),
-    ]
+    ],
   }));
 
   const pairs = await contract.getAccountWithKvs();
@@ -54,19 +51,19 @@ const deployContract = async () => {
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
-}
+};
 
-test("Pay gas for contract call no esdts", async () => {
+test('Pay gas for contract call no esdts', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "payGasForContractCall",
+    funcName: 'payGasForContractCall',
     funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
+      e.Str('ethereum'),
+      e.Str('mockAddress'),
+      e.Str('payload'),
       e.Addr(deployer.toString()),
     ],
   }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
@@ -80,243 +77,17 @@ test("Pay gas for contract call no esdts", async () => {
   });
 });
 
-test("Pay gas for contract call", async () => {
+test('Pay gas for contract call', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "payGasForContractCall",
+    funcName: 'payGasForContractCall',
     funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Addr(deployer.toString()),
-    ],
-    esdts: [
-      { id: TOKEN_ID, amount: 1_000 },
-    ]
-  });
-
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-
-      e.kvs.Esdts([
-        {
-          id: TOKEN_ID,
-          amount: 1_000,
-        },
-      ])
-    ],
-  });
-});
-
-test("Pay gas for contract call with token no esdts", async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 10_000_000,
-    funcName: "payGasForContractCallWithToken",
-    funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Str("symbol"),
-      e.U(2_000),
-      e.Addr(deployer.toString()),
-    ],
-  }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
-
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-});
-
-test("Pay gas for contract call with token", async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 10_000_000,
-    funcName: "payGasForContractCallWithToken",
-    funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Str("symbol"),
-      e.U(2_000),
-      e.Addr(deployer.toString()),
-    ],
-    esdts: [
-      { id: TOKEN_ID, amount: 1_000 },
-    ]
-  });
-
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-
-      e.kvs.Esdts([
-        {
-          id: TOKEN_ID,
-          amount: 1_000,
-        },
-      ])
-    ],
-  });
-});
-
-test("Pay native gas for contract call no value", async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 10_000_000,
-    funcName: "payNativeGasForContractCall",
-    funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Addr(deployer.toString()),
-    ],
-  }).assertFail({ code: 4, message: 'Nothing received' });
-
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-});
-
-test("Pay native gas for contract call", async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 10_000_000,
-    funcName: "payNativeGasForContractCall",
-    funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Addr(deployer.toString()),
-    ],
-    value: 1_000,
-  });
-
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 1_000,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-});
-
-test("Pay native gas for contract call with token no value", async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 10_000_000,
-    funcName: "payNativeGasForContractCallWithToken",
-    funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Str("symbol"),
-      e.U(2_000),
-      e.Addr(deployer.toString()),
-    ],
-  }).assertFail({ code: 4, message: 'Nothing received' });
-
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-});
-
-test("Pay native gas for contract call with token", async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 10_000_000,
-    funcName: "payNativeGasForContractCallWithToken",
-    funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Str("symbol"),
-      e.U(2_000),
-      e.Addr(deployer.toString()),
-    ],
-    value: 1_000,
-  });
-
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 1_000,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-});
-
-test("Pay gas for express contract call with token no esdts", async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 10_000_000,
-    funcName: "payGasForExpressCallWithToken",
-    funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Str("symbol"),
-      e.U(2_000),
-      e.Addr(deployer.toString()),
-    ],
-  }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
-
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-});
-
-test("Pay gas for express contract call with token", async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 10_000_000,
-    funcName: "payGasForExpressCallWithToken",
-    funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Str("symbol"),
-      e.U(2_000),
+      e.Str('ethereum'),
+      e.Str('mockAddress'),
+      e.Str('payload'),
       e.Addr(deployer.toString()),
     ],
     esdts: [
@@ -340,19 +111,17 @@ test("Pay gas for express contract call with token", async () => {
   });
 });
 
-test("Pay native gas for express contract call with token no value", async () => {
+test('Pay native gas for contract call no value', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "payNativeGasForExpressCallWithToken",
+    funcName: 'payNativeGasForContractCall',
     funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Str("symbol"),
-      e.U(2_000),
+      e.Str('ethereum'),
+      e.Str('mockAddress'),
+      e.Str('payload'),
       e.Addr(deployer.toString()),
     ],
   }).assertFail({ code: 4, message: 'Nothing received' });
@@ -366,19 +135,17 @@ test("Pay native gas for express contract call with token no value", async () =>
   });
 });
 
-test("Pay native gas for express contract call with token", async () => {
+test('Pay native gas for contract call', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "payNativeGasForExpressCallWithToken",
+    funcName: 'payNativeGasForContractCall',
     funcArgs: [
-      e.Str("ethereum"),
-      e.Str("mockAddress"),
-      e.Str("payload"),
-      e.Str("symbol"),
-      e.U(2_000),
+      e.Str('ethereum'),
+      e.Str('mockAddress'),
+      e.Str('payload'),
       e.Addr(deployer.toString()),
     ],
     value: 1_000,
@@ -393,19 +160,20 @@ test("Pay native gas for express contract call with token", async () => {
   });
 });
 
-test("Add gas no esdts", async () => {
+test('Pay gas for express contract call no esdts', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "addGas",
+    funcName: 'payGasForExpressCall',
     funcArgs: [
-      e.Str("txHash"),
-      e.U(10),
+      e.Str('ethereum'),
+      e.Str('mockAddress'),
+      e.Str('payload'),
       e.Addr(deployer.toString()),
     ],
-  }).assertFail({ code: 4, message: "incorrect number of ESDT transfers" });
+  }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
@@ -416,21 +184,22 @@ test("Add gas no esdts", async () => {
   });
 });
 
-test("Add gas", async () => {
+test('Pay gas for express contract call', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "addGas",
+    funcName: 'payGasForExpressCall',
     funcArgs: [
-      e.Str("txHash"),
-      e.U(10),
+      e.Str('ethereum'),
+      e.Str('mockAddress'),
+      e.Str('payload'),
       e.Addr(deployer.toString()),
     ],
     esdts: [
       { id: TOKEN_ID, amount: 1_000 },
-    ]
+    ],
   });
 
   let pairs = await contract.getAccountWithKvs();
@@ -449,19 +218,20 @@ test("Add gas", async () => {
   });
 });
 
-test("Add native gas no value", async () => {
+test('Pay native gas for express contract call no value', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "addNativeGas",
+    funcName: 'payNativeGasForExpressCall',
     funcArgs: [
-      e.Str("txHash"),
-      e.U(10),
+      e.Str('ethereum'),
+      e.Str('mockAddress'),
+      e.Str('payload'),
       e.Addr(deployer.toString()),
     ],
-  }).assertFail({ code: 4, message: "Nothing received" });
+  }).assertFail({ code: 4, message: 'Nothing received' });
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
@@ -472,16 +242,17 @@ test("Add native gas no value", async () => {
   });
 });
 
-test("Add native gas", async () => {
+test('Pay native gas for express contract call', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "addNativeGas",
+    funcName: 'payNativeGasForExpressCall',
     funcArgs: [
-      e.Str("txHash"),
-      e.U(10),
+      e.Str('ethereum'),
+      e.Str('mockAddress'),
+      e.Str('payload'),
       e.Addr(deployer.toString()),
     ],
     value: 1_000,
@@ -496,19 +267,19 @@ test("Add native gas", async () => {
   });
 });
 
-test("Add express gas no esdts", async () => {
+test('Add gas no esdts', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "addExpressGas",
+    funcName: 'addGas',
     funcArgs: [
-      e.Str("txHash"),
+      e.Str('txHash'),
       e.U(10),
       e.Addr(deployer.toString()),
     ],
-  }).assertFail({ code: 4, message: "incorrect number of ESDT transfers" });
+  }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
@@ -519,21 +290,21 @@ test("Add express gas no esdts", async () => {
   });
 });
 
-test("Add express gas", async () => {
+test('Add gas', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "addExpressGas",
+    funcName: 'addGas',
     funcArgs: [
-      e.Str("txHash"),
+      e.Str('txHash'),
       e.U(10),
       e.Addr(deployer.toString()),
     ],
     esdts: [
       { id: TOKEN_ID, amount: 1_000 },
-    ]
+    ],
   });
 
   let pairs = await contract.getAccountWithKvs();
@@ -552,19 +323,19 @@ test("Add express gas", async () => {
   });
 });
 
-test("Add native express gas no value", async () => {
+test('Add native gas no value', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "addNativeExpressGas",
+    funcName: 'addNativeGas',
     funcArgs: [
-      e.Str("txHash"),
+      e.Str('txHash'),
       e.U(10),
       e.Addr(deployer.toString()),
     ],
-  }).assertFail({ code: 4, message: "Nothing received" });
+  }).assertFail({ code: 4, message: 'Nothing received' });
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
@@ -575,15 +346,15 @@ test("Add native express gas no value", async () => {
   });
 });
 
-test("Add native express gas", async () => {
+test('Add native gas', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "addNativeExpressGas",
+    funcName: 'addNativeGas',
     funcArgs: [
-      e.Str("txHash"),
+      e.Str('txHash'),
       e.U(10),
       e.Addr(deployer.toString()),
     ],
@@ -599,13 +370,116 @@ test("Add native express gas", async () => {
   });
 });
 
-test("Collect fees not collector", async () => {
+test('Add express gas no esdts', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "collectFees",
+    funcName: 'addExpressGas',
+    funcArgs: [
+      e.Str('txHash'),
+      e.U(10),
+      e.Addr(deployer.toString()),
+    ],
+  }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
+
+  let pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+    ],
+  });
+});
+
+test('Add express gas', async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'addExpressGas',
+    funcArgs: [
+      e.Str('txHash'),
+      e.U(10),
+      e.Addr(deployer.toString()),
+    ],
+    esdts: [
+      { id: TOKEN_ID, amount: 1_000 },
+    ],
+  });
+
+  let pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+
+      e.kvs.Esdts([
+        {
+          id: TOKEN_ID,
+          amount: 1_000,
+        },
+      ]),
+    ],
+  });
+});
+
+test('Add native express gas no value', async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'addNativeExpressGas',
+    funcArgs: [
+      e.Str('txHash'),
+      e.U(10),
+      e.Addr(deployer.toString()),
+    ],
+  }).assertFail({ code: 4, message: 'Nothing received' });
+
+  let pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+    ],
+  });
+});
+
+test('Add native express gas', async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'addNativeExpressGas',
+    funcArgs: [
+      e.Str('txHash'),
+      e.U(10),
+      e.Addr(deployer.toString()),
+    ],
+    value: 1_000,
+  });
+
+  let pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 1_000,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+    ],
+  });
+});
+
+test('Collect fees not collector', async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'collectFees',
     funcArgs: [
       e.Addr(deployer.toString()),
 
@@ -618,15 +492,15 @@ test("Collect fees not collector", async () => {
   }).assertFail({ code: 4, message: 'Not collector' });
 });
 
-test("Collect fees invalid address", async () => {
+test('Collect fees invalid address', async () => {
   await deployContract();
 
   await collector.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "collectFees",
+    funcName: 'collectFees',
     funcArgs: [
-      e.Bytes("0000000000000000000000000000000000000000000000000000000000000000"),
+      e.Bytes('0000000000000000000000000000000000000000000000000000000000000000'),
 
       e.U32(1),
       e.Str(TOKEN_ID),
@@ -637,13 +511,13 @@ test("Collect fees invalid address", async () => {
   }).assertFail({ code: 4, message: 'Invalid address' });
 });
 
-test("Collect fees invalid amounts wrong length", async () => {
+test('Collect fees invalid amounts wrong length', async () => {
   await deployContract();
 
   await collector.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "collectFees",
+    funcName: 'collectFees',
     funcArgs: [
       e.Addr(deployer.toString()),
 
@@ -657,13 +531,13 @@ test("Collect fees invalid amounts wrong length", async () => {
   }).assertFail({ code: 4, message: 'Invalid amounts' });
 });
 
-test("Collect fees invalid amounts zero", async () => {
+test('Collect fees invalid amounts zero', async () => {
   await deployContract();
 
   await collector.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "collectFees",
+    funcName: 'collectFees',
     funcArgs: [
       e.Addr(deployer.toString()),
 
@@ -676,7 +550,7 @@ test("Collect fees invalid amounts zero", async () => {
   }).assertFail({ code: 4, message: 'Invalid amounts' });
 });
 
-test("Collect fees", async () => {
+test('Collect fees', async () => {
   await deployContract();
 
   await contract.setAccount({
@@ -697,13 +571,13 @@ test("Collect fees", async () => {
   await collector.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "collectFees",
+    funcName: 'collectFees',
     funcArgs: [
       e.Addr(deployer.toString()),
 
       e.U32(2),
       e.Str(TOKEN_ID),
-      e.Str("EGLD"),
+      e.Str('EGLD'),
 
       e.U32(2),
       e.U(1_000),
@@ -733,7 +607,7 @@ test("Collect fees", async () => {
   });
 });
 
-test("Collect fees too much asked", async () => {
+test('Collect fees too much asked', async () => {
   await deployContract();
 
   await contract.setAccount({
@@ -754,13 +628,13 @@ test("Collect fees too much asked", async () => {
   await collector.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "collectFees",
+    funcName: 'collectFees',
     funcArgs: [
       e.Addr(deployer.toString()),
 
       e.U32(2),
       e.Str(TOKEN_ID),
-      e.Str("EGLD"),
+      e.Str('EGLD'),
 
       e.U32(2),
       e.U(10_000), // Higher than balance so will do nothing
@@ -784,15 +658,15 @@ test("Collect fees too much asked", async () => {
   });
 });
 
-test("Refund not collector", async () => {
+test('Refund not collector', async () => {
   await deployContract();
 
   await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "refund",
+    funcName: 'refund',
     funcArgs: [
-      e.Str("txHash"),
+      e.Str('txHash'),
       e.U(1),
       e.Addr(deployer.toString()),
       e.Str(TOKEN_ID),
@@ -801,24 +675,24 @@ test("Refund not collector", async () => {
   }).assertFail({ code: 4, message: 'Not collector' });
 });
 
-test("Refund invalid address", async () => {
+test('Refund invalid address', async () => {
   await deployContract();
 
   await collector.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "refund",
+    funcName: 'refund',
     funcArgs: [
-      e.Str("txHash"),
+      e.Str('txHash'),
       e.U(1),
-      e.Bytes("0000000000000000000000000000000000000000000000000000000000000000"),
+      e.Bytes('0000000000000000000000000000000000000000000000000000000000000000'),
       e.Str(TOKEN_ID),
       e.U(1_000),
     ],
   }).assertFail({ code: 4, message: 'Invalid address' });
 });
 
-test("Refund egld", async () => {
+test('Refund egld', async () => {
   await deployContract();
 
   await contract.setAccount({
@@ -832,12 +706,12 @@ test("Refund egld", async () => {
   await collector.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "refund",
+    funcName: 'refund',
     funcArgs: [
-      e.Str("txHash"),
+      e.Str('txHash'),
       e.U(1),
       e.Addr(deployer.toString()),
-      e.Str("EGLD"),
+      e.Str('EGLD'),
       e.U(500),
     ],
   });
@@ -856,7 +730,7 @@ test("Refund egld", async () => {
   });
 });
 
-test("Refund esdt", async () => {
+test('Refund esdt', async () => {
   await deployContract();
 
   await contract.setAccount({
@@ -876,9 +750,9 @@ test("Refund esdt", async () => {
   await collector.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: "refund",
+    funcName: 'refund',
     funcArgs: [
-      e.Str("txHash"),
+      e.Str('txHash'),
       e.U(1),
       e.Addr(deployer.toString()),
       e.Str(TOKEN_ID),
@@ -910,6 +784,6 @@ test("Refund esdt", async () => {
           amount: 100_500,
         },
       ]),
-    ]
+    ],
   });
 });

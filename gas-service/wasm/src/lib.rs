@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           13
+// Endpoints:                           11
 // Async Callback (empty):               1
-// Total number of exported functions:  15
+// Total number of exported functions:  13
 
 #![no_std]
 
@@ -23,11 +23,9 @@ multiversx_sc_wasm_adapter::endpoints! {
     (
         init => init
         payGasForContractCall => pay_gas_for_contract_call
-        payGasForContractCallWithToken => pay_gas_for_contract_call_with_token
         payNativeGasForContractCall => pay_native_gas_for_contract_call
-        payNativeGasForContractCallWithToken => pay_native_gas_for_contract_call_with_token
-        payGasForExpressCallWithToken => pay_gas_for_express_call_with_token
-        payNativeGasForExpressCallWithToken => pay_native_gas_for_express_call_with_token
+        payGasForExpressCall => pay_gas_for_express_call
+        payNativeGasForExpressCall => pay_native_gas_for_express_call
         addGas => add_gas
         addNativeGas => add_native_gas
         addExpressGas => add_express_gas

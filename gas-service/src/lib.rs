@@ -1,10 +1,13 @@
 #![no_std]
 
+use crate::events::{
+    AddGasData, AddNativeGasData, GasPaidForContractCallData, NativeGasPaidForContractCallData,
+    RefundedData,
+};
+
 multiversx_sc::imports!();
 
 mod events;
-
-use crate::events::{AddGasData, AddNativeGasData, GasPaidForContractCallData, GasPaidForContractCallWithTokenData, NativeGasPaidForContractCallData, NativeGasPaidForContractCallWithTokenData, RefundedData};
 
 #[multiversx_sc::contract]
 pub trait GasService: events::Events {
@@ -40,37 +43,6 @@ pub trait GasService: events::Events {
         );
     }
 
-    #[payable("*")]
-    #[endpoint(payGasForContractCallWithToken)]
-    fn pay_gas_for_contract_call_with_token(
-        &self,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
-        payload: ManagedBuffer,
-        symbol: ManagedBuffer,
-        amount: BigUint,
-        refund_address: ManagedAddress,
-    ) {
-        let (gas_token, gas_fee_amount) = self.call_value().single_fungible_esdt();
-
-        let sender = self.blockchain().get_caller();
-        let hash = self.crypto().keccak256(&payload);
-
-        self.gas_paid_for_contract_call_with_token_event(
-            sender,
-            destination_chain,
-            destination_address,
-            GasPaidForContractCallWithTokenData {
-                hash,
-                symbol,
-                amount,
-                gas_token,
-                gas_fee_amount,
-                refund_address,
-            },
-        );
-    }
-
     #[payable("EGLD")]
     #[endpoint(payNativeGasForContractCall)]
     fn pay_native_gas_for_contract_call(
@@ -99,47 +71,13 @@ pub trait GasService: events::Events {
         );
     }
 
-    #[payable("EGLD")]
-    #[endpoint(payNativeGasForContractCallWithToken)]
-    fn pay_native_gas_for_contract_call_with_token(
-        &self,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
-        payload: ManagedBuffer,
-        symbol: ManagedBuffer,
-        amount: BigUint,
-        refund_address: ManagedAddress,
-    ) {
-        let value = self.call_value().egld_value().clone_value();
-
-        require!(value > 0, "Nothing received");
-
-        let sender = self.blockchain().get_caller();
-        let hash = self.crypto().keccak256(&payload);
-
-        self.native_gas_paid_for_contract_call_with_token_event(
-            sender,
-            destination_chain,
-            destination_address,
-            NativeGasPaidForContractCallWithTokenData {
-                hash,
-                symbol,
-                amount,
-                value,
-                refund_address,
-            },
-        );
-    }
-
     #[payable("*")]
-    #[endpoint(payGasForExpressCallWithToken)]
-    fn pay_gas_for_express_call_with_token(
+    #[endpoint(payGasForExpressCall)]
+    fn pay_gas_for_express_call(
         &self,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         payload: ManagedBuffer,
-        symbol: ManagedBuffer,
-        amount: BigUint,
         refund_address: ManagedAddress,
     ) {
         let (gas_token, gas_fee_amount) = self.call_value().single_fungible_esdt();
@@ -147,14 +85,12 @@ pub trait GasService: events::Events {
         let sender = self.blockchain().get_caller();
         let hash = self.crypto().keccak256(&payload);
 
-        self.gas_paid_for_express_call_with_token_event(
+        self.gas_paid_for_express_call(
             sender,
             destination_chain,
             destination_address,
-            GasPaidForContractCallWithTokenData {
+            GasPaidForContractCallData {
                 hash,
-                symbol,
-                amount,
                 gas_token,
                 gas_fee_amount,
                 refund_address,
@@ -163,14 +99,12 @@ pub trait GasService: events::Events {
     }
 
     #[payable("EGLD")]
-    #[endpoint(payNativeGasForExpressCallWithToken)]
-    fn pay_native_gas_for_express_call_with_token(
+    #[endpoint(payNativeGasForExpressCall)]
+    fn pay_native_gas_for_express_call(
         &self,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         payload: ManagedBuffer,
-        symbol: ManagedBuffer,
-        amount: BigUint,
         refund_address: ManagedAddress,
     ) {
         let value = self.call_value().egld_value().clone_value();
@@ -180,14 +114,12 @@ pub trait GasService: events::Events {
         let sender = self.blockchain().get_caller();
         let hash = self.crypto().keccak256(&payload);
 
-        self.native_gas_paid_for_express_call_with_token_event(
+        self.native_gas_paid_for_express_call(
             sender,
             destination_chain,
             destination_address,
-            NativeGasPaidForContractCallWithTokenData {
+            NativeGasPaidForContractCallData {
                 hash,
-                symbol,
-                amount,
                 value,
                 refund_address,
             },
@@ -306,10 +238,8 @@ pub trait GasService: events::Events {
                 if amount <= balance {
                     self.send().direct_egld(receiver, &amount);
                 }
-            } else {
-                if amount <= balance {
-                    payments.push(EsdtTokenPayment::new(token.unwrap_esdt(), 0, amount));
-                }
+            } else if amount <= balance {
+                payments.push(EsdtTokenPayment::new(token.unwrap_esdt(), 0, amount));
             }
         }
 
@@ -333,11 +263,15 @@ pub trait GasService: events::Events {
 
         self.send().direct(&receiver, &token, 0, &amount);
 
-        self.refunded_event(tx_hash, log_index, RefundedData {
-            receiver,
-            token,
-            amount,
-        });
+        self.refunded_event(
+            tx_hash,
+            log_index,
+            RefundedData {
+                receiver,
+                token,
+                amount,
+            },
+        );
     }
 
     fn require_only_collector(&self) {
