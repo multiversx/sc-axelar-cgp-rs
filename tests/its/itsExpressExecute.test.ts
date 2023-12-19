@@ -19,7 +19,7 @@ import {
   deployPingPongInterchain,
   gateway,
   interchainTokenFactory,
-  its, itsDeployTokenManagerLockUnlock,
+  its, itsDeployTokenManager,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
@@ -83,7 +83,7 @@ afterEach(async () => {
 });
 
 test('Express execute', async () => {
-  const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
+  const { computedTokenId } = await itsDeployTokenManager(world, user);
 
   // Remove '0x' from beginning of hex strings encoded by Ethereum
   const payload = AbiCoder.defaultAbiCoder().encode(

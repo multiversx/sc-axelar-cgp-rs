@@ -11,13 +11,13 @@ import {
 import {
   baseItsKvs, computeCanonicalInterchainTokenSalt,
   computeInterchainTokenId, computeInterchainTokenSalt,
-  deployContracts, deployInterchainTokenFactory, deployIts, deployTokenManagerLockUnlock, deployTokenManagerMintBurn,
+  deployContracts, deployInterchainTokenFactory, deployIts, deployTokenManager, deployTokenManagerMintBurn,
   gasService,
   gateway,
   interchainTokenFactory,
-  its, itsDeployTokenManagerLockUnlock, LATEST_METADATA_VERSION,
-  tokenManagerLockUnlock,
-  tokenManagerMintBurn,
+  its, itsDeployTokenManager, LATEST_METADATA_VERSION,
+  tokenManager,
+  tokenManager,
 } from '../itsHelpers';
 
 let world: SWorld;
@@ -99,7 +99,7 @@ const deployAndMockTokenManagerMintBurn = async (burnRole: boolean = false) => {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManager),
     ],
   });
   return { baseTokenManagerKvs, computedTokenId };
@@ -112,7 +112,7 @@ const deployAndMockTokenManagerLockUnlock = async (
 ) => {
   await deployContracts(deployer, collector);
 
-  let baseTokenManagerKvs = await deployTokenManagerLockUnlock(deployer, its, deployer, tokenId, interchainTokenId);
+  let baseTokenManagerKvs = await deployTokenManager(deployer, its, deployer, tokenId, interchainTokenId);
 
   let salt;
   if (interchainTokenId === INTERCHAIN_TOKEN_ID) {
@@ -129,7 +129,7 @@ const deployAndMockTokenManagerLockUnlock = async (
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerLockUnlock),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManager),
     ],
   });
   return { baseTokenManagerKvs, computedTokenId };
@@ -356,12 +356,12 @@ test('Deploy interchain token only issue esdt minter mint', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManager),
     ],
   });
 
   // Assert endpoint to deploy ESDT was called
-  kvs = await tokenManagerMintBurn.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -403,12 +403,12 @@ test('Deploy interchain token only issue esdt minter no mint', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManager),
     ],
   });
 
   // Assert endpoint to deploy ESDT was called
-  kvs = await tokenManagerMintBurn.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -459,7 +459,7 @@ test('Deploy interchain token only mint minter', async () => {
   });
 
   // Assert user got all roles
-  let kvs = await tokenManagerMintBurn.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -507,7 +507,7 @@ test('Deploy interchain token only mint no minter', async () => {
   });
 
   // Assert user got all roles
-  let kvs = await tokenManagerMintBurn.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -737,8 +737,8 @@ test('Deploy remote interchain token errors', async () => {
     ],
   }).assertFail({ code: 4, message: 'Not minter' });
 
-  await tokenManagerMintBurn.setAccount({
-    ...await tokenManagerMintBurn.getAccountWithKvs(),
+  await tokenManager.setAccount({
+    ...await tokenManager.getAccountWithKvs(),
     kvs: [
       ...baseTokenManagerKvs,
 
@@ -980,8 +980,8 @@ test('Deploy remote canonical interchain token errors', async () => {
 
   const { baseTokenManagerKvs } = await deployAndMockTokenManagerLockUnlock(TOKEN_ID, CHAIN_NAME, CANONICAL_INTERCHAIN_TOKEN_ID);
 
-  await tokenManagerLockUnlock.setAccount({
-    ...await tokenManagerLockUnlock.getAccountWithKvs(),
+  await tokenManager.setAccount({
+    ...await tokenManager.getAccountWithKvs(),
     kvs: [
       ...baseTokenManagerKvs,
 

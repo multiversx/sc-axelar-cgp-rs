@@ -20,8 +20,8 @@ import {
   gateway,
   its,
   interchainTokenFactory,
-  tokenManagerLockUnlock,
-  tokenManagerMintBurn, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, baseItsKvs,
+  tokenManager,
+  tokenManager, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, baseItsKvs,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -173,7 +173,7 @@ test("Execute deploy interchain token only issue esdt", async () => {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
   });
 
@@ -199,11 +199,11 @@ test("Execute deploy interchain token only issue esdt", async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
   });
 
-  const tokenManagerKvs = await tokenManagerMintBurn.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [

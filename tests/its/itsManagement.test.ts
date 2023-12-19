@@ -22,8 +22,8 @@ import {
   gateway,
   interchainTokenFactory,
   its,
-  tokenManagerLockUnlock,
-  tokenManagerMintBurn,
+  tokenManager,
+  tokenManager,
 } from '../itsHelpers';
 import { Encodable } from 'xsuite/dist/data/Encodable';
 import createKeccakHash from 'keccak';
@@ -88,8 +88,8 @@ test('Init errors', async () => {
     const codeArgs: Encodable[] = [
       gateway,
       gasService,
-      tokenManagerMintBurn,
-      tokenManagerLockUnlock,
+      tokenManager,
+      tokenManager,
       deployer,
       e.Str(CHAIN_NAME),
 
@@ -117,8 +117,8 @@ test('Init errors', async () => {
     codeArgs: [
       gateway,
       gasService,
-      tokenManagerMintBurn,
-      tokenManagerLockUnlock,
+      tokenManager,
+      tokenManager,
       deployer,
       e.Str(''),
 
@@ -137,8 +137,8 @@ test('Init errors', async () => {
     codeArgs: [
       gateway,
       gasService,
-      tokenManagerMintBurn,
-      tokenManagerLockUnlock,
+      tokenManager,
+      tokenManager,
       deployer,
       e.Str(CHAIN_NAME),
 
@@ -158,8 +158,8 @@ test('Init errors', async () => {
     codeArgs: [
       gateway,
       gasService,
-      tokenManagerMintBurn,
-      tokenManagerLockUnlock,
+      tokenManager,
+      tokenManager,
       deployer,
       e.Str(CHAIN_NAME),
 

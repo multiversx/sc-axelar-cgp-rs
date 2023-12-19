@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, test } from 'vitest';
+import { afterEach, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import createKeccakHash from 'keccak';
 import {
@@ -12,11 +12,10 @@ import {
 import {
   baseItsKvs,
   deployContracts,
-  deployTokenManagerLockUnlock,
   interchainTokenFactory,
   its,
   LATEST_METADATA_VERSION,
-  tokenManagerLockUnlock,
+  tokenManager,
 } from '../itsHelpers';
 
 let world: SWorld;
@@ -60,7 +59,7 @@ const deployTokenManager = async (itsAddr: SWallet | null = null, mock: boolean 
   await deployContracts(deployer, otherUser);
 
   // Re-deploy contract with correct code
-  await deployTokenManagerLockUnlock(deployer, itsAddr || its);
+  await deployTokenManager(deployer, itsAddr || its);
 
   if (mock) {
     // Mock token manager being known by ITS
@@ -69,7 +68,7 @@ const deployTokenManager = async (itsAddr: SWallet | null = null, mock: boolean 
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
-        e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerLockUnlock),
+        e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
       ],
     });
   }
@@ -85,83 +84,128 @@ const baseKvs = () => {
 
     e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
   ];
-}
+};
 
-test('Init errors', async () => {
-  const mockTokenId = createKeccakHash('keccak256').update('mockTokenId').digest('hex');
+describe('Init', () => {
+  test('Errors', async () => {
+    const mockTokenId = createKeccakHash('keccak256').update('mockTokenId').digest('hex');
 
-  await deployer.deployContract({
-    code: 'file:token-manager/output/token-manager.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      deployer,
-      e.Bytes(mockTokenId),
-      e.Option(deployer),
-      e.Option(null),
-    ],
-  }).assertFail({ code: 4, message: 'Invalid token address' });
+    await deployer.deployContract({
+      code: 'file:token-manager/output/token-manager.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [
+        e.Addr(ADDRESS_ZERO), // zero address
+        e.U8(2), // Lock/unlock
+        e.TopBuffer(mockTokenId),
+        e.Tuple(
+          e.Option(deployer),
+          e.Option(e.Str(TOKEN_ID)),
+        ),
+      ],
+    }).assertFail({ code: 4, message: 'Zero address' });
 
-  await deployer.deployContract({
-    code: 'file:token-manager/output/token-manager.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      e.Addr(ADDRESS_ZERO), // zero address
-      e.Bytes(mockTokenId),
-      e.Option(deployer),
-      e.Option(e.Str(TOKEN_ID)),
-    ],
-  }).assertFail({ code: 4, message: 'Zero address' });
-});
-
-test('Init different arguments', async () => {
-  const { contract } = await deployer.deployContract({
-    code: 'file:token-manager/output/token-manager.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      otherUser,
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Option(null),
-      e.Option(e.Str(TOKEN_ID)),
-    ],
+    await deployer.deployContract({
+      code: 'file:token-manager/output/token-manager.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [
+        deployer,
+        e.U8(2), // Lock/unlock
+        e.TopBuffer(mockTokenId),
+        e.Tuple(
+          e.Option(deployer),
+          e.Option(null),
+        ),
+      ],
+    }).assertFail({ code: 4, message: 'Invalid token address' });
   });
 
-  let kvs = await contract.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0n,
-    allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(otherUser),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its & zero address
-      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-    ],
+  test('Different arguments lock unlock', async () => {
+    const { contract } = await deployer.deployContract({
+      code: 'file:token-manager/output/token-manager.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [
+        otherUser,
+        e.U8(2),
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Tuple(
+          e.Option(null),
+          e.Option(e.Str(TOKEN_ID)),
+        ),
+      ],
+    });
+
+    let kvs = await contract.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0n,
+      allKvs: [
+        e.kvs.Mapper('interchain_token_service').Value(otherUser),
+        e.kvs.Mapper('implementation_type').Value(e.U8(2)),
+        e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
+        e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its & zero address
+        e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ],
+    });
+
+    const { contract: contract2 } = await deployer.deployContract({
+      code: 'file:token-manager/output/token-manager.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [
+        otherUser,
+        e.U8(2),
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Tuple(
+          e.Option(deployer),
+          e.Option(e.Str(TOKEN_ID)),
+        ),
+      ],
+    });
+
+    kvs = await contract2.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0n,
+      allKvs: [
+        e.kvs.Mapper('interchain_token_service').Value(otherUser),
+        e.kvs.Mapper('implementation_type').Value(e.U8(2)),
+        e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
+        e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles for operator & its
+        e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+      ],
+    });
   });
 
-  const { contract: contract2 } = await deployer.deployContract({
-    code: 'file:token-manager/output/token-manager.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      otherUser,
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Option(deployer),
-      e.Option(e.Str(TOKEN_ID)),
-    ],
-  });
+  test('Different arguments mint burn', async () => {
+    const { contract } = await deployer.deployContract({
+      code: 'file:token-manager/output/token-manager.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [
+        otherUser,
+        e.U8(0),
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Tuple(
+          e.Option(null),
+          e.Option(null),
+        ),
+      ],
+    });
 
-  kvs = await contract2.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0n,
-    allKvs: [
-      e.kvs.Mapper('interchain_token_service').Value(otherUser),
-      e.kvs.Mapper('interchain_token_id').Value(e.Bytes(INTERCHAIN_TOKEN_ID)),
-      e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles for operator & its
-      e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)),
-      e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-    ],
+    let kvs = await contract.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0n,
+      allKvs: [
+        e.kvs.Mapper('interchain_token_service').Value(otherUser),
+        e.kvs.Mapper('implementation_type').Value(e.U8(0)),
+        e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
+        e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its & zero address
+        e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)),
+      ],
+    });
   });
 });
 
@@ -169,7 +213,7 @@ test('Interchain transfer', async () => {
   await deployTokenManager();
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -181,7 +225,7 @@ test('Interchain transfer', async () => {
   });
 
   // Tokens remain in contract
-  const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  const kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -196,7 +240,7 @@ test('Interchain transfer with data', async () => {
   await deployTokenManager();
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -208,7 +252,7 @@ test('Interchain transfer with data', async () => {
   });
 
   // Tokens remain in contract
-  const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  const kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -223,7 +267,7 @@ test('Interchain transfer errors', async () => {
   await deployTokenManager(null, false);
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'interchainTransfer',
     gasLimit: 5_000_000,
     value: 1_000,
@@ -236,7 +280,7 @@ test('Interchain transfer errors', async () => {
 
   // ITS doesn't know about this token manager
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'interchainTransfer',
     gasLimit: 10_000_000,
     funcArgs: [
@@ -253,13 +297,13 @@ test('Interchain transfer errors', async () => {
     kvs: [
       ...baseItsKvs(deployer),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerLockUnlock),
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
   });
 
   // Wrong metadata version
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'interchainTransfer',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -272,7 +316,7 @@ test('Interchain transfer errors', async () => {
 
   // Test flow limit exceeded
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -281,7 +325,7 @@ test('Interchain transfer errors', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'interchainTransfer',
     gasLimit: 10_000_000,
     funcArgs: [
@@ -297,7 +341,7 @@ test('Call contract with interchain token', async () => {
   await deployTokenManager();
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'callContractWithInterchainToken',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -309,7 +353,7 @@ test('Call contract with interchain token', async () => {
   });
 
   // Tokens remain in contract
-  const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  const kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -324,7 +368,7 @@ test('Call contract with interchain token errors', async () => {
   await deployTokenManager(null, false);
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'callContractWithInterchainToken',
     gasLimit: 5_000_000,
     value: 1_000,
@@ -337,7 +381,7 @@ test('Call contract with interchain token errors', async () => {
 
   // ITS doesn't know about this token manager
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'callContractWithInterchainToken',
     gasLimit: 10_000_000,
     funcArgs: [
@@ -354,13 +398,13 @@ test('Call contract with interchain token errors', async () => {
     kvs: [
       ...baseItsKvs(deployer),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManagerLockUnlock),
+      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
   });
 
   // Test flow limit exceeded
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -369,7 +413,7 @@ test('Call contract with interchain token errors', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'callContractWithInterchainToken',
     gasLimit: 10_000_000,
     funcArgs: [
@@ -382,17 +426,17 @@ test('Call contract with interchain token errors', async () => {
 });
 
 test('Give token', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
+  const baseKvs = await deployTokenManager(deployer, user);
 
   // Ensure token manager has tokens
   await user.transfer({
-    receiver: tokenManagerLockUnlock,
+    receiver: tokenManager,
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
     gasLimit: 5_000_000,
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'giveToken',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -402,7 +446,7 @@ test('Give token', async () => {
   });
 
   // Tokens were sent from contract to otherUser
-  const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  const kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -421,18 +465,18 @@ test('Give token', async () => {
 });
 
 test('Give token flow limit', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
+  const baseKvs = await deployTokenManager(deployer, user);
 
   // Ensure token manager has tokens
   await user.transfer({
-    receiver: tokenManagerLockUnlock,
+    receiver: tokenManager,
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
     gasLimit: 5_000_000,
   });
 
   // Set flow limit
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -441,7 +485,7 @@ test('Give token flow limit', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'giveToken',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -451,7 +495,7 @@ test('Give token flow limit', async () => {
   });
 
   // Tokens were sent from contract to otherUser
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -476,7 +520,7 @@ test('Give token flow limit', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'giveToken',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -490,7 +534,7 @@ test('Give token flow limit', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'giveToken',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -499,7 +543,7 @@ test('Give token flow limit', async () => {
     ],
   });
 
-  kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -522,10 +566,10 @@ test('Give token flow limit', async () => {
 });
 
 test('Give token errors', async () => {
-  await deployTokenManagerLockUnlock(deployer, user);
+  await deployTokenManager(deployer, user);
 
   await otherUser.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'giveToken',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -536,7 +580,7 @@ test('Give token errors', async () => {
 
   // Test flow limit exceeded
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -545,7 +589,7 @@ test('Give token errors', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'giveToken',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -556,7 +600,7 @@ test('Give token errors', async () => {
 
   // Contract has no funds to send
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'giveToken',
     gasLimit: 20_000_000,
     funcArgs: [
@@ -567,10 +611,10 @@ test('Give token errors', async () => {
 });
 
 test('Take token', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
+  const baseKvs = await deployTokenManager(deployer, user);
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'takeToken',
     gasLimit: 20_000_000,
     funcArgs: [],
@@ -578,7 +622,7 @@ test('Take token', async () => {
   });
 
   // Tokens remain in contract
-  const kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  const kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -590,11 +634,11 @@ test('Take token', async () => {
 });
 
 test('Take token flow limit', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
+  const baseKvs = await deployTokenManager(deployer, user);
 
   // Set flow limit
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -603,7 +647,7 @@ test('Take token flow limit', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'takeToken',
     gasLimit: 20_000_000,
     funcArgs: [],
@@ -611,7 +655,7 @@ test('Take token flow limit', async () => {
   });
 
   // Tokens remain in contract
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -629,7 +673,7 @@ test('Take token flow limit', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'takeToken',
     gasLimit: 20_000_000,
     funcArgs: [],
@@ -641,14 +685,14 @@ test('Take token flow limit', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'takeToken',
     gasLimit: 20_000_000,
     funcArgs: [],
     esdts: [{ id: TOKEN_ID, amount: 500 }],
   });
 
-  kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -664,10 +708,10 @@ test('Take token flow limit', async () => {
 });
 
 test('Take token errors', async () => {
-  await deployTokenManagerLockUnlock(deployer, user);
+  await deployTokenManager(deployer, user);
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'takeToken',
     gasLimit: 20_000_000,
     funcArgs: [],
@@ -675,7 +719,7 @@ test('Take token errors', async () => {
   }).assertFail({ code: 4, message: 'Not service' });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'takeToken',
     gasLimit: 20_000_000,
     funcArgs: [],
@@ -684,7 +728,7 @@ test('Take token errors', async () => {
 
   // Test flow limit exceeded
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -693,7 +737,7 @@ test('Take token errors', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'takeToken',
     gasLimit: 20_000_000,
     funcArgs: [],
@@ -702,10 +746,10 @@ test('Take token errors', async () => {
 });
 
 test('Transfer operatorship', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
+  const baseKvs = await deployTokenManager(deployer, user, user);
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'transferOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -714,7 +758,7 @@ test('Transfer operatorship', async () => {
   }).assertFail({ code: 4, message: 'Missing any of roles' });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'transferOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -722,7 +766,7 @@ test('Transfer operatorship', async () => {
     ],
   });
 
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -735,7 +779,7 @@ test('Transfer operatorship', async () => {
 
   // Check that operator was changed
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'transferOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -745,10 +789,10 @@ test('Transfer operatorship', async () => {
 });
 
 test('Propose operatorship', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
+  const baseKvs = await deployTokenManager(deployer, user, user);
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'proposeOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -757,7 +801,7 @@ test('Propose operatorship', async () => {
   }).assertFail({ code: 4, message: 'Missing any of roles' });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'proposeOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -765,7 +809,7 @@ test('Propose operatorship', async () => {
     ],
   });
 
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -777,7 +821,7 @@ test('Propose operatorship', async () => {
 
   // Proposed operator can not call this function
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'proposeOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -787,7 +831,7 @@ test('Propose operatorship', async () => {
 
   // If called multiple times, multiple entries are added
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'proposeOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -795,7 +839,7 @@ test('Propose operatorship', async () => {
     ],
   });
 
-  kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -808,10 +852,10 @@ test('Propose operatorship', async () => {
 });
 
 test('Accept operatorship', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
+  const baseKvs = await deployTokenManager(deployer, user, user);
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'acceptOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -820,7 +864,7 @@ test('Accept operatorship', async () => {
   }).assertFail({ code: 4, message: 'Invalid proposed roles' });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'proposeOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -830,7 +874,7 @@ test('Accept operatorship', async () => {
 
   // Propose other
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'proposeOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -839,7 +883,7 @@ test('Accept operatorship', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'acceptOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -848,7 +892,7 @@ test('Accept operatorship', async () => {
   }).assertFail({ code: 4, message: 'Invalid proposed roles' });
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'acceptOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -856,7 +900,7 @@ test('Accept operatorship', async () => {
     ],
   });
 
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -871,7 +915,7 @@ test('Accept operatorship', async () => {
 
   // otherUser can no longer accept because user doesn't have operator role anymore
   await otherUser.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'acceptOperatorship',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -881,10 +925,10 @@ test('Accept operatorship', async () => {
 });
 
 test('Add flow limiter', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
+  const baseKvs = await deployTokenManager(deployer, user, user);
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'addFlowLimiter',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -893,7 +937,7 @@ test('Add flow limiter', async () => {
   }).assertFail({ code: 4, message: 'Missing any of roles' });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'addFlowLimiter',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -901,7 +945,7 @@ test('Add flow limiter', async () => {
     ],
   });
 
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -913,10 +957,10 @@ test('Add flow limiter', async () => {
 });
 
 test('Remove flow limiter', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
+  const baseKvs = await deployTokenManager(deployer, user, user);
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'removeFlowLimiter',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -925,7 +969,7 @@ test('Remove flow limiter', async () => {
   }).assertFail({ code: 4, message: 'Missing any of roles' });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'addFlowLimiter',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -934,7 +978,7 @@ test('Remove flow limiter', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'removeFlowLimiter',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -942,7 +986,7 @@ test('Remove flow limiter', async () => {
     ],
   });
 
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -954,7 +998,7 @@ test('Remove flow limiter', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'removeFlowLimiter',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -962,7 +1006,7 @@ test('Remove flow limiter', async () => {
     ],
   });
 
-  kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -975,10 +1019,10 @@ test('Remove flow limiter', async () => {
 });
 
 test('Set flow limit', async () => {
-  const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
+  const baseKvs = await deployTokenManager(deployer, user, user);
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -987,7 +1031,7 @@ test('Set flow limit', async () => {
   }).assertFail({ code: 4, message: 'Missing any of roles' });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'addFlowLimiter',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -996,7 +1040,7 @@ test('Set flow limit', async () => {
   });
 
   await user.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -1004,7 +1048,7 @@ test('Set flow limit', async () => {
     ],
   });
 
-  let kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  let kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -1017,7 +1061,7 @@ test('Set flow limit', async () => {
   });
 
   await deployer.callContract({
-    callee: tokenManagerLockUnlock,
+    callee: tokenManager,
     funcName: 'setFlowLimit',
     gasLimit: 5_000_000,
     funcArgs: [
@@ -1025,7 +1069,7 @@ test('Set flow limit', async () => {
     ],
   });
 
-  kvs = await tokenManagerLockUnlock.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [

@@ -20,11 +20,11 @@ import {
   gateway,
   its,
   interchainTokenFactory,
-  tokenManagerLockUnlock,
-  tokenManagerMintBurn,
+  tokenManager,
+  tokenManager,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   itsDeployTokenManagerMintBurn,
-  itsDeployTokenManagerLockUnlock, computeExpressExecuteHash, baseItsKvs,
+  itsDeployTokenManager, computeExpressExecuteHash, baseItsKvs,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -169,7 +169,7 @@ test('Execute interchain transfer mint/burn', async () => {
 });
 
 test('Execute interchain transfer lock/unlock', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(
     world,
     user,
     true,

@@ -20,7 +20,7 @@ import {
   gasService,
   interchainTokenFactory,
   its,
-  tokenManagerMintBurn,
+  tokenManager,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -482,7 +482,7 @@ test('Deploy interchain token only issue esdt minter', async () => {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManager),
     ],
   });
 
@@ -523,12 +523,12 @@ test('Deploy interchain token only issue esdt minter', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManager),
     ],
   });
 
   // Assert endpoint to deploy ESDT was called
-  kvs = await tokenManagerMintBurn.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [
@@ -557,7 +557,7 @@ test('Deploy interchain token only issue esdt no minter', async () => {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManager),
     ],
   });
 
@@ -582,12 +582,12 @@ test('Deploy interchain token only issue esdt no minter', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManagerMintBurn),
+      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(tokenManager),
     ],
   });
 
   // Assert endpoint to deploy ESDT was called
-  kvs = await tokenManagerMintBurn.getAccountWithKvs();
+  kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
     allKvs: [

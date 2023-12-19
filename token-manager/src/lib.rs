@@ -48,8 +48,12 @@ pub trait TokenManagerLockUnlockContract:
             Roles::FLOW_LIMITER | Roles::OPERATOR,
         );
 
-        // TODO: Check token identifier depending on token manager type
-        require!(params.token_identifier.is_some(), "Invalid token address");
+        if implementation_type == TokenManagerType::LockUnlock
+            || implementation_type == TokenManagerType::LockUnlockFee
+        {
+            require!(params.token_identifier.is_some(), "Invalid token address");
+        }
+
         if params.token_identifier.is_some() {
             self.token_identifier()
                 .set_if_empty(params.token_identifier.unwrap());

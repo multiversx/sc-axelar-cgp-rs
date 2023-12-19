@@ -19,8 +19,8 @@ import {
   gateway,
   its,
   interchainTokenFactory,
-  tokenManagerLockUnlock,
-  tokenManagerMintBurn, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, baseItsKvs, itsDeployTokenManagerLockUnlock,
+  tokenManager,
+  tokenManager, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, baseItsKvs, itsDeployTokenManager,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -197,7 +197,7 @@ test("Execute deploy token manager errors", async () => {
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(
     world,
     user,
   );

@@ -21,10 +21,10 @@ import {
   its,
   pingPong,
   interchainTokenFactory,
-  tokenManagerLockUnlock,
-  tokenManagerMintBurn,
+  tokenManager,
+  tokenManager,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
-  itsDeployTokenManagerLockUnlock,
+  itsDeployTokenManager,
   baseItsKvs,
   computeExpressExecuteHash,
 } from '../itsHelpers';
@@ -128,7 +128,7 @@ const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
 test('Execute interchain transfer with data', async () => {
   await deployPingPongInterchain(deployer);
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(
     world,
     user,
     true,
@@ -200,7 +200,7 @@ test('Execute interchain transfer with data', async () => {
 test('Execute receive token with data contract error', async () => {
   await deployPingPongInterchain(deployer);
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(
     world,
     user,
     true,
@@ -275,7 +275,7 @@ test('Execute receive token with data contract error', async () => {
 test('Execute interchain transfer with data express executor', async () => {
   await deployPingPongInterchain(deployer);
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(
     world,
     user,
     true,
