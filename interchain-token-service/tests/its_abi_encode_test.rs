@@ -7,7 +7,7 @@ use interchain_token_service::abi::Token;
 use interchain_token_service::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
 };
-use token_manager::TokenManagerType;
+use token_manager::constants::TokenManagerType;
 
 #[test]
 fn encode_uint256() {
@@ -136,7 +136,7 @@ fn encode_two_bytes() {
 }
 
 #[test]
-fn encode_interchain_transfer_payload() {
+fn encode_interchain_transfer_payload_empty_data() {
     let data = InterchainTransferPayload::<StaticApi> {
         message_type: BigUint::from(11u64),
         token_id: ManagedByteArray::from(&hex!(
@@ -147,7 +147,7 @@ fn encode_interchain_transfer_payload() {
             "000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf"
         )),
         amount: BigUint::from(23456789u64),
-        data: None,
+        data: ManagedBuffer::new(),
     };
 
     let encoded = data.abi_encode();
@@ -156,13 +156,15 @@ fn encode_interchain_transfer_payload() {
         "
             000000000000000000000000000000000000000000000000000000000000000b
             131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
-            00000000000000000000000000000000000000000000000000000000000000a0
-            00000000000000000000000000000000000000000000000000000000000000e0
+            00000000000000000000000000000000000000000000000000000000000000c0
+            0000000000000000000000000000000000000000000000000000000000000100
             000000000000000000000000000000000000000000000000000000000165ec15
+            0000000000000000000000000000000000000000000000000000000000000140
             0000000000000000000000000000000000000000000000000000000000000014
             f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
             0000000000000000000000000000000000000000000000000000000000000020
             000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf
+            0000000000000000000000000000000000000000000000000000000000000000
         "
     );
     assert_eq!(encoded, ManagedBuffer::from(&expected));
@@ -180,7 +182,7 @@ fn encode_interchain_transfer_payload_with_data() {
         )),
         destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
         amount: BigUint::from(23456789u64),
-        data: Some(ManagedBuffer::from(&hex!("536f6d6544617461"))),
+        data: ManagedBuffer::from(&hex!("536f6d6544617461")),
     };
 
     let encoded = data.abi_encode();

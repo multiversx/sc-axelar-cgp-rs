@@ -706,13 +706,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "flow-limit"
-version = "0.0.0"
-dependencies = [
- "multiversx-sc",
-]
-
-[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1105,7 +1098,6 @@ dependencies = [
  "num-bigint",
  "operatable",
  "token-manager",
- "token-manager-mint-burn",
 ]
 
 [[package]]
@@ -1120,7 +1112,6 @@ dependencies = [
 name = "interchain-token-service"
 version = "0.0.0"
 dependencies = [
- "flow-limit",
  "gas-service",
  "gateway",
  "multiversx-sc",
@@ -1129,7 +1120,6 @@ dependencies = [
  "num-bigint",
  "operatable",
  "token-manager",
- "token-manager-mint-burn",
 ]
 
 [[package]]
@@ -2310,49 +2300,18 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 name = "token-manager"
 version = "0.0.0"
 dependencies = [
- "flow-limit",
- "multiversx-sc",
- "operatable",
-]
-
-[[package]]
-name = "token-manager-lock-unlock"
-version = "0.0.0"
-dependencies = [
- "flow-limit",
  "multiversx-sc",
  "multiversx-sc-scenario",
  "num-bigint",
  "operatable",
- "token-manager",
 ]
 
 [[package]]
-name = "token-manager-lock-unlock-meta"
+name = "token-manager-meta"
 version = "0.0.0"
 dependencies = [
  "multiversx-sc-meta",
- "token-manager-lock-unlock",
-]
-
-[[package]]
-name = "token-manager-mint-burn"
-version = "0.0.0"
-dependencies = [
- "flow-limit",
- "multiversx-sc",
- "multiversx-sc-scenario",
- "num-bigint",
- "operatable",
  "token-manager",
-]
-
-[[package]]
-name = "token-manager-mint-burn-meta"
-version = "0.0.0"
-dependencies = [
- "multiversx-sc-meta",
- "token-manager-mint-burn",
 ]
 
 [[package]]

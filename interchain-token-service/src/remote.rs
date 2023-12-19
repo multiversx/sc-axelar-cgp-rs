@@ -1,10 +1,11 @@
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use token_manager::TokenManagerType;
+use token_manager::constants::TokenManagerType;
 
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
-    DeployTokenManagerPayload, InterchainTransferPayload, Metadata, MetadataVersion, TokenId,
-    LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, Metadata,
+    MetadataVersion, TokenId, LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
 use crate::{address_tracker, events, express_executor_tracker, proxy};
 
@@ -22,7 +23,7 @@ pub trait RemoteModule:
         &self,
         token_id: &TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
-        gas_value: BigUint,
+        gas_value: &BigUint,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) {
@@ -41,7 +42,7 @@ pub trait RemoteModule:
             &destination_chain,
             &payload,
             MetadataVersion::ContractCall,
-            &gas_value,
+            gas_value,
         );
 
         self.emit_token_manager_deployment_started(
@@ -49,6 +50,46 @@ pub trait RemoteModule:
             destination_chain,
             token_manager_type,
             params,
+        );
+    }
+
+    fn deploy_remote_interchain_token(
+        &self,
+        token_id: &TokenId<Self::Api>,
+        name: ManagedBuffer,
+        symbol: ManagedBuffer,
+        decimals: u8,
+        minter: ManagedBuffer,
+        destination_chain: ManagedBuffer,
+        gas_value: &BigUint,
+    ) {
+        self.valid_token_manager_address(token_id);
+
+        let data = DeployInterchainTokenPayload {
+            message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
+            token_id: token_id.clone(),
+            name: name.clone(),
+            symbol: symbol.clone(),
+            decimals,
+            minter: minter.clone(),
+        };
+
+        let payload = data.abi_encode();
+
+        self.call_contract(
+            &destination_chain,
+            &payload,
+            MetadataVersion::ContractCall,
+            gas_value,
+        );
+
+        self.emit_interchain_token_deployment_started_event(
+            token_id,
+            name,
+            symbol,
+            decimals,
+            minter,
+            destination_chain,
         );
     }
 
@@ -61,9 +102,13 @@ pub trait RemoteModule:
         amount: BigUint,
         metadata_version: MetadataVersion,
         data: ManagedBuffer,
-        gas_value: BigUint, // TODO: Handle gas
+        _gas_value: BigUint, // TODO: Handle gas
     ) {
-        let hash = self.crypto().keccak256(&data);
+        let data_hash = if data.is_empty() {
+            ManagedByteArray::from(&[0; KECCAK256_RESULT_LEN])
+        } else {
+            self.crypto().keccak256(&data)
+        };
 
         let payload = InterchainTransferPayload {
             message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER),
@@ -90,11 +135,7 @@ pub trait RemoteModule:
             destination_chain,
             destination_address,
             amount,
-            if data.len() == 0 {
-                ManagedByteArray::from(&[0; KECCAK256_RESULT_LEN])
-            } else {
-                hash
-            },
+            data_hash,
         );
     }
 

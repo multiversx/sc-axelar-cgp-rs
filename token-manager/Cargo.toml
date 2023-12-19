@@ -6,13 +6,16 @@ edition = "2018"
 publish = false
 
 [lib]
-path = "src/token_manager.rs"
+path = "src/lib.rs"
+
+[dev-dependencies]
+num-bigint = "0.4.2"
 
 [dependencies.multiversx-sc]
 version = "0.43.4"
 
-[dependencies.flow-limit]
-path = "../flow-limit"
-
 [dependencies.operatable]
-path = "../operatable"
+path = "../modules/operatable"
+
+[dev-dependencies.multiversx-sc-scenario]
+version = "0.43.4"

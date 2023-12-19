@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           29
+// Endpoints:                           31
 // Async Callback:                       1
-// Total number of exported functions:  31
+// Total number of exported functions:  33
 
 #![no_std]
 
@@ -19,24 +19,26 @@ multiversx_sc_wasm_adapter::allocator!();
 multiversx_sc_wasm_adapter::panic_handler!();
 
 multiversx_sc_wasm_adapter::endpoints! {
-    token_manager_mint_burn
+    token_manager
     (
         init => init
-        interchainTransfer => interchain_transfer
-        callContractWithInterchainToken => call_contract_with_interchain_token
+        addFlowIn => add_flow_in
+        addFlowOut => add_flow_out
+        addFlowLimiter => add_flow_limiter
+        removeFlowLimiter => remove_flow_limiter
+        setFlowLimit => set_flow_limit
         giveToken => give_token
         takeToken => take_token
         deployInterchainToken => deploy_interchain_token
         mint => mint
         burn => burn
-        implementationType => implementation_type
-        params => params
-        addFlowLimiter => add_flow_limiter
-        removeFlowLimiter => remove_flow_limiter
-        setFlowLimit => set_flow_limit
-        invalidTokenIdentifier => invalid_token_identifier
+        getImplementationTypeAndTokenIdentifier => get_implementation_type_and_token_identifier
         isFlowLimiter => is_flow_limiter
-        tokenId => interchain_token_id
+        params => params
+        invalidTokenIdentifier => invalid_token_identifier
+        interchainTokenService => interchain_token_service
+        implementationType => implementation_type
+        interchainTokenId => interchain_token_id
         tokenIdentifier => token_identifier
         flowOutAmount => get_flow_out_amount
         flowInAmount => get_flow_in_amount
@@ -54,4 +56,4 @@ multiversx_sc_wasm_adapter::endpoints! {
     )
 }
 
-multiversx_sc_wasm_adapter::async_callback! { token_manager_mint_burn }
+multiversx_sc_wasm_adapter::async_callback! { token_manager }

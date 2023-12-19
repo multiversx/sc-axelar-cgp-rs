@@ -23,14 +23,8 @@ version = "0.43.4"
 [dependencies.operatable]
 path = "../modules/operatable"
 
-[dependencies.flow-limit]
-path = "../modules/flow-limit"
-
 [dependencies.token-manager]
-path = "../modules/token-manager"
-
-[dependencies.token-manager-mint-burn]
-path = "../token-manager-mint-burn"
+path = "../token-manager"
 
 [dependencies.gas-service]
 path = "../gas-service"

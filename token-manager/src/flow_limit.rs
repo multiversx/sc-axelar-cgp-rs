@@ -1,5 +1,3 @@
-#![no_std]
-
 multiversx_sc::imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
@@ -18,18 +16,32 @@ pub trait FlowLimit {
         self.flow_limit().set(flow_limit);
     }
 
-    #[view(flowOutAmount)]
-    fn get_flow_out_amount(&self) -> BigUint {
-        let epoch = self.blockchain().get_block_timestamp() / EPOCH_TIME;
+    fn add_flow_out_raw(&self, flow_out_amount: &BigUint) {
+        let flow_limit = self.flow_limit().get();
 
-        self.flow_out_amount(epoch).get()
+        if flow_limit == 0 {
+            return;
+        }
+
+        let epoch = self.blockchain().get_block_timestamp() / EPOCH_TIME;
+        let slot_to_add = self.flow_out_amount(epoch);
+        let slot_to_compare = self.flow_in_amount(epoch);
+
+        self.add_flow(flow_limit, slot_to_add, slot_to_compare, flow_out_amount);
     }
 
-    #[view(flowInAmount)]
-    fn get_flow_in_amount(&self) -> BigUint {
-        let epoch = self.blockchain().get_block_timestamp() / EPOCH_TIME;
+    fn add_flow_in_raw(&self, flow_in_amount: &BigUint) {
+        let flow_limit = self.flow_limit().get();
 
-        self.flow_in_amount(epoch).get()
+        if flow_limit == 0 {
+            return;
+        }
+
+        let epoch = self.blockchain().get_block_timestamp() / EPOCH_TIME;
+        let slot_to_add = self.flow_in_amount(epoch);
+        let slot_to_compare = self.flow_out_amount(epoch);
+
+        self.add_flow(flow_limit, slot_to_add, slot_to_compare, flow_in_amount);
     }
 
     fn add_flow(
@@ -51,32 +63,18 @@ pub trait FlowLimit {
         slot_to_add.set(&flow_to_add + flow_amount);
     }
 
-    fn add_flow_out(&self, flow_out_amount: &BigUint) {
-        let flow_limit = self.flow_limit().get();
-
-        if flow_limit == 0 {
-            return;
-        }
-
+    #[view(flowOutAmount)]
+    fn get_flow_out_amount(&self) -> BigUint {
         let epoch = self.blockchain().get_block_timestamp() / EPOCH_TIME;
-        let slot_to_add = self.flow_out_amount(epoch);
-        let slot_to_compare = self.flow_in_amount(epoch);
 
-        self.add_flow(flow_limit, slot_to_add, slot_to_compare, flow_out_amount);
+        self.flow_out_amount(epoch).get()
     }
 
-    fn add_flow_in(&self, flow_in_amount: &BigUint) {
-        let flow_limit = self.flow_limit().get();
-
-        if flow_limit == 0 {
-            return;
-        }
-
+    #[view(flowInAmount)]
+    fn get_flow_in_amount(&self) -> BigUint {
         let epoch = self.blockchain().get_block_timestamp() / EPOCH_TIME;
-        let slot_to_add = self.flow_in_amount(epoch);
-        let slot_to_compare = self.flow_out_amount(epoch);
 
-        self.add_flow(flow_limit, slot_to_add, slot_to_compare, flow_in_amount);
+        self.flow_in_amount(epoch).get()
     }
 
     #[view(getFlowLimit)]

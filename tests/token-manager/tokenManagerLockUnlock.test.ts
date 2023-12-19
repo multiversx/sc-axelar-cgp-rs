@@ -91,7 +91,7 @@ test('Init errors', async () => {
   const mockTokenId = createKeccakHash('keccak256').update('mockTokenId').digest('hex');
 
   await deployer.deployContract({
-    code: 'file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm',
+    code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
@@ -103,7 +103,7 @@ test('Init errors', async () => {
   }).assertFail({ code: 4, message: 'Invalid token address' });
 
   await deployer.deployContract({
-    code: 'file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm',
+    code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
@@ -117,7 +117,7 @@ test('Init errors', async () => {
 
 test('Init different arguments', async () => {
   const { contract } = await deployer.deployContract({
-    code: 'file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm',
+    code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
@@ -141,7 +141,7 @@ test('Init different arguments', async () => {
   });
 
   const { contract: contract2 } = await deployer.deployContract({
-    code: 'file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm',
+    code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [

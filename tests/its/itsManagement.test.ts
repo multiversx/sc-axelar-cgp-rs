@@ -474,6 +474,7 @@ test('Pause', async () => {
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''),
+      e.U(0),
     ],
   }).assertFail({ code: 4, message: 'Contract is paused' });
 

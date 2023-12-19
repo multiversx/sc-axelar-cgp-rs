@@ -50,7 +50,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
 
 [[package]]
-name = "flow-limit"
+name = "gas-service"
+version = "0.0.0"
+dependencies = [
+ "multiversx-sc",
+]
+
+[[package]]
+name = "gateway"
 version = "0.0.0"
 dependencies = [
  "multiversx-sc",
@@ -81,12 +88,12 @@ checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 name = "interchain-token-service"
 version = "0.0.0"
 dependencies = [
- "flow-limit",
+ "gas-service",
+ "gateway",
  "multiversx-sc",
  "multiversx-sc-modules",
  "operatable",
  "token-manager",
- "token-manager-mint-burn",
 ]
 
 [[package]]
@@ -245,19 +252,8 @@ dependencies = [
 name = "token-manager"
 version = "0.0.0"
 dependencies = [
- "flow-limit",
  "multiversx-sc",
  "operatable",
-]
-
-[[package]]
-name = "token-manager-mint-burn"
-version = "0.0.0"
-dependencies = [
- "flow-limit",
- "multiversx-sc",
- "operatable",
- "token-manager",
 ]
 
 [[package]]

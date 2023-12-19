@@ -1,7 +1,7 @@
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use multiversx_sc::codec::{NestedDecodeInput, TopDecodeInput};
 
-use token_manager::TokenManagerType;
+use token_manager::constants::TokenManagerType;
 
 use crate::abi::{AbiEncodeDecode, ParamType, Token};
 
@@ -33,6 +33,30 @@ pub const LATEST_METADATA_VERSION: u32 = 1;
 
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 
+#[derive(TypeAbi)]
+pub struct Metadata<M: ManagedTypeApi> {
+    pub version: u32,
+    pub data: ManagedBuffer<M>,
+}
+
+impl<M: ManagedTypeApi> TopDecode for Metadata<M> {
+    fn top_decode<I>(input: I) -> Result<Self, DecodeError>
+    where
+        I: TopDecodeInput,
+    {
+        let mut buffer = input.into_nested_buffer();
+
+        let version = u32::dep_decode(&mut buffer)?;
+        let data = if !buffer.is_depleted() {
+            ManagedBuffer::dep_decode(&mut buffer)?
+        } else {
+            ManagedBuffer::new()
+        };
+
+        Result::Ok(Metadata { version, data })
+    }
+}
+
 pub struct InterchainTransferPayload<M: ManagedTypeApi> {
     pub message_type: BigUint<M>,
     pub token_id: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
@@ -63,7 +87,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for InterchainTransferPayload<M> {
                 ParamType::Bytes,
                 ParamType::Bytes,
                 ParamType::Uint256,
-                ParamType::Bytes
+                ParamType::Bytes,
             ],
             &payload,
             &mut result,
@@ -84,82 +108,6 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for InterchainTransferPayload<M> {
             destination_address,
             amount,
             data,
-        }
-    }
-}
-
-#[derive(TypeAbi)]
-pub struct Metadata<M: ManagedTypeApi> {
-    pub version: u32,
-    pub data: ManagedBuffer<M>,
-}
-
-impl<M: ManagedTypeApi> TopDecode for Metadata<M> {
-    fn top_decode<I>(input: I) -> Result<Self, DecodeError>
-    where
-        I: TopDecodeInput,
-    {
-        let mut buffer = input.into_nested_buffer();
-
-        let version = u32::dep_decode(&mut buffer)?;
-        let data = if !buffer.is_depleted() {
-            ManagedBuffer::dep_decode(&mut buffer)?
-        } else {
-            ManagedBuffer::new()
-        };
-
-        Result::Ok(Metadata { version, data })
-    }
-}
-
-#[derive(TypeAbi, TopDecode, TopEncode, NestedEncode)]
-pub struct DeployTokenManagerParams<M: ManagedTypeApi> {
-    pub operator: Option<ManagedAddress<M>>,
-    pub token_identifier: Option<EgldOrEsdtTokenIdentifier<M>>,
-}
-
-pub struct DeployTokenManagerPayload<M: ManagedTypeApi> {
-    pub message_type: BigUint<M>,
-    pub token_id: TokenId<M>,
-    pub token_manager_type: TokenManagerType,
-    pub params: ManagedBuffer<M>,
-}
-
-impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployTokenManagerPayload<M> {
-    fn abi_encode(self) -> ManagedBuffer<M> {
-        Self::raw_abi_encode(&[
-            Token::Uint256(self.message_type),
-            Token::Bytes32(self.token_id),
-            Token::Uint8(self.token_manager_type.into()),
-            Token::Bytes(self.params),
-        ])
-    }
-
-    fn abi_decode(payload: ManagedBuffer<M>) -> Self {
-        let mut result = ArrayVec::<Token<M>, 4>::new();
-
-        Self::raw_abi_decode(
-            &[
-                ParamType::Uint256,
-                ParamType::Bytes32,
-                ParamType::Uint8,
-                ParamType::Bytes,
-            ],
-            &payload,
-            &mut result,
-            0,
-        );
-
-        let params = result.pop().unwrap().into_managed_buffer();
-        let token_manager_type = result.pop().unwrap().into_u8();
-        let token_id = result.pop().unwrap().into_managed_byte_array();
-        let message_type = result.pop().unwrap().into_biguint();
-
-        DeployTokenManagerPayload {
-            message_type,
-            token_id,
-            token_manager_type: TokenManagerType::from(token_manager_type),
-            params,
         }
     }
 }
@@ -203,7 +151,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
         );
 
         let minter = result.pop().unwrap().into_managed_buffer();
-        let decimals: u8 = result.pop().unwrap().into();
+        let decimals = result.pop().unwrap().into_u8();
         let symbol = result.pop().unwrap().into_managed_buffer();
         let name = result.pop().unwrap().into_managed_buffer();
         let token_id = result.pop().unwrap().into_managed_byte_array();
@@ -216,6 +164,52 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
             symbol,
             decimals,
             minter,
+        }
+    }
+}
+
+pub struct DeployTokenManagerPayload<M: ManagedTypeApi> {
+    pub message_type: BigUint<M>,
+    pub token_id: TokenId<M>,
+    pub token_manager_type: TokenManagerType,
+    pub params: ManagedBuffer<M>,
+}
+
+impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployTokenManagerPayload<M> {
+    fn abi_encode(self) -> ManagedBuffer<M> {
+        Self::raw_abi_encode(&[
+            Token::Uint256(self.message_type),
+            Token::Bytes32(self.token_id),
+            Token::Uint8(self.token_manager_type.into()),
+            Token::Bytes(self.params),
+        ])
+    }
+
+    fn abi_decode(payload: ManagedBuffer<M>) -> Self {
+        let mut result = ArrayVec::<Token<M>, 4>::new();
+
+        Self::raw_abi_decode(
+            &[
+                ParamType::Uint256,
+                ParamType::Bytes32,
+                ParamType::Uint8, // TODO: Change implementationType to Uint256?
+                ParamType::Bytes,
+            ],
+            &payload,
+            &mut result,
+            0,
+        );
+
+        let params = result.pop().unwrap().into_managed_buffer();
+        let token_manager_type = result.pop().unwrap().into_u8();
+        let token_id = result.pop().unwrap().into_managed_byte_array();
+        let message_type = result.pop().unwrap().into_biguint();
+
+        DeployTokenManagerPayload {
+            message_type,
+            token_id,
+            token_manager_type: TokenManagerType::from(token_manager_type),
+            params,
         }
     }
 }

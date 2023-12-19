@@ -1,18 +1,19 @@
 #![no_std]
 
+use core::ops::Deref;
+
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
+
+use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
+
 use crate::constants::{Hash, TokenId, PREFIX_CANONICAL_TOKEN_SALT, PREFIX_INTERCHAIN_TOKEN_SALT};
 use crate::proxy::CallbackProxy as _;
-use core::ops::Deref;
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use token_manager::DeployTokenManagerParams;
-use token_manager::TokenManagerType;
 
 multiversx_sc::imports!();
 
 pub mod constants;
 pub mod proxy;
 
-// TODO
 #[multiversx_sc::contract]
 pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
     #[init]
@@ -166,10 +167,8 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         .top_encode(&mut params)
         .unwrap();
 
-        let salt = self.canonical_interchain_token_salt(
-            &self.chain_name_hash().get(),
-            token_identifier,
-        );
+        let salt =
+            self.canonical_interchain_token_salt(&self.chain_name_hash().get(), token_identifier);
 
         self.its_deploy_token_manager(
             salt,

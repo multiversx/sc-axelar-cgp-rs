@@ -5,10 +5,14 @@ use core::ops::Deref;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use token_manager::TokenManagerType;
+use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
 use crate::abi::{AbiEncodeDecode, ParamType};
-use crate::constants::{DeployTokenManagerParams, InterchainTransferPayload, LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER, Metadata, MetadataVersion, PREFIX_INTERCHAIN_TOKEN_ID, TokenId};
+use crate::constants::{
+    InterchainTransferPayload, MetadataVersion, TokenId, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    PREFIX_INTERCHAIN_TOKEN_ID,
+};
 
 multiversx_sc::imports!();
 
@@ -38,31 +42,30 @@ pub trait InterchainTokenServiceContract:
         &self,
         gateway: ManagedAddress,
         gas_service: ManagedAddress,
-        token_manager_mint_burn: ManagedAddress,
-        token_manager_lock_unlock: ManagedAddress,
+        token_manager_implementation: ManagedAddress,
+        token_handler: ManagedAddress,
+        // from _setup function below
         operator: ManagedAddress,
         chain_name: ManagedBuffer,
         trusted_chain_names: MultiValueManagedVecCounted<ManagedBuffer>,
         trusted_addresses: MultiValueManagedVecCounted<ManagedBuffer>,
     ) {
         require!(
-            !gateway.is_zero() && !gas_service.is_zero() && !operator.is_zero(),
+            !gateway.is_zero()
+                && !gas_service.is_zero()
+                && !token_manager_implementation.is_zero()
+                && !token_handler.is_zero(),
             "Zero address"
         );
 
         self.gateway().set_if_empty(gateway);
         self.gas_service().set_if_empty(gas_service);
-        self.implementation_mint_burn()
-            .set_if_empty(self.sanitize_token_manager_implementation(
-                token_manager_mint_burn,
-                TokenManagerType::MintBurn,
-            ));
-        self.implementation_lock_unlock()
-            .set_if_empty(self.sanitize_token_manager_implementation(
-                token_manager_lock_unlock,
-                TokenManagerType::LockUnlock,
-            ));
+        self.token_manager()
+            .set_if_empty(token_manager_implementation);
+        self.token_handler().set_if_empty(token_handler);
 
+        // from _setup function below
+        require!(!operator.is_zero(), "Zero address");
         require!(!chain_name.is_empty(), "Invalid chain name");
         require!(
             trusted_chain_names.len() == trusted_addresses.len(),
@@ -92,6 +95,7 @@ pub trait InterchainTokenServiceContract:
 
     /// User Functions
 
+    // Payable with EGLD for cross chain calls gas
     #[payable("EGLD")]
     #[endpoint(deployTokenManager)]
     fn deploy_token_manager(
@@ -106,7 +110,6 @@ pub trait InterchainTokenServiceContract:
         let mut deployer = self.blockchain().get_caller();
 
         if deployer == self.interchain_token_factory().get() {
-            // This removes the dependency on the address the token factory was deployed too to be able to derive the same tokenId.
             deployer = ManagedAddress::zero();
         }
 
@@ -114,14 +117,16 @@ pub trait InterchainTokenServiceContract:
 
         self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
 
-        let gas_value = self.call_value().egld_value().clone_value();
+        let gas_value = self.call_value().egld_value();
+        let gas_value = gas_value.deref();
 
         if destination_chain.is_empty() {
-            self.deploy_token_manager_raw(
-                &token_id,
-                token_manager_type,
-                DeployTokenManagerParams::<Self::Api>::top_decode(params).unwrap(),
+            require!(
+                gas_value == &BigUint::zero(),
+                "Can not accept EGLD if not cross chain call"
             );
+
+            self.deploy_token_manager_raw(&token_id, token_manager_type, params);
         } else {
             self.deploy_remote_token_manager(
                 &token_id,
@@ -135,6 +140,9 @@ pub trait InterchainTokenServiceContract:
         token_id
     }
 
+    // Payable with EGLD for:
+    // - ESDT token deploy (2nd transaction)
+    // - cross chain calls gas
     #[payable("EGLD")]
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
@@ -145,13 +153,12 @@ pub trait InterchainTokenServiceContract:
         symbol: ManagedBuffer,
         decimals: u8,
         minter: ManagedBuffer,
-    ) {
+    ) -> TokenId<Self::Api> {
         self.require_not_paused();
 
         let mut deployer = self.blockchain().get_caller();
 
         if deployer == self.interchain_token_factory().get() {
-            // This removes the dependency on the address the token factory was deployed too to be able to derive the same tokenId.
             deployer = ManagedAddress::zero();
         }
 
@@ -174,24 +181,27 @@ pub trait InterchainTokenServiceContract:
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
-                self.deploy_token_manager_raw(
-                    &token_id,
-                    TokenManagerType::MintBurn,
-                    DeployTokenManagerParams {
-                        operator: minter,
-                        token_identifier: None,
-                    },
-                );
+                let mut params = ManagedBuffer::new();
 
-                return;
+                DeployTokenManagerParams {
+                    operator: minter,
+                    token_identifier: None,
+                }
+                .top_encode(&mut params)
+                .unwrap();
+
+                self.deploy_token_manager_raw(&token_id, TokenManagerType::MintBurn, params);
+
+                return token_id;
             }
 
             self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);
         } else {
-            let gas_value = self.call_value().egld_value().clone_value();
+            let gas_value = self.call_value().egld_value();
+            let gas_value = gas_value.deref();
 
             self.deploy_remote_interchain_token(
-                token_id,
+                &token_id,
                 name,
                 symbol,
                 decimals,
@@ -200,6 +210,8 @@ pub trait InterchainTokenServiceContract:
                 gas_value,
             );
         }
+
+        token_id
     }
 
     #[payable("*")]
@@ -213,7 +225,7 @@ pub trait InterchainTokenServiceContract:
     ) {
         self.require_not_paused();
 
-        let interchain_transfer_payload: InterchainTransferPayload<Self::Api> =
+        let interchain_transfer_payload =
             InterchainTransferPayload::<Self::Api>::abi_decode(payload.clone());
 
         require!(
@@ -229,7 +241,7 @@ pub trait InterchainTokenServiceContract:
         let express_executor = self.blockchain().get_caller();
         let payload_hash = self.crypto().keccak256(payload);
 
-        let express_hash = self.set_express_executor(
+        self.express_executed_event(
             &command_id,
             &source_chain,
             &source_address,
@@ -237,12 +249,12 @@ pub trait InterchainTokenServiceContract:
             &express_executor,
         );
 
-        self.express_executed_event(
+        let express_hash = self.set_express_executor(
             &command_id,
             &source_chain,
             &source_address,
-            &express_executor,
             &payload_hash,
+            &express_executor,
         );
 
         self.express_execute_raw(
@@ -268,6 +280,7 @@ pub trait InterchainTokenServiceContract:
 
         let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
+        // TODO: Handle gas value using WEGLD
         // Send cross chain only the amount which was not used to pay for gas
         self.token_manager_take_token(&token_id, token_identifier, &amount - &gas_value);
 
@@ -281,7 +294,7 @@ pub trait InterchainTokenServiceContract:
             amount,
             metadata_version,
             data,
-            gas_value
+            gas_value,
         );
     }
 
@@ -297,8 +310,12 @@ pub trait InterchainTokenServiceContract:
     ) {
         self.require_not_paused();
 
+        require!(!data.is_empty(), "Empty data");
+
         let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
 
+        // TODO: Handle gas value using WEGLD
+        // Send cross chain only the amount which was not used to pay for gas
         self.token_manager_take_token(&token_id, token_identifier, &amount - &gas_value);
 
         self.transmit_interchain_transfer_raw(
@@ -309,39 +326,7 @@ pub trait InterchainTokenServiceContract:
             amount,
             MetadataVersion::ContractCall,
             data,
-            gas_value
-        );
-    }
-
-    /// Token Manager Functions
-
-    #[payable("EGLD")]
-    #[endpoint(transmitInterchainTransfer)]
-    fn transmit_interchain_transfer(
-        &self,
-        token_id: TokenId<Self::Api>,
-        source_address: ManagedAddress,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
-        amount: BigUint,
-        metadata: ManagedBuffer,
-    ) {
-        self.require_not_paused();
-
-        // TODO: Add takeToken?
-        // self.only_token_manager(&token_id);
-
-        let (metadata_version, data) = self.decode_metadata(metadata);
-
-        self.transmit_interchain_transfer_raw(
-            token_id,
-            source_address,
-            destination_chain,
-            destination_address,
-            amount,
-            metadata_version,
-            data,
-            self.call_value().egld_value().clone_value(),
+            gas_value,
         );
     }
 
@@ -428,14 +413,14 @@ pub trait InterchainTokenServiceContract:
                         &command_id,
                         &source_chain,
                         &source_address,
-                        &express_executor,
                         &payload_hash,
+                        &express_executor,
                     );
                 }
 
                 self.process_interchain_transfer_payload(
-                    &express_executor,
                     command_id,
+                    express_executor,
                     source_chain,
                     payload,
                 );
@@ -481,6 +466,20 @@ pub trait InterchainTokenServiceContract:
             "Wrong token or amount sent"
         );
 
+        self.interchain_transfer_received_event(
+            &command_id,
+            &interchain_transfer_payload.token_id,
+            &source_chain,
+            &interchain_transfer_payload.source_address,
+            &destination_address,
+            if interchain_transfer_payload.data.is_empty() {
+                ManagedByteArray::from(&[0; KECCAK256_RESULT_LEN])
+            } else {
+                self.crypto().keccak256(&interchain_transfer_payload.data)
+            },
+            &interchain_transfer_payload.amount,
+        );
+
         if !interchain_transfer_payload.data.is_empty() {
             self.executable_contract_express_execute_with_interchain_token(
                 destination_address,
@@ -499,7 +498,6 @@ pub trait InterchainTokenServiceContract:
             return;
         }
 
-        // TODO: Use token handler transferTokenFrom here instead?
         self.send().direct(
             &destination_address,
             &token_identifier,
@@ -515,21 +513,6 @@ pub trait InterchainTokenServiceContract:
             caller == self.valid_token_manager_address(token_id),
             "Not token manager"
         );
-    }
-
-    fn sanitize_token_manager_implementation(
-        &self,
-        address: ManagedAddress,
-        token_manager_type: TokenManagerType,
-    ) -> ManagedAddress {
-        require!(!address.is_zero(), "Zero address");
-
-        require!(
-            self.token_manager_implementation_type(address.clone()) == token_manager_type,
-            "Invalid token manager implementation type"
-        );
-
-        address
     }
 
     #[view(interchainTokenId)]

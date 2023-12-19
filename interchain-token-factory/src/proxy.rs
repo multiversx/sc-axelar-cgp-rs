@@ -1,16 +1,15 @@
 multiversx_sc::imports!();
 
-use crate::constants::{Hash, TokenId, ManagedBufferAscii};
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
+use crate::constants::{Hash, ManagedBufferAscii, TokenId};
 use core::ops::Deref;
-use token_manager::TokenManagerType;
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use interchain_token_service::ProxyTrait as _;
-use token_manager_mint_burn::ProxyTrait as _;
-use token_manager::ProxyTrait as _;
 use interchain_token_service::proxy::ProxyTrait as _;
-use token_manager_mint_burn::minter::ProxyTrait as _;
+use interchain_token_service::ProxyTrait as _;
 use operatable::ProxyTrait as _;
+use token_manager::constants::TokenManagerType;
+use token_manager::minter::ProxyTrait as _;
+use token_manager::ProxyTrait as _;
 
 #[multiversx_sc::module]
 pub trait ProxyModule {
@@ -40,26 +39,19 @@ pub trait ProxyModule {
         minter: &ManagedBuffer,
         gas_value: BigUint,
     ) {
-        self
-            .interchain_token_service_proxy(self.interchain_token_service().get())
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
             .deploy_interchain_token(salt, destination_chain, name, symbol, decimals, minter)
             .with_egld_transfer(gas_value)
             .execute_on_dest_context::<()>();
     }
 
-    fn its_invalid_token_manager_address(
-        &self,
-        token_id: &TokenId<Self::Api>,
-    ) -> ManagedAddress {
+    fn its_invalid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
             .invalid_token_manager_address(token_id)
             .execute_on_dest_context()
     }
 
-    fn its_valid_token_manager_address(
-        &self,
-        token_id: &TokenId<Self::Api>,
-    ) -> ManagedAddress {
+    fn its_valid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
             .valid_token_manager_address(token_id)
             .execute_on_dest_context()
@@ -73,29 +65,10 @@ pub trait ProxyModule {
         params: ManagedBuffer,
         gas_value: BigUint,
     ) -> TokenId<Self::Api> {
-        self
-            .interchain_token_service_proxy(self.interchain_token_service().get())
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
             .deploy_token_manager(salt, destination_chain, token_manager_type, params)
             .with_egld_transfer(gas_value)
             .execute_on_dest_context()
-    }
-
-    fn its_interchain_transfer(
-        &self,
-        token_id: TokenId<Self::Api>,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
-    ) {
-        self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .interchain_transfer(token_id, destination_chain, destination_address, ManagedBuffer::new())
-            .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(
-                token_identifier,
-                0,
-                amount,
-            ))
-            .execute_on_dest_context::<()>();
     }
 
     fn token_manager_invalid_token_identifier(
@@ -116,41 +89,58 @@ pub trait ProxyModule {
             .execute_on_dest_context()
     }
 
-    fn token_manager_mint(&self, sc_address: ManagedAddress, address: ManagedAddress, amount: BigUint) {
+    fn token_manager_mint(
+        &self,
+        sc_address: ManagedAddress,
+        address: ManagedAddress,
+        amount: BigUint,
+    ) {
         self.token_manager_proxy(sc_address)
             .mint(address, amount)
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_transfer_mintership(&self, sc_address: ManagedAddress, minter: ManagedAddress) {
+    fn token_manager_transfer_mintership(
+        &self,
+        sc_address: ManagedAddress,
+        minter: ManagedAddress,
+    ) {
         self.token_manager_proxy(sc_address)
             .transfer_mintership(minter)
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_remove_flow_limiter(&self, sc_address: ManagedAddress, flow_limiter: ManagedAddress) {
+    fn token_manager_remove_flow_limiter(
+        &self,
+        sc_address: ManagedAddress,
+        flow_limiter: ManagedAddress,
+    ) {
         self.token_manager_proxy(sc_address)
             .remove_flow_limiter(flow_limiter)
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_add_flow_limiter(&self, sc_address: ManagedAddress, flow_limiter: ManagedAddress) {
+    fn token_manager_add_flow_limiter(
+        &self,
+        sc_address: ManagedAddress,
+        flow_limiter: ManagedAddress,
+    ) {
         self.token_manager_proxy(sc_address)
             .add_flow_limiter(flow_limiter)
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_transfer_operatorship(&self, sc_address: ManagedAddress, operator: ManagedAddress) {
+    fn token_manager_transfer_operatorship(
+        &self,
+        sc_address: ManagedAddress,
+        operator: ManagedAddress,
+    ) {
         self.token_manager_proxy(sc_address)
             .transfer_operatorship(operator)
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_is_minter(
-        &self,
-        sc_address: ManagedAddress,
-        minter: &ManagedAddress,
-    ) -> bool {
+    fn token_manager_is_minter(&self, sc_address: ManagedAddress, minter: &ManagedAddress) -> bool {
         self.token_manager_proxy(sc_address)
             .is_minter(minter)
             .execute_on_dest_context()
@@ -190,7 +180,7 @@ pub trait ProxyModule {
     fn token_manager_proxy(
         &self,
         sc_address: ManagedAddress,
-    ) -> token_manager_mint_burn::Proxy<Self::Api>;
+    ) -> token_manager::Proxy<Self::Api>;
 
     // TODO: Test that this callback works properly (probably only on devnet)
     #[callback]

@@ -74,6 +74,7 @@ export const deployGasService = async (deployer: SWallet, collector: SWallet) =>
   });
 };
 
+// TODO:
 export const deployTokenManagerMintBurn = async (
   deployer: SWallet,
   operator: SWallet | SContract = deployer,
@@ -148,7 +149,7 @@ export const deployTokenManagerLockUnlock = async (
   interchainTokenId: string = INTERCHAIN_TOKEN_ID,
 ): Promise<Kvs> => {
   ({ contract: tokenManagerLockUnlock, address } = await deployer.deployContract({
-    code: 'file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm',
+    code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [

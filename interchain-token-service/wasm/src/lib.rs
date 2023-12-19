@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           37
+// Endpoints:                           36
 // Async Callback:                       1
-// Total number of exported functions:  39
+// Total number of exported functions:  38
 
 #![no_std]
 
@@ -28,13 +28,12 @@ multiversx_sc_wasm_adapter::endpoints! {
         expressExecute => express_execute_endpoint
         interchainTransfer => interchain_transfer
         callContractWithInterchainToken => call_contract_with_interchain_token
-        transmitInterchainTransfer => transmit_interchain_transfer
         setFlowLimits => set_flow_limits
         execute => execute
         interchainTokenId => interchain_token_id
         contractCallValue => contract_call_value
-        chainNameHash => chain_name_hash
         interchainTokenFactory => interchain_token_factory
+        chainNameHash => chain_name_hash
         transferOperatorship => transfer_operatorship
         proposeOperatorship => propose_operatorship
         acceptOperatorship => accept_operatorship
@@ -49,13 +48,13 @@ multiversx_sc_wasm_adapter::endpoints! {
         flowLimit => flow_limit
         flowOutAmount => flow_out_amount
         flowInAmount => flow_in_amount
-        validTokenIdentifier => valid_token_identifier
         validTokenManagerAddress => valid_token_manager_address
+        validTokenIdentifier => valid_token_identifier
         invalidTokenManagerAddress => invalid_token_manager_address
         gateway => gateway
         gasService => gas_service
         tokenManagerAddress => token_manager_address
-        tokenManagerImplementation => token_manager_implementation
+        tokenManagerImplementation => token_manager
         pause => pause_endpoint
         unpause => unpause_endpoint
         isPaused => paused_status

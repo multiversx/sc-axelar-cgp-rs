@@ -1,16 +1,17 @@
+use multiversx_sc::api::KECCAK256_RESULT_LEN;
+
+use token_manager::constants::TokenManagerType;
+
+use crate::constants::TokenId;
+
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
-
-use crate::constants::{DeployTokenManagerParams, TokenId};
-use token_manager::TokenManagerType;
-
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[derive(TypeAbi, TopEncode)]
 pub struct TokenManagerDeployedEventData<M: ManagedTypeApi> {
     token_manager: ManagedAddress<M>,
     token_manager_type: TokenManagerType,
-    params: DeployTokenManagerParams<M>,
+    params: ManagedBuffer<M>, // Should actually be of type DeployTokenManagerParams
 }
 
 #[derive(TypeAbi, TopEncode)]
@@ -52,7 +53,7 @@ pub trait EventsModule {
         token_id: &TokenId<Self::Api>,
         token_manager: ManagedAddress,
         token_manager_type: TokenManagerType,
-        params: DeployTokenManagerParams<Self::Api>,
+        params: ManagedBuffer,
     ) {
         self.token_manager_deployed_event(
             token_id,
@@ -66,7 +67,7 @@ pub trait EventsModule {
 
     fn emit_interchain_token_deployment_started_event(
         &self,
-        token_id: TokenId<Self::Api>,
+        token_id: &TokenId<Self::Api>,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
@@ -149,7 +150,7 @@ pub trait EventsModule {
     #[event("interchain_token_deployment_started_event")]
     fn interchain_token_deployment_started_event(
         &self,
-        #[indexed] token_id: TokenId<Self::Api>,
+        #[indexed] token_id: &TokenId<Self::Api>,
         data: InterchainTokenDeploymentStartedEventData<Self::Api>,
     );
 
@@ -188,20 +189,12 @@ pub trait EventsModule {
     #[event("interchain_transfer_received_event")]
     fn interchain_transfer_received_event(
         &self,
-        #[indexed] token_id: TokenId<Self::Api>,
-        #[indexed] source_chain: ManagedBuffer,
-        #[indexed] source_address: ManagedBuffer,
-        #[indexed] destination_address: ManagedAddress,
-        amount: BigUint,
-    );
-
-    #[event("interchain_transfer_received_with_data_event")]
-    fn interchain_transfer_received_with_data_event(
-        &self,
+        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] source_chain: &ManagedBuffer,
         #[indexed] source_address: &ManagedBuffer,
         #[indexed] destination_address: &ManagedAddress,
+        #[indexed] data_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         amount: &BigUint,
     );
 
@@ -223,8 +216,8 @@ pub trait EventsModule {
         #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] source_chain: &ManagedBuffer,
         #[indexed] source_address: &ManagedBuffer,
-        #[indexed] express_executor: &ManagedAddress,
-        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        express_executor: &ManagedAddress,
     );
 
     #[event("express_execution_fulfilled_event")]
@@ -233,8 +226,8 @@ pub trait EventsModule {
         #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] source_chain: &ManagedBuffer,
         #[indexed] source_address: &ManagedBuffer,
-        #[indexed] express_executor: &ManagedAddress,
-        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        express_executor: &ManagedAddress,
     );
 
     #[event("express_execute_with_interchain_token_success_event")]

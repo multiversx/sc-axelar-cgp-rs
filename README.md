@@ -27,8 +27,7 @@ It is based on the Axelar ITS Solidity implementation available at the time of w
 It consists of the following contracts:
 - [Interchain Token Service](/interchain-token-service) - main contract which handles transfering of tokens, registering & deploying of token managers
 - [Remote Address Validator](/remote-address-validator) - holds & validates addresses of other ITS contracts from other chains
-- [Token Managed Lock Unlock](/token-manager-lock-unlock) - an implementation of a Token Manager which stores tokens in the contract
-- [Token Manager Mint Burn](/token-manager-mint-burn) - an implementation of a Token Manager which burns & mints tokens as needed
+- [Token Manager](/token-manager) - Token Manager implementation which either stores tokens in the contract or mints/burns them
 
 There are also 3 modules used by the Token Manager contracts:
 - [Flow Limit module](/modules/flow-limit) - used to manage in/out flow limit of tokens

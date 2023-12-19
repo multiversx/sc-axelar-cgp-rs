@@ -3,8 +3,7 @@
   "codeAuth": "file:auth/output/auth.wasm",
   "codeGasReceiver": "file:gas-service/output/gas-service.wasm",
   "codeRemoteAddressValidator": "file:remote-address-validator/output/remote-address-validator.wasm",
-  "codeTokenManagerMintBurn": "file:token-manager-mint-burn/output/token-manager-mint-burn.wasm",
-  "codeTokenManagerLockUnlock": "file:token-manager-lock-unlock/output/token-manager-lock-unlock.wasm",
+  "codeTokenManager": "file:token-manager/output/token-manager.wasm",
   "codeIts": "file:interchain-token-service/output/interchain-token-service.wasm",
   "codePingPongInterchain": "file:ping-pong-interchain/output/ping-ping-interchain.wasm",
   "chainId": {

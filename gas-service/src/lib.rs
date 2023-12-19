@@ -9,6 +9,7 @@ multiversx_sc::imports!();
 
 mod events;
 
+// TODO: Add sender argument to endpoints, so another address can pay for cross chain gas
 #[multiversx_sc::contract]
 pub trait GasService: events::Events {
     #[init]

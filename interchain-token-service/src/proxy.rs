@@ -1,17 +1,13 @@
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use flow_limit::ProxyTrait as _;
 use gas_service::ProxyTrait as _;
 use gateway::ProxyTrait as _;
+use token_manager::constants::TokenManagerType;
+use token_manager::flow_limit::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
-use token_manager::TokenManagerType;
-use token_manager_mint_burn::ProxyTrait as _;
 
+use crate::constants::{MetadataVersion, TokenId};
 use crate::{address_tracker, events, express_executor_tracker};
-use crate::abi::AbiEncodeDecode;
-use crate::constants::{
-    DeployInterchainTokenPayload, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MetadataVersion, TokenId,
-};
 
 multiversx_sc::imports!();
 
@@ -189,6 +185,7 @@ pub trait ProxyModule:
             .execute_on_dest_context::<()>();
     }
 
+    // TODO
     fn token_manager_implementation_type(&self, sc_address: ManagedAddress) -> TokenManagerType {
         self.token_manager_proxy(sc_address)
             .implementation_type()
@@ -258,46 +255,6 @@ pub trait ProxyModule:
             .call_and_exit();
     }
 
-    fn deploy_remote_interchain_token(
-        &self,
-        token_id: TokenId<Self::Api>,
-        name: ManagedBuffer,
-        symbol: ManagedBuffer,
-        decimals: u8,
-        minter: ManagedBuffer,
-        destination_chain: ManagedBuffer,
-        gas_value: BigUint,
-    ) {
-        self.valid_token_manager_address(&token_id);
-
-        let data = DeployInterchainTokenPayload {
-            message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
-            token_id: token_id.clone(),
-            name: name.clone(),
-            symbol: symbol.clone(),
-            decimals,
-            minter: minter.clone(),
-        };
-
-        let payload = data.abi_encode();
-
-        self.call_contract(
-            &destination_chain,
-            &payload,
-            MetadataVersion::ContractCall,
-            &gas_value,
-        );
-
-        self.emit_interchain_token_deployment_started_event(
-            token_id,
-            name,
-            symbol,
-            decimals,
-            minter,
-            destination_chain,
-        );
-    }
-
     fn call_contract(
         &self,
         destination_chain: &ManagedBuffer,
@@ -322,7 +279,7 @@ pub trait ProxyModule:
                 ),
                 MetadataVersion::ExpressCall => self.gas_service_pay_native_gas_for_express_call(
                     destination_chain,
-                    destination_address,
+                    &destination_address,
                     payload,
                     gas_value,
                 ),
@@ -353,13 +310,6 @@ pub trait ProxyModule:
             .execute_on_dest_context()
     }
 
-    #[view(validTokenIdentifier)]
-    fn valid_token_identifier(&self, token_id: &TokenId<Self::Api>) -> EgldOrEsdtTokenIdentifier {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
-            .token_identifier()
-            .execute_on_dest_context()
-    }
-
     #[view(validTokenManagerAddress)]
     fn valid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
         let token_manager_address_mapper = self.token_manager_address(token_id);
@@ -370,6 +320,13 @@ pub trait ProxyModule:
         );
 
         token_manager_address_mapper.get()
+    }
+
+    #[view(validTokenIdentifier)]
+    fn valid_token_identifier(&self, token_id: &TokenId<Self::Api>) -> EgldOrEsdtTokenIdentifier {
+        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+            .token_identifier()
+            .execute_on_dest_context()
     }
 
     #[view(invalidTokenManagerAddress)]
@@ -405,10 +362,7 @@ pub trait ProxyModule:
     fn gas_service_proxy(&self, sc_address: ManagedAddress) -> gas_service::Proxy<Self::Api>;
 
     #[proxy]
-    fn token_manager_proxy(
-        &self,
-        address: ManagedAddress,
-    ) -> token_manager_mint_burn::Proxy<Self::Api>;
+    fn token_manager_proxy(&self, address: ManagedAddress) -> token_manager::Proxy<Self::Api>;
 
     #[proxy]
     fn executable_contract_proxy(

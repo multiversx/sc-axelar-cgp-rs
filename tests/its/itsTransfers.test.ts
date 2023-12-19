@@ -78,6 +78,7 @@ test('Interchain transfer', async () => {
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''), // No metadata, uses default
+      e.U(0),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   });
@@ -120,6 +121,7 @@ test('Interchain transfer metadata', async () => {
         e.U32(LATEST_METADATA_VERSION),
         e.Str('sth'),
       ),
+      e.U(0),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   });
@@ -157,6 +159,7 @@ test('Interchain transfer errors', async () => {
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''), // No metadata
+      e.U(0),
     ],
   }).assertFail({ code: 4, message: 'Token manager does not exist' });
 
@@ -171,6 +174,7 @@ test('Interchain transfer errors', async () => {
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''), // No metadata
+      e.U(0),
     ],
   }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
@@ -186,6 +190,7 @@ test('Interchain transfer errors', async () => {
         e.U32(1), // Wrong Metadata version,
         e.Str('sth'),
       ),
+      e.U(0),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   }).assertFail({ code: 4, message: 'Invalid metadata version' });
@@ -199,6 +204,7 @@ test('Interchain transfer errors', async () => {
       e.Str('Unsupported-Chain'),
       e.Str(OTHER_CHAIN_ADDRESS),
       e.Buffer(''), // No metadata
+      e.U(0),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   }).assertFail({ code: 4, message: 'Untrusted chain' });
@@ -215,6 +221,7 @@ test('Interchain transfer errors', async () => {
         e.U32(LATEST_METADATA_VERSION), // Correct Metadata version,
         e.Str('sth'),
       ),
+      e.U(0),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
   }).assertFail({ code: 4, message: 'Untrusted chain' });

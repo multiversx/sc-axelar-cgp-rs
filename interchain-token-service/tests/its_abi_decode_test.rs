@@ -9,7 +9,7 @@ use interchain_token_service::abi::Token;
 use interchain_token_service::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
 };
-use token_manager::TokenManagerType;
+use token_manager::constants::TokenManagerType;
 
 #[test]
 #[should_panic]
@@ -199,18 +199,20 @@ fn decode_two_bytes() {
 }
 
 #[test]
-fn decode_interchain_transfer_payload() {
+fn decode_interchain_transfer_payload_empty_data() {
     let result = InterchainTransferPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
         "
 			000000000000000000000000000000000000000000000000000000000000000b
             131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
-            00000000000000000000000000000000000000000000000000000000000000a0
-            00000000000000000000000000000000000000000000000000000000000000e0
+            00000000000000000000000000000000000000000000000000000000000000c0
+            0000000000000000000000000000000000000000000000000000000000000100
             000000000000000000000000000000000000000000000000000000000165ec15
+            0000000000000000000000000000000000000000000000000000000000000140
             0000000000000000000000000000000000000000000000000000000000000014
             f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
             0000000000000000000000000000000000000000000000000000000000000020
             000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf
+            0000000000000000000000000000000000000000000000000000000000000000
 		"
     )));
 
@@ -224,47 +226,7 @@ fn decode_interchain_transfer_payload() {
             "000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf"
         )),
         amount: BigUint::from(23456789u64),
-        data: None,
-    };
-
-    assert_eq!(result.message_type, expected.message_type);
-    assert_eq!(result.token_id, expected.token_id);
-    assert_eq!(result.destination_address, expected.destination_address);
-    assert_eq!(result.amount, expected.amount);
-    assert_eq!(result.source_address, expected.source_address);
-    assert_eq!(result.data, expected.data);
-}
-
-#[test]
-fn decode_interchain_transfer_payload_larger() {
-    let result = InterchainTransferPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
-        "
-			000000000000000000000000000000000000000000000000000000000000000b
-            131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
-            00000000000000000000000000000000000000000000000000000000000000c0
-            0000000000000000000000000000000000000000000000000000000000000100
-            000000000000000000000000000000000000000000000000000000000165ec15
-            0000000000000000000000000000000000000000000000000000000000000140
-            0000000000000000000000000000000000000000000000000000000000000020
-            000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf
-            0000000000000000000000000000000000000000000000000000000000000014
-            f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
-            0000000000000000000000000000000000000000000000000000000000000008
-            536f6d6544617461000000000000000000000000000000000000000000000000
-		"
-    )));
-
-    let expected = InterchainTransferPayload::<StaticApi> {
-        message_type: BigUint::from(11u64),
-        token_id: ManagedByteArray::from(&hex!(
-            "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
-        )),
-        source_address: ManagedBuffer::from(&hex!(
-            "000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf"
-        )),
-        destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
-        amount: BigUint::from(23456789u64),
-        data: None,
+        data: ManagedBuffer::new(),
     };
 
     assert_eq!(result.message_type, expected.message_type);
@@ -304,7 +266,7 @@ fn decode_interchain_transfer_payload_with_data() {
         )),
         destination_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
         amount: BigUint::from(23456789u64),
-        data: Some(ManagedBuffer::from(&hex!("536f6d6544617461"))),
+        data: ManagedBuffer::from(&hex!("536f6d6544617461")),
     };
 
     assert_eq!(result.message_type, expected.message_type);
