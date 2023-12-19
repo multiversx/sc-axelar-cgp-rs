@@ -58,7 +58,7 @@ pub trait Events {
         data: NativeGasPaidForContractCallData<Self::Api>,
     );
 
-    #[event("gas_paid_for_express_call_with_token_event")]
+    #[event("gas_paid_for_express_call")]
     fn gas_paid_for_express_call(
         &self,
         #[indexed] sender: ManagedAddress,
@@ -67,7 +67,7 @@ pub trait Events {
         data: GasPaidForContractCallData<Self::Api>,
     );
 
-    #[event("native_gas_paid_for_express_call_with_token_event")]
+    #[event("native_gas_paid_for_express_call")]
     fn native_gas_paid_for_express_call(
         &self,
         #[indexed] sender: ManagedAddress,
