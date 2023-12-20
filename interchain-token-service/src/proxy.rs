@@ -50,21 +50,92 @@ pub trait ProxyModule:
     + express_executor_tracker::ExpressExecutorTracker
     + multiversx_sc_modules::pause::PauseModule
 {
-    fn gas_service_pay_native_gas_for_contract_call(
+    fn gas_service_pay_gas_for_contract_call(
         &self,
         destination_chain: &ManagedBuffer,
         destination_address: &ManagedBuffer,
         payload: &ManagedBuffer,
-        gas_value: &BigUint,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
     ) {
+        if token_identifier.is_egld() {
+            self.gas_service_pay_native_gas_for_contract_call(
+                destination_chain,
+                destination_address,
+                payload,
+                gas_value,
+            );
+
+            return;
+        }
+
         self.gas_service_proxy(self.gas_service().get())
-            .pay_native_gas_for_contract_call(
+            .pay_gas_for_contract_call(
+                self.blockchain().get_sc_address(),
                 destination_chain,
                 destination_address,
                 payload,
                 self.blockchain().get_caller(),
             )
-            .with_egld_transfer(gas_value.clone())
+            .with_esdt_transfer(EsdtTokenPayment::new(
+                token_identifier.unwrap_esdt(),
+                0,
+                gas_value,
+            ))
+            .execute_on_dest_context::<()>();
+    }
+
+    fn gas_service_pay_native_gas_for_contract_call(
+        &self,
+        destination_chain: &ManagedBuffer,
+        destination_address: &ManagedBuffer,
+        payload: &ManagedBuffer,
+        gas_value: BigUint,
+    ) {
+        self.gas_service_proxy(self.gas_service().get())
+            .pay_native_gas_for_contract_call(
+                self.blockchain().get_sc_address(),
+                destination_chain,
+                destination_address,
+                payload,
+                self.blockchain().get_caller(),
+            )
+            .with_egld_transfer(gas_value)
+            .execute_on_dest_context::<()>();
+    }
+
+    fn gas_service_pay_gas_for_express_call(
+        &self,
+        destination_chain: &ManagedBuffer,
+        destination_address: &ManagedBuffer,
+        payload: &ManagedBuffer,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
+    ) {
+        if token_identifier.is_egld() {
+            self.gas_service_pay_native_gas_for_express_call(
+                destination_chain,
+                destination_address,
+                payload,
+                gas_value,
+            );
+
+            return;
+        }
+
+        self.gas_service_proxy(self.gas_service().get())
+            .pay_gas_for_express_call(
+                self.blockchain().get_sc_address(),
+                destination_chain,
+                destination_address,
+                payload,
+                self.blockchain().get_caller(),
+            )
+            .with_esdt_transfer(EsdtTokenPayment::new(
+                token_identifier.unwrap_esdt(),
+                0,
+                gas_value,
+            ))
             .execute_on_dest_context::<()>();
     }
 
@@ -73,16 +144,17 @@ pub trait ProxyModule:
         destination_chain: &ManagedBuffer,
         destination_address: &ManagedBuffer,
         payload: &ManagedBuffer,
-        gas_value: &BigUint,
+        gas_value: BigUint,
     ) {
         self.gas_service_proxy(self.gas_service().get())
             .pay_native_gas_for_express_call(
+                self.blockchain().get_sc_address(),
                 destination_chain,
                 destination_address,
                 payload,
                 self.blockchain().get_caller(),
             )
-            .with_egld_transfer(gas_value.clone())
+            .with_egld_transfer(gas_value)
             .execute_on_dest_context::<()>();
     }
 
@@ -260,7 +332,8 @@ pub trait ProxyModule:
         destination_chain: &ManagedBuffer,
         payload: &ManagedBuffer,
         metadata_version: MetadataVersion,
-        gas_value: &BigUint,
+        gas_token: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
     ) {
         let destination_address = self.trusted_address(destination_chain);
 
@@ -269,18 +342,20 @@ pub trait ProxyModule:
         let destination_address = destination_address.get();
 
         // TODO: see how to properly handle the gas here, since on MultiversX we can not send both EGLD and ESDT in the same transaction,
-        if gas_value > &BigUint::zero() {
+        if gas_value > 0 {
             match metadata_version {
-                MetadataVersion::ContractCall => self.gas_service_pay_native_gas_for_contract_call(
+                MetadataVersion::ContractCall => self.gas_service_pay_gas_for_contract_call(
                     destination_chain,
                     &destination_address,
                     payload,
+                    gas_token,
                     gas_value,
                 ),
-                MetadataVersion::ExpressCall => self.gas_service_pay_native_gas_for_express_call(
+                MetadataVersion::ExpressCall => self.gas_service_pay_gas_for_express_call(
                     destination_chain,
                     &destination_address,
                     payload,
+                    gas_token,
                     gas_value,
                 ),
             }

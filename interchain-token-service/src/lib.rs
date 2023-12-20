@@ -50,9 +50,7 @@ pub trait InterchainTokenServiceContract:
         trusted_addresses: MultiValueManagedVecCounted<ManagedBuffer>,
     ) {
         require!(
-            !gateway.is_zero()
-                && !gas_service.is_zero()
-                && !token_manager_implementation.is_zero(),
+            !gateway.is_zero() && !gas_service.is_zero() && !token_manager_implementation.is_zero(),
             "Zero address"
         );
 
@@ -114,12 +112,11 @@ pub trait InterchainTokenServiceContract:
 
         self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
 
-        let gas_value = self.call_value().egld_value();
-        let gas_value = gas_value.deref();
+        let gas_value = self.call_value().egld_value().clone_value();
 
         if destination_chain.is_empty() {
             require!(
-                gas_value == &BigUint::zero(),
+                gas_value == 0,
                 "Can not accept EGLD if not cross chain call"
             );
 
@@ -128,6 +125,7 @@ pub trait InterchainTokenServiceContract:
             self.deploy_remote_token_manager(
                 &token_id,
                 destination_chain,
+                EgldOrEsdtTokenIdentifier::egld(),
                 gas_value,
                 token_manager_type,
                 params,
@@ -194,8 +192,7 @@ pub trait InterchainTokenServiceContract:
 
             self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);
         } else {
-            let gas_value = self.call_value().egld_value();
-            let gas_value = gas_value.deref();
+            let gas_value = self.call_value().egld_value().clone_value();
 
             self.deploy_remote_interchain_token(
                 &token_id,
@@ -204,6 +201,7 @@ pub trait InterchainTokenServiceContract:
                 decimals,
                 minter,
                 destination_chain,
+                EgldOrEsdtTokenIdentifier::egld(),
                 gas_value,
             );
         }
@@ -275,11 +273,9 @@ pub trait InterchainTokenServiceContract:
     ) {
         self.require_not_paused();
 
-        let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
+        let (token_identifier, amount, gas_token) = self.get_transfer_and_gas_tokens(&gas_value);
 
-        // TODO: Handle gas value using WEGLD
-        // Send cross chain only the amount which was not used to pay for gas
-        self.token_manager_take_token(&token_id, token_identifier, &amount - &gas_value);
+        self.token_manager_take_token(&token_id, token_identifier, amount.clone());
 
         let (metadata_version, data) = self.decode_metadata(metadata);
 
@@ -291,6 +287,7 @@ pub trait InterchainTokenServiceContract:
             amount,
             metadata_version,
             data,
+            gas_token,
             gas_value,
         );
     }
@@ -309,11 +306,9 @@ pub trait InterchainTokenServiceContract:
 
         require!(!data.is_empty(), "Empty data");
 
-        let (token_identifier, amount) = self.call_value().egld_or_single_fungible_esdt();
+        let (token_identifier, amount, gas_token) = self.get_transfer_and_gas_tokens(&gas_value);
 
-        // TODO: Handle gas value using WEGLD
-        // Send cross chain only the amount which was not used to pay for gas
-        self.token_manager_take_token(&token_id, token_identifier, &amount - &gas_value);
+        self.token_manager_take_token(&token_id, token_identifier, amount.clone());
 
         self.transmit_interchain_transfer_raw(
             token_id,
@@ -323,6 +318,7 @@ pub trait InterchainTokenServiceContract:
             amount,
             MetadataVersion::ContractCall,
             data,
+            gas_token,
             gas_value,
         );
     }
@@ -501,6 +497,68 @@ pub trait InterchainTokenServiceContract:
             0,
             &interchain_transfer_payload.amount,
         );
+    }
+
+    // TODO: Add tests for all these cases
+    fn get_transfer_and_gas_tokens(
+        &self,
+        gas_value: &BigUint,
+    ) -> (
+        EgldOrEsdtTokenIdentifier,
+        BigUint,
+        EgldOrEsdtTokenIdentifier,
+    ) {
+        let payments = self.call_value().any_payment();
+
+        match payments {
+            EgldOrMultiEsdtPayment::Egld(value) => {
+                require!(value > 0, "No payment sent");
+                require!(&value > gas_value, "Invalid gas value");
+
+                return (
+                    EgldOrEsdtTokenIdentifier::egld(),
+                    &value - gas_value,
+                    EgldOrEsdtTokenIdentifier::egld(),
+                );
+            }
+            EgldOrMultiEsdtPayment::MultiEsdt(esdts) => {
+                require!(
+                    esdts.len() <= 2,
+                    "A maximum of two esdt payments are supported"
+                );
+
+                let first_payment = esdts.get(0);
+
+                require!(first_payment.token_nonce == 0, "Non fungible esdt sent");
+
+                let token_identifier =
+                    EgldOrEsdtTokenIdentifier::esdt(first_payment.token_identifier);
+                let amount = first_payment.amount;
+
+                let second_payment = esdts.try_get(1);
+
+                if second_payment.is_none() {
+                    require!(&amount > gas_value, "Invalid gas value");
+
+                    return (
+                        token_identifier.clone(),
+                        &amount - gas_value,
+                        token_identifier,
+                    );
+                }
+
+                let second_payment = second_payment.unwrap();
+
+                require!(second_payment.token_nonce == 0, "Non fungible esdt sent");
+                require!(&second_payment.amount == gas_value, "Invalid gas value");
+
+                return (
+                    token_identifier,
+                    amount,
+                    EgldOrEsdtTokenIdentifier::esdt(second_payment.token_identifier),
+                );
+            }
+        }
     }
 
     fn only_token_manager(&self, token_id: &TokenId<Self::Api>) {

@@ -23,7 +23,8 @@ pub trait RemoteModule:
         &self,
         token_id: &TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
-        gas_value: &BigUint,
+        gas_token: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) {
@@ -42,6 +43,7 @@ pub trait RemoteModule:
             &destination_chain,
             &payload,
             MetadataVersion::ContractCall,
+            gas_token,
             gas_value,
         );
 
@@ -61,7 +63,8 @@ pub trait RemoteModule:
         decimals: u8,
         minter: ManagedBuffer,
         destination_chain: ManagedBuffer,
-        gas_value: &BigUint,
+        gas_token: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
     ) {
         self.valid_token_manager_address(token_id);
 
@@ -80,6 +83,7 @@ pub trait RemoteModule:
             &destination_chain,
             &payload,
             MetadataVersion::ContractCall,
+            gas_token,
             gas_value,
         );
 
@@ -102,7 +106,8 @@ pub trait RemoteModule:
         amount: BigUint,
         metadata_version: MetadataVersion,
         data: ManagedBuffer,
-        _gas_value: BigUint, // TODO: Handle gas
+        gas_token: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
     ) {
         let data_hash = if data.is_empty() {
             ManagedByteArray::from(&[0; KECCAK256_RESULT_LEN])
@@ -121,12 +126,12 @@ pub trait RemoteModule:
 
         let payload = payload.abi_encode();
 
-        // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
         self.call_contract(
             &destination_chain,
             &payload,
             metadata_version,
-            &BigUint::zero(),
+            gas_token,
+            gas_value,
         );
 
         self.emit_interchain_transfer_event(
