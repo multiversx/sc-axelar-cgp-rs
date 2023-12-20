@@ -104,7 +104,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             self.token_manager_transfer_operatorship(token_manager, minter);
         }
 
-        return token_id;
+        token_id
     }
 
     #[payable("EGLD")]
@@ -148,7 +148,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             token_manager,
         );
 
-        return token_id;
+        token_id
     }
 
     #[endpoint(registerCanonicalInterchainToken)]
@@ -212,7 +212,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             token_manager,
         );
 
-        return token_id;
+        token_id
     }
 
     fn deploy_remote_interchain_token_raw(
