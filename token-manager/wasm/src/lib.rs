@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           31
+// Endpoints:                           29
 // Async Callback:                       1
-// Total number of exported functions:  33
+// Total number of exported functions:  31
 
 #![no_std]
 
@@ -22,8 +22,6 @@ multiversx_sc_wasm_adapter::endpoints! {
     token_manager
     (
         init => init
-        addFlowIn => add_flow_in
-        addFlowOut => add_flow_out
         addFlowLimiter => add_flow_limiter
         removeFlowLimiter => remove_flow_limiter
         setFlowLimit => set_flow_limit

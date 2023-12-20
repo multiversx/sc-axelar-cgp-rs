@@ -11,7 +11,7 @@ import {
 import {
   baseItsKvs, computeCanonicalInterchainTokenSalt,
   computeInterchainTokenId, computeInterchainTokenSalt,
-  deployContracts, deployInterchainTokenFactory, deployIts, deployTokenManager, deployTokenManagerMintBurn,
+  deployContracts, deployInterchainTokenFactory, deployIts, deployTokenManagerLockUnlock, deployTokenManagerMintBurn,
   gasService,
   gateway,
   interchainTokenFactory,
@@ -112,7 +112,7 @@ const deployAndMockTokenManagerLockUnlock = async (
 ) => {
   await deployContracts(deployer, collector);
 
-  let baseTokenManagerKvs = await deployTokenManager(deployer, its, deployer, tokenId, interchainTokenId);
+  let baseTokenManagerKvs = await deployTokenManagerLockUnlock(deployer, its, deployer, tokenId, interchainTokenId);
 
   let salt;
   if (interchainTokenId === INTERCHAIN_TOKEN_ID) {

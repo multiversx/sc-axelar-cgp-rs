@@ -48,31 +48,23 @@ pub trait TokenManagerLockUnlockContract:
             Roles::FLOW_LIMITER | Roles::OPERATOR,
         );
 
-        if implementation_type == TokenManagerType::LockUnlock
-            || implementation_type == TokenManagerType::LockUnlockFee
-        {
-            require!(params.token_identifier.is_some(), "Invalid token address");
+        match implementation_type {
+            TokenManagerType::LockUnlock | TokenManagerType::LockUnlockFee => {
+                require!(params.token_identifier.is_some(), "Invalid token address");
+            }
+            TokenManagerType::MintBurn | TokenManagerType::MintBurnFrom => {
+                require!(
+                    params.token_identifier.is_none()
+                        || params.token_identifier.clone().unwrap().is_esdt(),
+                    "Invalid token address"
+                );
+            }
         }
 
         if params.token_identifier.is_some() {
             self.token_identifier()
                 .set_if_empty(params.token_identifier.unwrap());
         }
-    }
-
-    // TODO: Do we need these?
-    #[endpoint(addFlowIn)]
-    fn add_flow_in(&self, amount: BigUint) {
-        self.only_service();
-
-        self.add_flow_in_raw(&amount);
-    }
-
-    #[endpoint(addFlowOut)]
-    fn add_flow_out(&self, amount: BigUint) {
-        self.only_service();
-
-        self.add_flow_out_raw(&amount);
     }
 
     #[endpoint(addFlowLimiter)]
@@ -114,9 +106,9 @@ pub trait TokenManagerLockUnlockContract:
                 self.give_token_mint_burn(&token_identifier, destination_address, &amount);
             }
             // nothing to do for lock/unlock, tokens remain in contract
-            TokenManagerType::LockUnlock | TokenManagerType::LockUnlockFee => self
-                .give_token_lock_unlock(&token_identifier, destination_address, &amount)
-                .into(),
+            TokenManagerType::LockUnlock | TokenManagerType::LockUnlockFee => {
+                self.give_token_lock_unlock(&token_identifier, destination_address, &amount);
+            }
         }
 
         (token_identifier, amount).into()
@@ -155,7 +147,6 @@ pub trait TokenManagerLockUnlockContract:
         symbol: ManagedBuffer,
         decimals: u8,
     ) {
-        // TODO:
         require!(
             self.implementation_type().get() == TokenManagerType::MintBurn,
             "Not mint burn token manager"
