@@ -416,7 +416,7 @@ describe('Deploy interchain token', () => {
         // ESDT token deployment was tested on Devnet and it works fine
         e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
           e.Str('deploy_token_callback'),
-          e.Bytes('00000000'),
+          e.TopBuffer('00000000'),
         )),
       ],
     });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, test } from 'vitest';
+import { afterEach, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import { INTERCHAIN_TOKEN_ID, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
@@ -7,7 +7,7 @@ import {
   gasService,
   interchainTokenFactory,
   its,
-  itsDeployTokenManager,
+  itsDeployTokenManagerLockUnlock,
   LATEST_METADATA_VERSION,
 } from '../itsHelpers';
 
@@ -66,416 +66,309 @@ afterEach(async () => {
   await world.terminate();
 });
 
-test('Interchain transfer', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
+describe('Interchain transfer', () => {
+  test('No metadata', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
 
-  await user.callContract({
-    callee: its,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''), // No metadata, uses default
-      e.U(0),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''), // No metadata, uses default
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    });
+
+    // Assert NO gas was paid for cross chain call
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      allKvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
+      ],
+    });
+
+    // There are events emitted for the Gateway contract, but there is no way to test those currently...
   });
 
-  // Assert NO gas was paid for cross chain call
-  let kvs = await gasService.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
+  test('With metadata', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    // Specify custom metadata
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Tuple(
+          e.U32(LATEST_METADATA_VERSION),
+          e.Str('sth'),
+        ),
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    });
+
+    // Assert NO gas was paid for cross chain call
+    const kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      allKvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
   });
 
-  let tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  assertAccount(tokenManagerKvs, {
-    balance: 0n,
-    allKvs: [
-      ...baseTokenManagerKvs,
+  test('With partial metadata', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
 
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
-    ],
+    // Specify custom metadata
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Tuple(
+          e.U32(LATEST_METADATA_VERSION),
+        ),
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    });
+
+    // Assert NO gas was paid for cross chain call
+    const kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      allKvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
   });
 
-  // There are events emitted for the Gateway contract, but there is no way to test those currently...
+  test('Errors', async () => {
+    const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      value: 1_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''), // No metadata
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Token manager does not exist' });
+
+    // Sending wrong token to token manager
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      value: 1_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''), // No metadata
+        e.U(0),
+      ],
+    }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Tuple(
+          e.U32(2), // Wrong Metadata version,
+          e.Str('sth'),
+        ),
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    }).assertFail({ code: 4, message: 'Invalid metadata version' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str('Unsupported-Chain'),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''), // No metadata
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    }).assertFail({ code: 4, message: 'Untrusted chain' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str('Unsupported-Chain'),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Tuple(
+          e.U32(LATEST_METADATA_VERSION), // Correct Metadata version,
+          e.Str('sth'),
+        ),
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    }).assertFail({ code: 4, message: 'Untrusted chain' });
+  });
 });
 
-test('Interchain transfer metadata', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
+describe('Call contract with interchain token', () => {
+  test('Call contract', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
 
-  // Specify custom metadata
-  await user.callContract({
-    callee: its,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Tuple(
-        e.U32(LATEST_METADATA_VERSION),
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
         e.Str('sth'),
-      ),
-      e.U(0),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    });
+
+    // Assert NO gas was paid for cross chain call
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      allKvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
+      ],
+    });
+
+    // There are events emitted for the Gateway contract, but there is no way to test those currently...
   });
 
-  // Assert NO gas was paid for cross chain call
-  const kvs = await gasService.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
+  test('Errors', async () => {
+    const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
 
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  assertAccount(tokenManagerKvs, {
-    balance: 0n,
-    allKvs: [
-      ...baseTokenManagerKvs,
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      value: 1_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''), // No data
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    }).assertFail({ code: 4, message: 'Empty data' });
 
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
-    ],
-  });
-});
-
-test('Interchain transfer errors', async () => {
-  const { computedTokenId } = await itsDeployTokenManager(world, user);
-
-  await user.callContract({
-    callee: its,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    value: 1_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''), // No metadata
-      e.U(0),
-    ],
-  }).assertFail({ code: 4, message: 'Token manager does not exist' });
-
-  // Sending wrong token to token manager
-  await user.callContract({
-    callee: its,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    value: 1_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''), // No metadata
-      e.U(0),
-    ],
-  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Tuple(
-        e.U32(1), // Wrong Metadata version,
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      value: 1_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
         e.Str('sth'),
-      ),
-      e.U(0),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  }).assertFail({ code: 4, message: 'Invalid metadata version' });
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Token manager does not exist' });
 
-  await user.callContract({
-    callee: its,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str('Unsupported-Chain'),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''), // No metadata
-      e.U(0),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  }).assertFail({ code: 4, message: 'Untrusted chain' });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'interchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str('Unsupported-Chain'),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Tuple(
-        e.U32(LATEST_METADATA_VERSION), // Correct Metadata version,
+    // Sending wrong token
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      value: 1_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
         e.Str('sth'),
-      ),
-      e.U(0),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  }).assertFail({ code: 4, message: 'Untrusted chain' });
-});
+        e.U(0),
+      ],
+    }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
-test('Call contract with interchain token', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
-
-  await user.callContract({
-    callee: its,
-    funcName: 'callContractWithInterchainToken',
-    gasLimit: 20_000_000,
-    value: 1_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Buffer(''), // No data
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  });
-
-  // Assert NO gas was paid for cross chain call
-  let kvs = await gasService.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-
-  let tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  assertAccount(tokenManagerKvs, {
-    balance: 0n,
-    allKvs: [
-      ...baseTokenManagerKvs,
-
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
-    ],
-  });
-
-  // There are events emitted for the Gateway contract, but there is no way to test those currently...
-});
-
-test('Call contract with interchain token metadata', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(world, user);
-
-  await user.callContract({
-    callee: its,
-    funcName: 'callContractWithInterchainToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Str('sth'),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  });
-
-  // Assert NO gas was paid for cross chain call
-  const kvs = await gasService.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    ],
-  });
-
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  assertAccount(tokenManagerKvs, {
-    balance: 0n,
-    allKvs: [
-      ...baseTokenManagerKvs,
-
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
-    ],
-  });
-});
-
-test('Send token with data errors', async () => {
-  const { computedTokenId } = await itsDeployTokenManager(world, user);
-
-  await user.callContract({
-    callee: its,
-    funcName: 'callContractWithInterchainToken',
-    gasLimit: 20_000_000,
-    value: 1_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Str('sth'),
-    ],
-  }).assertFail({ code: 4, message: 'Token manager does not exist' });
-
-  // Sending wrong token
-  await user.callContract({
-    callee: its,
-    funcName: 'callContractWithInterchainToken',
-    gasLimit: 20_000_000,
-    value: 1_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Str('sth'),
-    ],
-  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
-
-  // Sending to unsupported chain
-  await user.callContract({
-    callee: its,
-    funcName: 'callContractWithInterchainToken',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      e.Str('Unsupported-Chain'),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Str('sth'),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  }).assertFail({ code: 4, message: 'Untrusted chain' });
-});
-
-test('Transmit interchain transfer', async () => {
-  // Mock token manager being user to be able to test the transmitSendToken function
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(INTERCHAIN_TOKEN_ID)).Value(user),
-    ],
-  });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'transmitInterchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      user,
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.U(1_000),
-      e.Buffer(''), // No metadata
-    ],
-  });
-
-  // There are events emitted for the Gateway contract, but there is no way to test those currently...
-
-  // Specify custom metadata
-  await user.callContract({
-    callee: its,
-    funcName: 'transmitInterchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      user,
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.U(1_000),
-      e.Tuple(e.U32(LATEST_METADATA_VERSION), e.Str('')),
-    ],
-  });
-});
-
-test('Transmit interchain transfer errors', async () => {
-  const { computedTokenId } = await itsDeployTokenManager(world, user);
-
-  await user.callContract({
-    callee: its,
-    funcName: 'transmitInterchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(INTERCHAIN_TOKEN_ID),
-      user,
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.U(1_000),
-      e.Buffer(''), // No metadata
-    ],
-  }).assertFail({ code: 4, message: 'Token manager does not exist' });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'transmitInterchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      user,
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.U(1_000),
-      e.Buffer(''), // No metadata
-    ],
-  }).assertFail({ code: 4, message: 'Not token manager' });
-
-  // Mock token manager being user to be able to test the transmitSendToken function
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
-
-      e.kvs.Mapper('token_manager_address', e.Bytes(computedTokenId)).Value(user),
-    ],
-  });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'transmitInterchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      user,
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.U(1_000),
-      e.Tuple(
-        e.U32(1), // wrong metadata version
-        e.Str('')
-      ),
-    ],
-  }).assertFail({ code: 4, message: 'Invalid metadata version' });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'transmitInterchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      user,
-      e.Str('Unsupported-Chain'),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.U(1_000),
-      e.Buffer(''), // No metadata
-    ],
-  }).assertFail({ code: 4, message: 'Untrusted chain' });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'transmitInterchainTransfer',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Bytes(computedTokenId),
-      user,
-      e.Str('Unsupported-Chain'),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.U(1_000),
-      e.Tuple(
-        e.U32(LATEST_METADATA_VERSION), // Correct Metadata version,
+    // Sending to unsupported chain
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str('Unsupported-Chain'),
+        e.Str(OTHER_CHAIN_ADDRESS),
         e.Str('sth'),
-      ),
-    ],
-  }).assertFail({ code: 4, message: 'Untrusted chain' });
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    }).assertFail({ code: 4, message: 'Untrusted chain' });
+  });
 });

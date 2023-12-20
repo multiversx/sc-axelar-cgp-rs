@@ -44,7 +44,7 @@ test('Transfer operatorship not owner', async () => {
   const otherWallet = await world.createWallet();
 
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -82,7 +82,7 @@ test('Transfer operatorship invalid operators duplicate', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY), e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -102,11 +102,11 @@ test('Transfer operatorship invalid operators duplicate 2', async () => {
 
   const data = e.Tuple(
     e.List(
-      e.Bytes(ALICE_PUB_KEY),
-      e.Bytes(BOB_PUB_KEY),
-      e.Bytes(MOCK_PUB_KEY_1),
-      e.Bytes(BOB_PUB_KEY),
-      e.Bytes(MOCK_PUB_KEY_2),
+      e.TopBuffer(ALICE_PUB_KEY),
+      e.TopBuffer(BOB_PUB_KEY),
+      e.TopBuffer(MOCK_PUB_KEY_1),
+      e.TopBuffer(BOB_PUB_KEY),
+      e.TopBuffer(MOCK_PUB_KEY_2),
     ),
     e.List(e.U(10)),
     e.U(10),
@@ -126,7 +126,7 @@ test('Transfer operatorship invalid weights', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(), // not enough weights
     e.U(10),
   );
@@ -145,7 +145,7 @@ test('Transfer operatorship invalid threshold zero', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(0),
   );
@@ -164,7 +164,7 @@ test('Transfer operatorship invalid threshold less', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(11),
   );
@@ -188,12 +188,12 @@ test('Transfer operatorship duplicate operators', async () => {
     owner: deployer,
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
     ],
   });
 
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -212,7 +212,7 @@ test('Transfer operatorship', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
@@ -232,9 +232,9 @@ test('Transfer operatorship', async () => {
   assertAccount(pairs, {
     balance: 0,
     allKvs: [
-      e.kvs.Mapper('hash_for_epoch', e.U64(1)).Value(e.Bytes(operatorsHash)),
+      e.kvs.Mapper('hash_for_epoch', e.U64(1)).Value(e.TopBuffer(operatorsHash)),
 
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(1)),
     ],
@@ -245,12 +245,12 @@ test('Deploy with recent operators', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
   );
   const data2 = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY), e.TopBuffer(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(2)),
     e.U(12),
   );
@@ -273,12 +273,12 @@ test('Deploy with recent operators', async () => {
     balance: 0,
     allKvs: [
       // epoch 1
-      e.kvs.Mapper('hash_for_epoch', e.U64(1)).Value(e.Bytes(operatorsHash)),
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('hash_for_epoch', e.U64(1)).Value(e.TopBuffer(operatorsHash)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       // epoch 2
-      e.kvs.Mapper('hash_for_epoch', e.U64(2)).Value(e.Bytes(operatorsHash2)),
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash2)).Value(e.U64(2)),
+      e.kvs.Mapper('hash_for_epoch', e.U64(2)).Value(e.TopBuffer(operatorsHash2)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash2)).Value(e.U64(2)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(2)),
     ],

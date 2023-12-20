@@ -90,10 +90,10 @@ test('Validate contract call invalid', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateContractCall',
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str('ethereum'),
       e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-      e.Bytes(PAYLOAD_HASH)
+      e.TopBuffer(PAYLOAD_HASH)
     ],
   });
   assert(result.returnData[0] === '');
@@ -130,7 +130,7 @@ test('Validate contract call valid', async () => {
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
       // Manually approve call
-      e.kvs.Mapper('contract_call_approved', e.Bytes(dataHash)).Value(e.U8(1))
+      e.kvs.Mapper('contract_call_approved', e.TopBuffer(dataHash)).Value(e.U8(1))
     ],
   });
 
@@ -139,10 +139,10 @@ test('Validate contract call valid', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateContractCall',
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str('ethereum'),
       e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-      e.Bytes(PAYLOAD_HASH)
+      e.TopBuffer(PAYLOAD_HASH)
     ],
   });
   assert(result.returnData[0] === '01');

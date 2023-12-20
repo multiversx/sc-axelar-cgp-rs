@@ -82,8 +82,8 @@ const deployContract = async () => {
     owner: address,
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHashCanTransfer)).Value(e.U64(16)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHashCanTransfer)).Value(e.U64(16)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -99,7 +99,7 @@ test('Execute invalid proof', async () => {
 
   const data = e.Tuple(
     e.Str(CHAIN_ID),
-    e.List(e.Bytes(COMMAND_ID)),
+    e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('approveContractCall')),
     e.List(),
   );
@@ -107,10 +107,10 @@ test('Execute invalid proof', async () => {
   const proofData = Buffer.from(data.toTopHex(), 'hex');
   const signature = generateSignature(proofData);
   const proof = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(11)), // wrong weight
     e.U(10),
-    e.List(e.Bytes(signature)),
+    e.List(e.TopBuffer(signature)),
   );
 
   await deployer.callContract({
@@ -128,7 +128,7 @@ test('Execute invalid commands', async () => {
 
   const data = e.Tuple(
     e.Str(CHAIN_ID),
-    e.List(e.Bytes(COMMAND_ID)),
+    e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('deployToken'), e.Str('mintToken')),
     e.List(),
   );
@@ -143,7 +143,7 @@ test('Execute invalid commands', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateProof',
     funcArgs: [
-      e.Bytes(messageHash),
+      e.TopBuffer(messageHash),
       proof,
     ],
   });
@@ -165,7 +165,7 @@ test('Execute command already executed', async () => {
 
   const data = e.Tuple(
     e.Str(CHAIN_ID),
-    e.List(e.Bytes(commandId)),
+    e.List(e.TopBuffer(commandId)),
     e.List(e.Str('deployToken')),
     e.List(
       e.Buffer(
@@ -190,7 +190,7 @@ test('Execute command already executed', async () => {
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(commandId)).Value(e.U8(0)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(0)),
     ],
   });
 
@@ -210,7 +210,7 @@ test('Execute command already executed', async () => {
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(commandId)).Value(e.U8(0)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(0)),
     ],
   });
 });
@@ -220,7 +220,7 @@ test('Execute approve contract call', async () => {
 
   const data = e.Tuple(
     e.Str(CHAIN_ID),
-    e.List(e.Bytes(COMMAND_ID)),
+    e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('approveContractCall')),
     e.List(
       e.Buffer(
@@ -228,7 +228,7 @@ test('Execute approve contract call', async () => {
           e.Str('ethereum'),
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
-          e.Bytes(getKeccak256Hash('payloadHash'))
+          e.TopBuffer(getKeccak256Hash('payloadHash'))
         ).toTopBytes(),
       ),
     ),
@@ -265,9 +265,9 @@ test('Execute approve contract call', async () => {
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(commandIdHash)).Value(e.U8(1)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandIdHash)).Value(e.U8(1)),
 
-      e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash)).Value(e.U8(1)),
+      e.kvs.Mapper('contract_call_approved', e.TopBuffer(approvedDataHash)).Value(e.U8(1)),
     ],
   });
 });
@@ -277,7 +277,7 @@ test('Execute transfer operatorship old proof', async () => {
 
   const data = e.Tuple(
     e.Str(CHAIN_ID),
-    e.List(e.Bytes(COMMAND_ID), e.Bytes(getKeccak256Hash('commandIdInvalid'))),
+    e.List(e.TopBuffer(COMMAND_ID), e.TopBuffer(getKeccak256Hash('commandIdInvalid'))),
     e.List(e.Str('transferOperatorship'), e.Str('transferOperatorship')),
     e.List(
       e.Buffer(''),
@@ -312,19 +312,19 @@ test('Execute transfer operatorship', async () => {
   // Second transferOperatorship command will be ignored
   const data = e.Tuple(
     e.Str(CHAIN_ID),
-    e.List(e.Bytes(COMMAND_ID), e.Bytes(getKeccak256Hash('commandId2'))),
+    e.List(e.TopBuffer(COMMAND_ID), e.TopBuffer(getKeccak256Hash('commandId2'))),
     e.List(e.Str('transferOperatorship'), e.Str('transferOperatorship')),
     e.List(
       e.Buffer(
         e.Tuple(
-          e.List(e.Bytes(BOB_PUB_KEY)),
+          e.List(e.TopBuffer(BOB_PUB_KEY)),
           e.List(e.U(2)),
           e.U(2),
         ).toTopBytes(),
       ),
       e.Buffer(
         e.Tuple(
-          e.List(e.Bytes(ALICE_PUB_KEY)),
+          e.List(e.TopBuffer(ALICE_PUB_KEY)),
           e.List(e.U(5)),
           e.U(5),
         ).toTopBytes(),
@@ -336,10 +336,10 @@ test('Execute transfer operatorship', async () => {
   const signatureBob = generateSignature(Buffer.from(data.toTopHex(), 'hex'), './bob.pem');
 
   const proof = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY), e.TopBuffer(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(2)),
     e.U(12),
-    e.List(e.Bytes(signature), e.Bytes(signatureBob)),
+    e.List(e.TopBuffer(signature), e.TopBuffer(signatureBob)),
   );
 
   await deployer.callContract({
@@ -360,7 +360,7 @@ test('Execute transfer operatorship', async () => {
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(commandIdHash)).Value(e.U8(1)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandIdHash)).Value(e.U8(1)),
     ],
   });
 
@@ -374,11 +374,11 @@ test('Execute transfer operatorship', async () => {
     balance: 0,
     allKvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash2)).Value(e.U64(16)),
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash3)).Value(e.U64(17)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash2)).Value(e.U64(16)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash3)).Value(e.U64(17)),
 
-      e.kvs.Mapper('hash_for_epoch', e.U64(17)).Value(e.Bytes(operatorsHash3)),
+      e.kvs.Mapper('hash_for_epoch', e.U64(17)).Value(e.TopBuffer(operatorsHash3)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(17)),
     ],
@@ -408,7 +408,7 @@ test('Execute multiple commands', async () => {
 
   const data = e.Tuple(
     e.Str(CHAIN_ID),
-    e.List(e.Bytes(COMMAND_ID), e.Bytes(getKeccak256Hash('commandIdInvalid')), e.Bytes(getKeccak256Hash('commandId3'))),
+    e.List(e.TopBuffer(COMMAND_ID), e.TopBuffer(getKeccak256Hash('commandIdInvalid')), e.TopBuffer(getKeccak256Hash('commandId3'))),
     e.List(e.Str('approveContractCall'), e.Str('deployToken'), e.Str('approveContractCall')),
     e.List(
       e.Buffer(
@@ -416,7 +416,7 @@ test('Execute multiple commands', async () => {
           e.Str('arbitrum'),
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
-          e.Bytes(getKeccak256Hash('payloadHash2'))
+          e.TopBuffer(getKeccak256Hash('payloadHash2'))
         ).toTopBytes(),
       ),
       e.Buffer(''),
@@ -425,7 +425,7 @@ test('Execute multiple commands', async () => {
           e.Str('ethereum'),
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(deployer.toString()),
-          e.Bytes(getKeccak256Hash('payloadHash'))
+          e.TopBuffer(getKeccak256Hash('payloadHash'))
         ).toTopBytes(),
       ),
     ),
@@ -473,11 +473,11 @@ test('Execute multiple commands', async () => {
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(commandIdHash)).Value(e.U8(1)),
-      e.kvs.Mapper('command_executed', e.Bytes(commandId3Hash)).Value(e.U8(1)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandIdHash)).Value(e.U8(1)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandId3Hash)).Value(e.U8(1)),
 
-      e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash)).Value(e.U8(1)),
-      e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash3)).Value(e.U8(1)),
+      e.kvs.Mapper('contract_call_approved', e.TopBuffer(approvedDataHash)).Value(e.U8(1)),
+      e.kvs.Mapper('contract_call_approved', e.TopBuffer(approvedDataHash3)).Value(e.U8(1)),
     ],
   });
 });
@@ -532,9 +532,9 @@ test('Execute approve contract call with multisig prover encoded data', async ()
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(commandId)).Value(e.U8(1)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(1)),
 
-      e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash)).Value(e.U8(1))
+      e.kvs.Mapper('contract_call_approved', e.TopBuffer(approvedDataHash)).Value(e.U8(1))
     ],
   });
 });
@@ -561,10 +561,10 @@ test('Execute transfer operatorship with multisig prover encoded data', async ()
   const signatureBob = generateSignature(data, './bob.pem');
 
   const proof = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY), e.TopBuffer(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(2)),
     e.U(12),
-    e.List(e.Bytes(signature), e.Bytes(signatureBob)),
+    e.List(e.TopBuffer(signature), e.TopBuffer(signatureBob)),
   );
 
   await deployer.callContract({
@@ -585,7 +585,7 @@ test('Execute transfer operatorship with multisig prover encoded data', async ()
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(commandId)).Value(e.U8(1)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(1)),
     ],
   });
 
@@ -599,11 +599,11 @@ test('Execute transfer operatorship with multisig prover encoded data', async ()
     balance: 0,
     allKvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash2)).Value(e.U64(16)),
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash3)).Value(e.U64(17)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash2)).Value(e.U64(16)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash3)).Value(e.U64(17)),
 
-      e.kvs.Mapper('hash_for_epoch', e.U64(17)).Value(e.Bytes(operatorsHash3)),
+      e.kvs.Mapper('hash_for_epoch', e.U64(17)).Value(e.TopBuffer(operatorsHash3)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(17)),
     ],
@@ -631,9 +631,9 @@ test('View functions', async () => {
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
-      e.kvs.Mapper('contract_call_approved', e.Bytes(approvedDataHash)).Value(e.U8(1)),
+      e.kvs.Mapper('contract_call_approved', e.TopBuffer(approvedDataHash)).Value(e.U8(1)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(commandId)).Value(e.U8(1)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(1)),
     ],
   });
 
@@ -641,11 +641,11 @@ test('View functions', async () => {
     callee: contract,
     funcName: 'isContractCallApproved',
     funcArgs: [
-      e.Bytes(commandId),
+      e.TopBuffer(commandId),
       e.Str('ethereum'),
       e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
       e.Addr(deployer.toString()),
-      e.Bytes(PAYLOAD_HASH),
+      e.TopBuffer(PAYLOAD_HASH),
     ],
   });
   assert(result.returnData[0] === '01');
@@ -654,7 +654,7 @@ test('View functions', async () => {
     callee: contract,
     funcName: 'isCommandExecuted',
     funcArgs: [
-      e.Bytes(commandId),
+      e.TopBuffer(commandId),
     ],
   });
   assert(result.returnData[0] === '01');

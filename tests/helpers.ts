@@ -92,10 +92,10 @@ export const generateProof = (data: Encodable | Buffer): TupleEncodable => {
   const signature = generateSignature(data);
 
   return e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
-    e.List(e.Bytes(signature)),
+    e.List(e.TopBuffer(signature)),
   );
 };
 

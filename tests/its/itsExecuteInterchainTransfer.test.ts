@@ -3,28 +3,25 @@ import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import createKeccakHash from 'keccak';
 import {
   CHAIN_ID,
-  CHAIN_NAME_HASH, COMMAND_ID, INTERCHAIN_TOKEN_ID,
+  COMMAND_ID,
+  INTERCHAIN_TOKEN_ID,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID_CANONICAL,
-  TOKEN_ID_MANAGER_ADDRESS,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
-  computeInterchainTokenId,
+  baseItsKvs,
+  computeExpressExecuteHash,
   deployContracts,
-  gasService,
   gateway,
-  its,
   interchainTokenFactory,
-  tokenManager,
-  tokenManager,
-  MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+  its,
+  itsDeployTokenManagerLockUnlock,
   itsDeployTokenManagerMintBurn,
-  itsDeployTokenManager, computeExpressExecuteHash, baseItsKvs,
+  MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -87,13 +84,14 @@ afterEach(async () => {
 const mockGatewayCall = async (interchainTokenId: string, payload: string | null = null) => {
   if (!payload) {
     payload = AbiCoder.defaultAbiCoder().encode(
-      ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256'],
+      ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
       [
         MESSAGE_TYPE_INTERCHAIN_TRANSFER,
         Buffer.from(interchainTokenId, 'hex'),
         Buffer.from(OTHER_CHAIN_ADDRESS),
         Buffer.from(otherUser.toTopBytes()),
         1_000,
+        Buffer.from(''),
       ],
     ).substring(2);
   }
@@ -118,14 +116,14 @@ const mockGatewayCall = async (interchainTokenId: string, payload: string | null
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
 
       // Manually approve call
-      e.kvs.Mapper('contract_call_approved', e.Bytes(dataHash)).Value(e.U8(1)),
+      e.kvs.Mapper('contract_call_approved', e.TopBuffer(dataHash)).Value(e.U8(1)),
     ],
   });
 
   return payload;
 };
 
-test('Execute interchain transfer mint/burn', async () => {
+test('Transfer mint burn', async () => {
   const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(world, user);
 
   const payload = await mockGatewayCall(computedTokenId);
@@ -135,7 +133,7 @@ test('Execute interchain transfer mint/burn', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -168,8 +166,8 @@ test('Execute interchain transfer mint/burn', async () => {
   });
 });
 
-test('Execute interchain transfer lock/unlock', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManager(
+test('Transfer lock unlock', async () => {
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
     world,
     user,
     true,
@@ -182,7 +180,7 @@ test('Execute interchain transfer lock/unlock', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -219,7 +217,7 @@ test('Execute interchain transfer lock/unlock', async () => {
   });
 });
 
-test('Execute interchain transfer flow limit', async () => {
+test('Flow limit', async () => {
   const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(
     world,
     user,
@@ -233,7 +231,7 @@ test('Execute interchain transfer flow limit', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -262,7 +260,7 @@ test('Execute interchain transfer flow limit', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -281,7 +279,7 @@ test('Execute interchain transfer flow limit', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -300,7 +298,7 @@ test('Execute interchain transfer flow limit', async () => {
   });
 });
 
-test('Execute interchain transfer express executor', async () => {
+test('Express executor', async () => {
   const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(
     world,
     user,
@@ -316,7 +314,7 @@ test('Execute interchain transfer express executor', async () => {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
 
-      e.kvs.Mapper('express_execute', e.Bytes(expressExecuteHash)).Value(user),
+      e.kvs.Mapper('express_execute', e.TopBuffer(expressExecuteHash)).Value(user),
     ],
   });
 
@@ -325,7 +323,7 @@ test('Execute interchain transfer express executor', async () => {
     funcName: 'execute',
     gasLimit: 25_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -378,7 +376,7 @@ test('Execute interchain transfer express executor', async () => {
   });
 });
 
-test('Execute interchain transfer errors', async () => {
+test('Errors', async () => {
   let payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256'],
     [
@@ -392,7 +390,7 @@ test('Execute interchain transfer errors', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str('SomeOtherAddress'),
       payload,
@@ -404,7 +402,7 @@ test('Execute interchain transfer errors', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -424,7 +422,7 @@ test('Execute interchain transfer errors', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,

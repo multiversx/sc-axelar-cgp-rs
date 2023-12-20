@@ -1,28 +1,28 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
-import createKeccakHash from 'keccak';
 import {
   COMMAND_ID,
-  INTERCHAIN_TOKEN_ID,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID_MANAGER_ADDRESS,
   TOKEN_SALT,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
-  baseItsKvs, computeExpressExecuteHash, computeInterchainTokenId,
+  baseItsKvs,
+  computeExpressExecuteHash,
+  computeInterchainTokenId,
   deployContracts,
   deployPingPongInterchain,
   gateway,
   interchainTokenFactory,
-  its, itsDeployTokenManager,
+  its,
+  itsDeployTokenManagerLockUnlock,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-  MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
+  MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   pingPong,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
@@ -83,17 +83,18 @@ afterEach(async () => {
 });
 
 test('Express execute', async () => {
-  const { computedTokenId } = await itsDeployTokenManager(world, user);
+  const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
 
   // Remove '0x' from beginning of hex strings encoded by Ethereum
   const payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256'],
+    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
     [
       MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
       Buffer.from(otherUser.toTopBytes()),
       100_000,
+      Buffer.from(''),
     ],
   ).substring(2);
 
@@ -102,7 +103,7 @@ test('Express execute', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -119,7 +120,7 @@ test('Express execute', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
 
-      e.kvs.Mapper('express_execute', e.Bytes(expressExecuteHash)).Value(user),
+      e.kvs.Mapper('express_execute', e.TopBuffer(expressExecuteHash)).Value(user),
     ],
   });
 
@@ -143,7 +144,7 @@ test('Express execute with data', async () => {
     funcName: 'deployTokenManager',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(TOKEN_SALT),
+      e.TopBuffer(TOKEN_SALT),
       e.Str(''), // destination chain empty
       e.U8(2), // Lock/unlock
       e.Buffer(e.Tuple(
@@ -157,7 +158,7 @@ test('Express execute with data', async () => {
   const payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
     [
-      MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
+      MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
       Buffer.from(pingPong.toTopBytes()),
@@ -172,7 +173,7 @@ test('Express execute with data', async () => {
     gasLimit: 30_000_000,
     value: 1_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -188,7 +189,7 @@ test('Express execute with data', async () => {
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
 
-      e.kvs.Mapper('express_execute', e.Bytes(expressExecuteHash)).Value(user),
+      e.kvs.Mapper('express_execute', e.TopBuffer(expressExecuteHash)).Value(user),
     ],
   });
 
@@ -223,7 +224,7 @@ test('Express execute with data error', async () => {
     funcName: 'deployTokenManager',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(TOKEN_SALT),
+      e.TopBuffer(TOKEN_SALT),
       e.Str(''), // destination chain empty
       e.U8(2), // Lock/unlock
       e.Buffer(e.Tuple(
@@ -237,7 +238,7 @@ test('Express execute with data error', async () => {
   const payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
     [
-      MESSAGE_TYPE_INTERCHAIN_TRANSFER_WITH_DATA,
+      MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
       Buffer.from(pingPong.toTopBytes()),
@@ -252,68 +253,54 @@ test('Express execute with data error', async () => {
     gasLimit: 300_000_000,
     value: 1_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
   });
 
-  const expressExecuteHash = computeExpressExecuteHash(payload);
-
-  // TODO: This works correctly on Devnet but doesn't work in tests for some reason, the error callback is not called
   // Assert express execute hash NOT set
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     // balance: 0n,
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
-
-      // These keys should not have been set
-      e.kvs.Mapper('express_execute', e.Bytes(expressExecuteHash)).Value(user),
-      e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
-        e.Str('exp_execute_with_token_callback'),
-        e.Bytes('00000005'),
-        e.Buffer(user.toTopBytes()),
-        e.Buffer(COMMAND_ID),
-        e.Str('EGLD'),
-        e.U(1_000),
-        e.Buffer(expressExecuteHash),
-      )),
     ],
   });
 
-  // // Assert ping pong was NOT called
-  // const pingPongKvs = await pingPong.getAccountWithKvs();
-  // assertAccount(pingPongKvs, {
-  //   balance: 0,
-  //   allKvs: [
-  //     e.kvs.Mapper('interchain_token_service').Value(its),
-  //     e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
-  //     e.kvs.Mapper('deadline').Value(e.U64(10)),
-  //     e.kvs.Mapper('activationTimestamp').Value(e.U64(0)),
-  //     e.kvs.Mapper('maxFunds').Value(e.Option(null)),
-  //   ],
-  // });
-  //
-  // // Assert user still has initial balance
-  // const userKvs = await user.getAccountWithKvs();
-  // assertAccount(userKvs, {
-  //   balance: BigInt('10000000000000000'),
-  // });
+  // Assert ping pong was NOT called
+  const pingPongKvs = await pingPong.getAccountWithKvs();
+  assertAccount(pingPongKvs, {
+    balance: 0,
+    allKvs: [
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
+      e.kvs.Mapper('deadline').Value(e.U64(10)),
+      e.kvs.Mapper('activationTimestamp').Value(e.U64(0)),
+      e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+    ],
+  });
+
+  // Assert user still has initial balance
+  const userKvs = await user.getAccountWithKvs();
+  assertAccount(userKvs, {
+    balance: BigInt('10000000000000000'),
+  });
 });
 
 test('Express execute errors', async () => {
   const computedTokenId = computeInterchainTokenId(user);
 
   let payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256'],
+    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
     [
       MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
       Buffer.from(otherUser.toTopBytes()),
       100_000,
+      Buffer.from(''),
     ],
   ).substring(2);
 
@@ -322,7 +309,7 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -331,13 +318,14 @@ test('Express execute errors', async () => {
   }).assertFail({ code: 4, message: 'Invalid express message type' });
 
   payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256'],
+    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
     [
       MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
       Buffer.from(otherUser.toTopBytes()),
       100_000,
+      Buffer.from(''),
     ],
   ).substring(2);
 
@@ -346,7 +334,7 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -359,7 +347,7 @@ test('Express execute errors', async () => {
     funcName: 'deployTokenManager',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(TOKEN_SALT),
+      e.TopBuffer(TOKEN_SALT),
       e.Str(''), // destination chain empty
       e.U8(2), // Lock/unlock
       e.Buffer(e.Tuple(
@@ -375,7 +363,7 @@ test('Express execute errors', async () => {
     gasLimit: 20_000_000,
     value: 100_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -387,7 +375,7 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -401,7 +389,7 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -414,7 +402,7 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
@@ -428,7 +416,7 @@ test('Express execute errors', async () => {
     kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
 
-      e.kvs.Mapper('command_executed', e.Bytes(COMMAND_ID)).Value(e.U8(1)),
+      e.kvs.Mapper('command_executed', e.TopBuffer(COMMAND_ID)).Value(e.U8(1)),
     ],
   });
 
@@ -437,7 +425,7 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.Bytes(COMMAND_ID),
+      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,

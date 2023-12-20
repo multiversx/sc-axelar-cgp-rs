@@ -24,9 +24,9 @@ impl From<u8> for TokenManagerType {
     }
 }
 
-impl Into<u8> for TokenManagerType {
-    fn into(self) -> u8 {
-        match self {
+impl From<TokenManagerType> for u8 {
+    fn from(value: TokenManagerType) -> Self {
+        match value {
             TokenManagerType::MintBurn => 0,
             TokenManagerType::MintBurnFrom => 1,
             TokenManagerType::LockUnlock => 2,

@@ -213,7 +213,4 @@ pub trait ExecutableModule:
     #[view(tokenManagerImplementation)]
     #[storage_mapper("token_manager")]
     fn token_manager(&self) -> SingleValueMapper<ManagedAddress>;
-
-    #[storage_mapper("token_handler")]
-    fn token_handler(&self) -> SingleValueMapper<ManagedAddress>;
 }

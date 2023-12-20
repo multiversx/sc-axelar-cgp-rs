@@ -43,7 +43,6 @@ pub trait InterchainTokenServiceContract:
         gateway: ManagedAddress,
         gas_service: ManagedAddress,
         token_manager_implementation: ManagedAddress,
-        token_handler: ManagedAddress,
         // from _setup function below
         operator: ManagedAddress,
         chain_name: ManagedBuffer,
@@ -53,8 +52,7 @@ pub trait InterchainTokenServiceContract:
         require!(
             !gateway.is_zero()
                 && !gas_service.is_zero()
-                && !token_manager_implementation.is_zero()
-                && !token_handler.is_zero(),
+                && !token_manager_implementation.is_zero(),
             "Zero address"
         );
 
@@ -62,7 +60,6 @@ pub trait InterchainTokenServiceContract:
         self.gas_service().set_if_empty(gas_service);
         self.token_manager()
             .set_if_empty(token_manager_implementation);
-        self.token_handler().set_if_empty(token_handler);
 
         // from _setup function below
         require!(!operator.is_zero(), "Zero address");
