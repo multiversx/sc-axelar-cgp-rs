@@ -341,7 +341,6 @@ pub trait ProxyModule:
 
         let destination_address = destination_address.get();
 
-        // TODO: see how to properly handle the gas here, since on MultiversX we can not send both EGLD and ESDT in the same transaction,
         if gas_value > 0 {
             match metadata_version {
                 MetadataVersion::ContractCall => self.gas_service_pay_gas_for_contract_call(

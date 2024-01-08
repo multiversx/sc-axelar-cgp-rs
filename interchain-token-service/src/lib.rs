@@ -125,10 +125,10 @@ pub trait InterchainTokenServiceContract:
             self.deploy_remote_token_manager(
                 &token_id,
                 destination_chain,
-                EgldOrEsdtTokenIdentifier::egld(),
-                gas_value,
                 token_manager_type,
                 params,
+                EgldOrEsdtTokenIdentifier::egld(),
+                gas_value,
             );
         }
 

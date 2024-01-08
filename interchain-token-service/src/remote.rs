@@ -23,10 +23,10 @@ pub trait RemoteModule:
         &self,
         token_id: &TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
-        gas_token: EgldOrEsdtTokenIdentifier,
-        gas_value: BigUint,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
+        gas_token: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
     ) {
         let _ = self.valid_token_manager_address(token_id);
 
