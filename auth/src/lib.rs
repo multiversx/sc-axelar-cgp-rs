@@ -4,7 +4,7 @@ multiversx_sc::imports!();
 
 mod constants;
 
-use crate::constants::{ProofData, TransferData, OLD_KEY_RETENTION, Operator};
+use crate::constants::{Operator, ProofData, TransferData, OLD_KEY_RETENTION};
 use core::ops::Deref;
 use multiversx_sc::api::{ED25519_SIGNATURE_BYTE_LEN, KECCAK256_RESULT_LEN};
 
@@ -32,12 +32,11 @@ pub trait Auth {
             &proof_data.threshold,
         );
 
-        let operators_epoch_mapper = self.epoch_for_hash(&operators_hash);
+        let operators_epoch = self.epoch_for_hash(&operators_hash).get();
         let epoch = self.current_epoch().get();
 
         require!(
-            !operators_epoch_mapper.is_empty()
-                && epoch - operators_epoch_mapper.get() < OLD_KEY_RETENTION,
+            operators_epoch > 0 && epoch - operators_epoch < OLD_KEY_RETENTION,
             "Invalid operators"
         );
 
@@ -49,7 +48,7 @@ pub trait Auth {
             proof_data.signatures,
         );
 
-        operators_epoch_mapper.get() == epoch
+        operators_epoch == epoch
     }
 
     #[only_owner]
@@ -82,8 +81,10 @@ pub trait Auth {
             &transfer_data.new_threshold,
         );
 
+        let epoch_for_hash_mapper = self.epoch_for_hash(&new_operators_hash);
+
         require!(
-            self.epoch_for_hash(&new_operators_hash).is_empty(),
+            epoch_for_hash_mapper.is_empty(),
             "Duplicate operators"
         );
 
@@ -93,7 +94,7 @@ pub trait Auth {
         });
 
         self.hash_for_epoch(epoch).set(&new_operators_hash);
-        self.epoch_for_hash(&new_operators_hash).set(epoch);
+        epoch_for_hash_mapper.set(epoch);
 
         self.operatorship_transferred_event(transfer_data);
     }
@@ -155,14 +156,15 @@ pub trait Auth {
         self.crypto().keccak256(encoded)
     }
 
-    // TODO: Check for a better way of doing this when ManagedMap is available?
     fn contains_no_duplicate(&self, operators: &ManagedVec<Operator<Self::Api>>) -> bool {
         if operators.is_empty() {
             return false;
         }
 
-        for iindex in 0..(operators.len() - 1) {
-            for jindex in (iindex + 1)..operators.len() {
+        let len = operators.len();
+
+        for iindex in 0..(len - 1) {
+            for jindex in (iindex + 1)..len {
                 if operators.get(iindex) == operators.get(jindex) {
                     return false;
                 }
