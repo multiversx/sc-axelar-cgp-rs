@@ -27,6 +27,7 @@ export const TOKEN_ID2: string = 'OTHER-654321';
 export const TOKEN_ID2_MANAGER_ADDRESS: string = 'erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02';
 
 export const ADDRESS_ZERO: string = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu';
+export const ADDRESS_MOCK_SC: string = 'erd1qqqqqqqqqqqqqpgqpv09kfzry5y4sj05udcngesat07umyj70n4sa2c0rp';
 
 export const CHAIN_NAME: string = 'MultiversX';
 export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');

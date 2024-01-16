@@ -157,6 +157,15 @@ test('Init & upgrade', async () => {
     ],
   }).assertFail({ code: 4, message: 'Zero address' });
 
+  await deployer.deployContract({
+    code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      deployer,
+    ],
+  }).assertFail({ code: 4, message: 'Not a smart contract address' });
+
   await deployInterchainTokenFactory(deployer, false);
 
   await deployer.upgradeContract({

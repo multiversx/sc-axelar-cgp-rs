@@ -11,11 +11,14 @@ multiversx_sc::imports!();
 
 pub mod constants;
 pub mod flow_limit;
-pub mod minter;
+pub mod mintership;
 
 #[multiversx_sc::contract]
 pub trait TokenManagerLockUnlockContract:
-    flow_limit::FlowLimit + operatable::Operatable + operatable::roles::AccountRoles + minter::Minter
+    flow_limit::FlowLimit
+    + operatable::Operatable
+    + operatable::roles::AccountRoles
+    + mintership::Mintership
 {
     #[init]
     fn init(

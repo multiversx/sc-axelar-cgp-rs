@@ -8,7 +8,7 @@ use interchain_token_service::proxy::ProxyTrait as _;
 use interchain_token_service::ProxyTrait as _;
 use operatable::ProxyTrait as _;
 use token_manager::constants::TokenManagerType;
-use token_manager::minter::ProxyTrait as _;
+use token_manager::mintership::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
 #[multiversx_sc::module]
