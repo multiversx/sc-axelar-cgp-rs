@@ -5,7 +5,7 @@ use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use crate::constants::*;
-use crate::events::{ContractCallData};
+use crate::events::ContractCallData;
 
 multiversx_sc::imports!();
 
@@ -25,6 +25,9 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
         self.auth_module().set_if_empty(auth_module);
         self.chain_id().set_if_empty(chain_id);
     }
+
+    #[upgrade]
+    fn upgrade(&self) {}
 
     #[endpoint(callContract)]
     fn call_contract(
@@ -82,11 +85,8 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
     fn execute(&self, input: ExecuteInput<Self::Api>) {
         let message_hash = self.get_message_hash(&input.data);
 
-        let mut allow_operatorship_transfer: bool =
-            self.auth_validate_proof(&message_hash, &input.proof);
-
-        let execute_data: ExecuteData<Self::Api> =
-            ExecuteData::<Self::Api>::top_decode(input.data).unwrap();
+        let execute_data: ExecuteData<Self::Api> = ExecuteData::<Self::Api>::top_decode(input.data)
+            .unwrap_or_else(|_| sc_panic!("Could not decode execute data"));
 
         require!(
             execute_data.chain_id == self.chain_id().get(),
@@ -100,6 +100,9 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
                 && commands_length == execute_data.params.len(),
             "Invalid commands"
         );
+
+        let mut allow_operatorship_transfer: bool =
+            self.auth_validate_proof(&message_hash, &input.proof);
 
         let selector_approve_contract_call =
             &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL);
@@ -118,27 +121,22 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
             let command_ref = execute_data.commands.get(index);
             let command = command_ref.deref();
 
-            let success: bool;
-
             if command == selector_approve_contract_call {
-                success =
-                    self.approve_contract_call(execute_data.params.get(index).deref(), command_id);
+                self.approve_contract_call(execute_data.params.get(index).deref(), command_id);
             } else if command == selector_transfer_operatorship {
                 if !allow_operatorship_transfer {
                     continue;
                 }
 
                 allow_operatorship_transfer = false;
-                success = self.transfer_operatorship(execute_data.params.get(index).deref());
+                self.transfer_operatorship(execute_data.params.get(index).deref());
             } else {
                 continue; // ignore if unknown command received
             }
 
-            if success {
-                command_executed_mapper.add(command_id);
+            command_executed_mapper.add(command_id);
 
-                self.executed_event(command_id);
-            }
+            self.executed_event(command_id);
         }
     }
 
@@ -148,9 +146,10 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
         &self,
         params_raw: &ManagedBuffer,
         command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> bool {
+    ) {
         let params: ApproveContractCallParams<Self::Api> =
-            ApproveContractCallParams::<Self::Api>::top_decode(params_raw.clone()).unwrap();
+            ApproveContractCallParams::<Self::Api>::top_decode(params_raw.clone())
+                .unwrap_or_else(|_| sc_panic!("Could not decode approve contract call"));
 
         let hash = self.get_is_contract_call_approved_key(
             command_id,
@@ -169,16 +168,12 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
             params.contract_address,
             params.payload_hash,
         );
-
-        true
     }
 
-    fn transfer_operatorship(&self, params: &ManagedBuffer) -> bool {
+    fn transfer_operatorship(&self, params: &ManagedBuffer) {
         self.auth_transfer_operatorship(params);
 
         self.operatorship_transferred_event(params);
-
-        true
     }
 
     fn get_is_contract_call_approved_key(

@@ -3,7 +3,7 @@ multiversx_sc::imports!();
 use operatable::roles::Roles;
 
 #[multiversx_sc::module]
-pub trait Minter: operatable::roles::AccountRoles {
+pub trait Mintership: operatable::roles::AccountRoles {
     #[endpoint(transferMintership)]
     fn transfer_mintership(&self, minter: ManagedAddress) {
         self.only_minter();

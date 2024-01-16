@@ -10,7 +10,7 @@ let address: string;
 
 beforeEach(async () => {
   world = await SWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
   });
@@ -40,7 +40,7 @@ const deployContract = async () => {
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
-      e.Addr(collector.toString()),
+      collector,
     ],
   }));
 
@@ -48,7 +48,7 @@ const deployContract = async () => {
   assertAccount(pairs, {
     balance: 0n,
     allKvs: [
-      e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      e.kvs.Mapper('gas_collector').Value(collector),
     ],
   });
 };
@@ -792,6 +792,70 @@ test('Refund esdt', async () => {
           amount: 100_500,
         },
       ]),
+    ],
+  });
+});
+
+test('Set gas collector not collector', async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'setGasCollector',
+    funcArgs: [
+      deployer,
+    ],
+  }).assertFail({ code: 4, message: 'Not collector' });
+});
+
+test('Set gas collector', async () => {
+  await deployContract();
+
+  await collector.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'setGasCollector',
+    funcArgs: [
+      deployer,
+    ],
+  });
+
+  const pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(deployer),
+    ],
+  });
+});
+
+test('Upgrade', async () => {
+  await deployContract();
+
+  // Upgrading is not supported with new gas collector
+  await deployer.upgradeContract({
+    callee: contract,
+    code: 'file:gas-service/output/gas-service.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      deployer,
+    ],
+  }).assertFail({ code: 4, message: 'wrong number of arguments' });
+
+  await deployer.upgradeContract({
+    callee: contract,
+    code: 'file:gas-service/output/gas-service.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+  });
+
+  const pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(collector),
     ],
   });
 });

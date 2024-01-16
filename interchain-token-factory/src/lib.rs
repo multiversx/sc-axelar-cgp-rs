@@ -19,6 +19,11 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
     #[init]
     fn init(&self, interchain_token_service: ManagedAddress) {
         require!(!interchain_token_service.is_zero(), "Zero address");
+        require!(
+            self.blockchain()
+                .is_smart_contract(&interchain_token_service),
+            "Not a smart contract address"
+        );
 
         self.interchain_token_service()
             .set_if_empty(&interchain_token_service);
@@ -26,6 +31,9 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         self.chain_name_hash()
             .set_if_empty(self.its_chain_name_hash());
     }
+
+    #[upgrade]
+    fn upgrade(&self) {}
 
     // Needs to be payable because it issues ESDT token through the TokenManager
     #[payable("*")]
@@ -55,6 +63,8 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         let token_id = self.its_interchain_token_id(&ManagedAddress::zero(), &salt);
         let token_manager = self.its_invalid_token_manager_address(&token_id);
 
+        let egld_value = self.call_value().egld_value();
+
         // 1st transaction - deploy token manager
         // 2nd transaction - deploy token
         if token_manager.is_zero()
@@ -64,13 +74,13 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         {
             let gas_value = if token_manager.is_zero() {
                 require!(
-                    self.call_value().egld_value().deref() == &BigUint::zero(),
+                    egld_value.deref() == &BigUint::zero(),
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
                 BigUint::zero()
             } else {
-                self.call_value().egld_value().clone_value()
+                egld_value.clone_value()
             };
 
             self.its_deploy_interchain_token(
@@ -87,7 +97,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         }
 
         require!(
-            self.call_value().egld_value().deref() == &BigUint::zero(),
+            egld_value.deref() == &BigUint::zero(),
             "Can not send EGLD payment if not issuing ESDT"
         );
 

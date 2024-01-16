@@ -9,7 +9,7 @@ publish = false
 path = "src/operatable.rs"
 
 [dependencies.multiversx-sc]
-version = "0.43.4"
+version = "0.46.1"
 
 [dependencies]
 bitflags = "2.4.1"

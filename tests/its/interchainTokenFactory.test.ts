@@ -144,7 +144,7 @@ const deployAndMockTokenManagerLockUnlock = async (
   return { baseTokenManagerKvs, computedTokenId };
 };
 
-test('Init', async () => {
+test('Init & upgrade', async () => {
   await deployContracts(deployer, collector, false);
   await deployIts(deployer);
 
@@ -157,9 +157,17 @@ test('Init', async () => {
     ],
   }).assertFail({ code: 4, message: 'Zero address' });
 
+  await deployer.deployContract({
+    code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      deployer,
+    ],
+  }).assertFail({ code: 4, message: 'Not a smart contract address' });
+
   await deployInterchainTokenFactory(deployer, false);
 
-  // On upgrade storage is not updated
   await deployer.upgradeContract({
     callee: interchainTokenFactory,
     code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
@@ -168,6 +176,15 @@ test('Init', async () => {
     codeArgs: [
       deployer,
     ],
+  }).assertFail({ code: 4, message: 'wrong number of arguments' });
+
+  // On upgrade storage is not updated
+  await deployer.upgradeContract({
+    callee: interchainTokenFactory,
+    code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [],
   });
 
   const kvs = await interchainTokenFactory.getAccountWithKvs();

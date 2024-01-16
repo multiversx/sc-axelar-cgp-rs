@@ -8,7 +8,7 @@ use interchain_token_service::proxy::ProxyTrait as _;
 use interchain_token_service::ProxyTrait as _;
 use operatable::ProxyTrait as _;
 use token_manager::constants::TokenManagerType;
-use token_manager::minter::ProxyTrait as _;
+use token_manager::mintership::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
 #[multiversx_sc::module]
@@ -182,7 +182,7 @@ pub trait ProxyModule {
         sc_address: ManagedAddress,
     ) -> token_manager::Proxy<Self::Api>;
 
-    // TODO: Test that this callback works properly (probably only on devnet)
+    // This was tested on devnet and worked fine
     #[callback]
     fn deploy_remote_token_callback(
         &self,

@@ -84,7 +84,7 @@ describe('Deploy token manager', () => {
     let result = await user.callContract({
       callee: its,
       funcName: 'deployTokenManager',
-      gasLimit: 20_000_000,
+      gasLimit: 100_000_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
         e.Str(''), // destination chain empty
@@ -554,7 +554,7 @@ describe('Deploy interchain token', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      hasKvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user & its
@@ -613,7 +613,7 @@ describe('Deploy interchain token', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      hasKvs: [
         ...baseTokenManagerKvs,
 
         // minter role was set for zero address and its

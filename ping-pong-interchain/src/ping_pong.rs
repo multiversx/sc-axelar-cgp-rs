@@ -102,6 +102,7 @@ pub trait PingPong {
 
     /// User sends some EGLD to be locked in the contract for a period of time.
     /// Optional `_data` argument is ignored.
+    #[allow_multiple_var_args]
     #[payable("EGLD")]
     #[endpoint]
     fn ping(&self, opt_caller: OptionalValue<ManagedAddress>, _data: IgnoreValue) {

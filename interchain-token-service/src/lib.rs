@@ -37,6 +37,7 @@ pub trait InterchainTokenServiceContract:
     + remote::RemoteModule
     + multiversx_sc_modules::pause::PauseModule
 {
+    #[allow_multiple_var_args]
     #[init]
     fn init(
         &self,
@@ -80,6 +81,9 @@ pub trait InterchainTokenServiceContract:
             self.set_trusted_address(name.deref(), address.deref());
         }
     }
+
+    #[upgrade]
+    fn upgrade(&self) {}
 
     #[only_owner]
     #[endpoint(setInterchainTokenFactory)]
@@ -325,6 +329,7 @@ pub trait InterchainTokenServiceContract:
 
     /// Owner functions
 
+    #[allow_multiple_var_args]
     #[endpoint(setFlowLimits)]
     fn set_flow_limits(
         &self,

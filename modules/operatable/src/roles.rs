@@ -3,7 +3,7 @@ multiversx_sc::imports!();
 use bitflags::bitflags;
 bitflags! {
     #[derive(PartialEq, Copy, Clone)]
-    pub struct Roles: u32 {
+    pub struct Roles: u8 {
         const MINTER = 0b00000001;
         const OPERATOR = 0b00000010;
         const FLOW_LIMITER = 0b00000100;
@@ -15,7 +15,7 @@ impl TopEncode for Roles {
     where
         O: multiversx_sc::codec::TopEncodeOutput,
     {
-        u32::top_encode(&self.bits(), output)
+        u8::top_encode(&self.bits(), output)
     }
 }
 
@@ -24,14 +24,14 @@ impl TopDecode for Roles {
     where
         I: multiversx_sc::codec::TopDecodeInput,
     {
-        let bits = u32::top_decode(input)?;
+        let bits = u8::top_decode(input)?;
         Roles::from_bits(bits).ok_or(DecodeError::INVALID_VALUE)
     }
 }
 
 impl TypeAbi for Roles {
     fn type_name() -> multiversx_sc::abi::TypeName {
-        core::any::type_name::<u32>().into()
+        core::any::type_name::<u8>().into()
     }
 }
 
@@ -52,11 +52,13 @@ pub trait AccountRoles {
     }
 
     fn has_role(&self, address: &ManagedAddress, roles: Roles) -> bool {
-        if self.account_roles(address).is_empty() {
+        let account_roles_mapper = self.account_roles(address);
+
+        if account_roles_mapper.is_empty() {
             return false;
         }
 
-        let caller_roles = self.account_roles(address).get();
+        let caller_roles = account_roles_mapper.get();
 
         caller_roles.intersects(roles)
     }

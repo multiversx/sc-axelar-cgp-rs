@@ -11,11 +11,14 @@ multiversx_sc::imports!();
 
 pub mod constants;
 pub mod flow_limit;
-pub mod minter;
+pub mod mintership;
 
 #[multiversx_sc::contract]
 pub trait TokenManagerLockUnlockContract:
-    flow_limit::FlowLimit + operatable::Operatable + operatable::roles::AccountRoles + minter::Minter
+    flow_limit::FlowLimit
+    + operatable::Operatable
+    + operatable::roles::AccountRoles
+    + mintership::Mintership
 {
     #[init]
     fn init(
@@ -65,6 +68,22 @@ pub trait TokenManagerLockUnlockContract:
             self.token_identifier()
                 .set_if_empty(params.token_identifier.unwrap());
         }
+    }
+
+    #[upgrade]
+    fn upgrade(
+        &self,
+        interchain_token_service: ManagedAddress,
+        implementation_type: TokenManagerType,
+        interchain_token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        params: DeployTokenManagerParams<Self::Api>,
+    ) {
+        self.init(
+            interchain_token_service,
+            implementation_type,
+            interchain_token_id,
+            params,
+        )
     }
 
     #[endpoint(addFlowLimiter)]

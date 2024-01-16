@@ -14,9 +14,9 @@ permissions:
 jobs:
   contracts:
     name: Contracts
-    uses: multiversx/mx-sc-actions/.github/workflows/contracts.yml@v2.3.1
+    uses: multiversx/mx-sc-actions/.github/workflows/contracts.yml@v2.3.5
     with:
-      rust-toolchain: nightly-2023-05-26
+      rust-toolchain: nightly-2023-12-11
       vmtools-version: v1.4.60
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
@@ -39,7 +39,7 @@ jobs:
 
       - name: Install prerequisites
         run: |
-          pip3 install multiversx-sdk-cli==v8.1.5
+          pip3 install multiversx-sdk-cli==v9.3.0
           mkdir $HOME/multiversx-sdk
           python3 -m multiversx_sdk_cli.cli config set "dependencies.vmtools.urlTemplate.linux" "https://github.com/multiversx/mx-chain-vm-go/archive/{TAG}.tar.gz"
           python3 -m multiversx_sdk_cli.cli config set "dependencies.vmtools.tag" "latest"

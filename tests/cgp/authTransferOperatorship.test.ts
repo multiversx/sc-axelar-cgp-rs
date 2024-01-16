@@ -9,7 +9,7 @@ let address: string;
 
 beforeEach(async () => {
   world = await SWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
   });
@@ -242,8 +242,6 @@ test('Transfer operatorship', async () => {
 });
 
 test('Deploy with recent operators', async () => {
-  await deployContract();
-
   const data = e.Tuple(
     e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
@@ -282,5 +280,39 @@ test('Deploy with recent operators', async () => {
 
       e.kvs.Mapper('current_epoch').Value(e.U64(2)),
     ],
+  });
+});
+
+test('Upgrade', async () => {
+  await deployContract();
+
+  const data = e.Tuple(
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
+    e.List(e.U(10)),
+    e.U(10),
+  );
+
+  // Upgrading is not supported with recent operators
+  await deployer.upgradeContract({
+    callee: contract,
+    code: 'file:auth/output/auth.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      data,
+    ]
+  }).assertFail({ code: 4, message: 'wrong number of arguments' });
+
+  await deployer.upgradeContract({
+    callee: contract,
+    code: 'file:auth/output/auth.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+  });
+
+  const pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0n,
+    allKvs: [],
   });
 });
