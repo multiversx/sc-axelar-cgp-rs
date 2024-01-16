@@ -27,6 +27,9 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             .set_if_empty(self.its_chain_name_hash());
     }
 
+    #[upgrade]
+    fn upgrade(&self) {}
+
     // Needs to be payable because it issues ESDT token through the TokenManager
     #[payable("*")]
     #[endpoint(deployInterchainToken)]

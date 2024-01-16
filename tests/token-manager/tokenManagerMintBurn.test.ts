@@ -48,12 +48,12 @@ afterEach(async () => {
 });
 
 describe('Give token mint burn', () => {
-  test("Normal", async () => {
+  test('Normal', async () => {
     const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID);
 
     await user.callContract({
       callee: tokenManager,
-      funcName: "giveToken",
+      funcName: 'giveToken',
       gasLimit: 20_000_000,
       funcArgs: [
         otherUser,
@@ -76,13 +76,13 @@ describe('Give token mint burn', () => {
     });
   });
 
-  test("With flow limit", async () => {
+  test('With flow limit', async () => {
     const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID);
 
     // Set flow limit
     await deployer.callContract({
       callee: tokenManager,
-      funcName: "setFlowLimit",
+      funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
       funcArgs: [
         e.U(500),
@@ -91,7 +91,7 @@ describe('Give token mint burn', () => {
 
     await user.callContract({
       callee: tokenManager,
-      funcName: "giveToken",
+      funcName: 'giveToken',
       gasLimit: 20_000_000,
       funcArgs: [
         otherUser,
@@ -124,7 +124,7 @@ describe('Give token mint burn', () => {
 
     await user.callContract({
       callee: tokenManager,
-      funcName: "giveToken",
+      funcName: 'giveToken',
       gasLimit: 20_000_000,
       funcArgs: [
         otherUser,
@@ -138,7 +138,7 @@ describe('Give token mint burn', () => {
 
     await user.callContract({
       callee: tokenManager,
-      funcName: "giveToken",
+      funcName: 'giveToken',
       gasLimit: 20_000_000,
       funcArgs: [
         otherUser,
@@ -166,12 +166,12 @@ describe('Give token mint burn', () => {
     });
   });
 
-  test("Errors", async () => {
+  test('Errors', async () => {
     await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID, false);
 
     await otherUser.callContract({
       callee: tokenManager,
-      funcName: "giveToken",
+      funcName: 'giveToken',
       gasLimit: 20_000_000,
       funcArgs: [
         otherUser,
@@ -182,7 +182,7 @@ describe('Give token mint burn', () => {
     // Test flow limit exceeded
     await deployer.callContract({
       callee: tokenManager,
-      funcName: "setFlowLimit",
+      funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
       funcArgs: [
         e.U(999),
@@ -191,7 +191,7 @@ describe('Give token mint burn', () => {
 
     await user.callContract({
       callee: tokenManager,
-      funcName: "giveToken",
+      funcName: 'giveToken',
       gasLimit: 20_000_000,
       funcArgs: [
         otherUser,
@@ -202,7 +202,7 @@ describe('Give token mint burn', () => {
     // Contract can not mint tokens
     await user.callContract({
       callee: tokenManager,
-      funcName: "giveToken",
+      funcName: 'giveToken',
       gasLimit: 20_000_000,
       funcArgs: [
         otherUser,
@@ -408,7 +408,7 @@ describe('Deploy interchain token', () => {
     const kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      hasKvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // minter role was added to user
