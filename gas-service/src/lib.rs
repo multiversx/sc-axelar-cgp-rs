@@ -30,6 +30,8 @@ pub trait GasService: events::Events {
     ) {
         let (gas_token, gas_fee_amount) = self.call_value().single_fungible_esdt();
 
+        require!(gas_fee_amount > 0, "Nothing received");
+
         let sender = self.blockchain().get_caller();
         let hash = self.crypto().keccak256(&payload);
 
@@ -85,6 +87,8 @@ pub trait GasService: events::Events {
     ) {
         let (gas_token, gas_fee_amount) = self.call_value().single_fungible_esdt();
 
+        require!(gas_fee_amount > 0, "Nothing received");
+
         let sender = self.blockchain().get_caller();
         let hash = self.crypto().keccak256(&payload);
 
@@ -134,6 +138,8 @@ pub trait GasService: events::Events {
     fn add_gas(&self, tx_hash: ManagedBuffer, log_index: BigUint, refund_address: ManagedAddress) {
         let (gas_token, gas_fee_amount) = self.call_value().single_fungible_esdt();
 
+        require!(gas_fee_amount > 0, "Nothing received");
+
         self.gas_added_event(
             tx_hash,
             log_index,
@@ -176,6 +182,8 @@ pub trait GasService: events::Events {
         refund_address: ManagedAddress,
     ) {
         let (gas_token, gas_fee_amount) = self.call_value().single_fungible_esdt();
+
+        require!(gas_fee_amount > 0, "Nothing received");
 
         self.express_gas_added_event(
             tx_hash,
@@ -276,6 +284,13 @@ pub trait GasService: events::Events {
                 amount,
             },
         );
+    }
+
+    #[endpoint(setGasCollector)]
+    fn set_gas_collector(&self, gas_collector: &ManagedAddress) {
+        self.require_only_collector();
+
+        self.gas_collector().set(gas_collector);
     }
 
     fn require_only_collector(&self) {

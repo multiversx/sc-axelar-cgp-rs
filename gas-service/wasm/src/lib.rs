@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           12
+// Endpoints:                           13
 // Async Callback (empty):               1
-// Total number of exported functions:  14
+// Total number of exported functions:  15
 
 #![no_std]
 #![allow(internal_features)]
@@ -31,6 +31,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         addNativeExpressGas => add_native_express_gas
         collectFees => collect_fees
         refund => refund
+        setGasCollector => set_gas_collector
         gas_collector => gas_collector
     )
 }

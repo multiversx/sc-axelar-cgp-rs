@@ -788,6 +788,40 @@ test('Refund esdt', async () => {
   });
 });
 
+test('Set gas collector not collector', async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'setGasCollector',
+    funcArgs: [
+      deployer,
+    ],
+  }).assertFail({ code: 4, message: 'Not collector' });
+});
+
+test('Set gas collector', async () => {
+  await deployContract();
+
+  await collector.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'setGasCollector',
+    funcArgs: [
+      deployer,
+    ],
+  });
+
+  const pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0n,
+    allKvs: [
+      e.kvs.Mapper('gas_collector').Value(deployer),
+    ],
+  });
+});
+
 test('Upgrade', async () => {
   await deployContract();
 
