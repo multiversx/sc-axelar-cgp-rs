@@ -1,7 +1,15 @@
 import { afterEach, assert, beforeEach, test } from 'vitest';
 import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
 import createKeccakHash from 'keccak';
-import { CHAIN_ID, COMMAND_ID, MOCK_CONTRACT_ADDRESS_1, PAYLOAD_HASH, TOKEN_ID, TOKEN_ID2 } from './helpers';
+import {
+  CHAIN_ID,
+  COMMAND_ID,
+  MOCK_CONTRACT_ADDRESS_1,
+  MOCK_CONTRACT_ADDRESS_2,
+  PAYLOAD_HASH,
+  TOKEN_ID,
+  TOKEN_ID2,
+} from './helpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -150,6 +158,38 @@ test('Validate contract call valid', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
+    allKvs: [
+      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+    ],
+  });
+});
+
+test('Upgrade', async () => {
+  await deployContract();
+
+  // Upgrading is not supported with new values
+  await deployer.upgradeContract({
+    callee: contract,
+    code: 'file:gateway/output/gateway.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      e.Addr(MOCK_CONTRACT_ADDRESS_2),
+      e.Str('Sth'),
+    ],
+  }).assertFail({ code: 4, message: 'wrong number of arguments' });
+
+  await deployer.upgradeContract({
+    callee: contract,
+    code: 'file:gateway/output/gateway.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+  });
+
+  const pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0n,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
       e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),

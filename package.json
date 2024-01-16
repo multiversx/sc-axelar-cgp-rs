@@ -21,11 +21,11 @@
     "@multiversx/sdk-core": "^12.5.0",
     "@multiversx/sdk-wallet": "^4.2.0",
     "@types/node": "^18.16.18",
-    "commander": "11.0.0",
+    "commander": "^11.1.0",
     "tsx": "^3.12.7",
     "typescript": "^5.0.4",
     "vitest": "^0.33.0",
-    "xsuite": "0.0.43",
+    "xsuite": "0.0.46",
     "keccak": "^3.0.3",
     "@types/keccak": "^3.0.3"
   }

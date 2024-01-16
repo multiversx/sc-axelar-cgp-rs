@@ -17,6 +17,9 @@ pub trait Auth {
         }
     }
 
+    #[upgrade]
+    fn upgrade(&self) {}
+
     #[endpoint(validateProof)]
     fn validate_proof(
         &self,

@@ -26,6 +26,9 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
         self.chain_id().set_if_empty(chain_id);
     }
 
+    #[upgrade]
+    fn upgrade(&self) {}
+
     #[endpoint(callContract)]
     fn call_contract(
         &self,

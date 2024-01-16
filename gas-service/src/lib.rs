@@ -16,6 +16,9 @@ pub trait GasService: events::Events {
         self.gas_collector().set_if_empty(gas_collector);
     }
 
+    #[upgrade]
+    fn upgrade(&self) {}
+
     #[payable("*")]
     #[endpoint(payGasForContractCall)]
     fn pay_gas_for_contract_call(
@@ -207,6 +210,7 @@ pub trait GasService: events::Events {
         );
     }
 
+    #[allow_multiple_var_args]
     #[endpoint(collectFees)]
     fn collect_fees(
         &self,
