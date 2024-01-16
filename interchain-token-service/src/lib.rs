@@ -51,9 +51,7 @@ pub trait InterchainTokenServiceContract:
         trusted_addresses: MultiValueManagedVecCounted<ManagedBuffer>,
     ) {
         require!(
-            !gateway.is_zero()
-                && !gas_service.is_zero()
-                && !token_manager_implementation.is_zero(),
+            !gateway.is_zero() && !gas_service.is_zero() && !token_manager_implementation.is_zero(),
             "Zero address"
         );
 
@@ -83,6 +81,9 @@ pub trait InterchainTokenServiceContract:
             self.set_trusted_address(name.deref(), address.deref());
         }
     }
+
+    #[upgrade]
+    fn upgrade(&self) {}
 
     #[only_owner]
     #[endpoint(setInterchainTokenFactory)]

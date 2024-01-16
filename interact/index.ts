@@ -3,16 +3,18 @@ import { envChain } from 'xsuite/interact';
 import { World } from 'xsuite/world';
 // @ts-ignore
 import data from './data.json';
-import { e } from 'xsuite/data';
+import { d, e } from 'xsuite/data';
 import {
   ALICE_PUB_KEY,
   BOB_PUB_KEY,
+  COMMAND_ID,
   generateProof,
   generateSignature,
   MOCK_CONTRACT_ADDRESS_2,
 } from '../tests/helpers';
-import { executeGateway } from './generateProofRaw';
+import { executeGatewayApproveContractCallRaw } from './generateProofRaw';
 import { setupITSCommands } from './its';
+import createKeccakHash from 'keccak';
 
 const world = World.new({
   proxyUrl: envChain.publicProxyUrl(),
@@ -21,6 +23,10 @@ const world = World.new({
 });
 
 export const loadWallet = () => world.newWalletFromFile('wallet.json');
+
+export const getKeccak256Hash = (payload: string = 'commandId') => {
+  return createKeccakHash('keccak256').update(Buffer.from(payload)).digest('hex');
+};
 
 export const program = new Command();
 
@@ -60,7 +66,7 @@ program.command('deploy').action(async () => {
       e.Str(envChain.select(data.chainId)),
     ],
   });
-  console.log('Result:', resultGateway);
+  console.log('Result Gateway:', resultGateway);
 
   // Change owner of auth contract to be gateway contract
   const resultChangeOwner = await wallet.callContract({
@@ -121,8 +127,8 @@ program.command('callContract').action(async () => {
     gasLimit: 10_000_000,
     funcArgs: [
       e.Str('ethereum-2'),
-      e.Bytes(Buffer.from('Fb7378D0997B0092bE6bBf278Ca9b8058C24752f', 'hex')),
-      e.Bytes(Buffer.from(
+      e.TopBuffer(Buffer.from('Fb7378D0997B0092bE6bBf278Ca9b8058C24752f', 'hex')),
+      e.TopBuffer(Buffer.from(
         '095ea7b30000000000000000000000004a24b5268a5d286f1602a965ac72913b997858d50000000000000000000000000000000000000000000000000000000000000000',
         'hex',
       )),
@@ -135,7 +141,8 @@ program.command('executeApproveContractCall').action(async () => {
   const wallet = await loadWallet();
 
   const executeData = e.Tuple(
-    e.List(e.Str('commandId')),
+    e.Str(envChain.select(data.chainId)),
+    e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('approveContractCall')),
     e.List(
       e.Buffer(
@@ -143,9 +150,7 @@ program.command('executeApproveContractCall').action(async () => {
           e.Str('ethereum'),
           e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
           e.Addr(MOCK_CONTRACT_ADDRESS_2),
-          e.Str('payloadHash'),
-          e.Str('sourceTxHash'),
-          e.U(123),
+          e.TopBuffer(getKeccak256Hash('payloadHash')),
         ).toTopBytes(),
       ),
     ),
@@ -158,7 +163,7 @@ program.command('executeApproveContractCall').action(async () => {
     gasLimit: 15_000_000,
     funcName: 'execute',
     funcArgs: [
-      e.Tuple(executeData, proof),
+      e.Tuple(e.Buffer(executeData.toTopBytes()), e.Buffer(proof.toTopBytes())),
     ],
   });
   console.log('Result:', result);
@@ -167,15 +172,14 @@ program.command('executeApproveContractCall').action(async () => {
 program.command('executeApproveContractCallRaw').action(async () => {
   const wallet = await loadWallet();
 
-  const transaction = await executeGateway(
+  const transaction = await executeGatewayApproveContractCallRaw(
+    envChain.select(data.chainId),
     'approveContractCall',
-    'commandId',
+    COMMAND_ID,
     'ethereum',
     '0x4976da71bF84D750b5451B053051158EC0A4E876',
     MOCK_CONTRACT_ADDRESS_2,
-    Buffer.from('payloadHash'),
-    'sourceTxHash',
-    123,
+    getKeccak256Hash('payloadHash'),
     wallet.toString(),
   );
 
@@ -194,7 +198,8 @@ program.command('executeTransferOperatorship')
     const wallet = await loadWallet();
 
     const executeData = e.Tuple(
-      e.List(e.Str('commandIdExecute3')),
+      e.Str(envChain.select(data.chainId)),
+      e.List(e.TopBuffer(COMMAND_ID)),
       e.List(e.Str('transferOperatorship')),
       e.List(
         e.Buffer(
@@ -216,7 +221,7 @@ program.command('executeTransferOperatorship')
         e.List(e.Addr(ALICE_PUB_KEY), e.Addr(BOB_PUB_KEY)),
         e.List(e.U(10), e.U(2)),
         e.U(12),
-        e.List(e.Bytes(signature), e.Bytes(signatureBob)),
+        e.List(e.TopBuffer(signature), e.TopBuffer(signatureBob)),
       );
     } else {
       proof = generateProof(executeData);
@@ -227,10 +232,39 @@ program.command('executeTransferOperatorship')
       gasLimit: 20_000_000,
       funcName: 'execute',
       funcArgs: [
-        e.Tuple(executeData, proof),
+        e.Tuple(e.Buffer(executeData.toTopBytes()), e.Buffer(proof.toTopBytes())),
       ],
     });
     console.log('Result:', result);
+  });
+
+program.command('isContractCallApproved')
+  .action(async () => {
+    const result = await world.query({
+      callee: e.Addr(envChain.select(data.addressGateway)),
+      funcName: 'isContractCallApproved',
+      funcArgs: [
+        e.TopBuffer(COMMAND_ID),
+        e.Str('ethereum'),
+        e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
+        e.Addr(MOCK_CONTRACT_ADDRESS_2),
+        e.TopBuffer(getKeccak256Hash('payloadHash')),
+      ],
+    });
+    console.log('Result:', d.Bool().topDecode(result.returnData[0]));
+  });
+
+program.command('isCommandExecuted')
+  .argument('commandId', '')
+  .action(async (commandId: string) => {
+    const result = await world.query({
+      callee: e.Addr(envChain.select(data.addressGateway)),
+      funcName: 'isCommandExecuted',
+      funcArgs: [
+        e.TopBuffer(commandId),
+      ],
+    });
+    console.log('Result:', d.Bool().topDecode(result.returnData[0]));
   });
 
 program.parse(process.argv);

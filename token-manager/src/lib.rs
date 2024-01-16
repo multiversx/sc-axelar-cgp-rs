@@ -67,6 +67,22 @@ pub trait TokenManagerLockUnlockContract:
         }
     }
 
+    #[upgrade]
+    fn upgrade(
+        &self,
+        interchain_token_service: ManagedAddress,
+        implementation_type: TokenManagerType,
+        interchain_token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        params: DeployTokenManagerParams<Self::Api>,
+    ) {
+        self.init(
+            interchain_token_service,
+            implementation_type,
+            interchain_token_id,
+            params,
+        )
+    }
+
     #[endpoint(addFlowLimiter)]
     fn add_flow_limiter(&self, flow_limiter: ManagedAddress) {
         self.only_operator();

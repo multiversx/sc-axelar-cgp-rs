@@ -182,7 +182,7 @@ pub trait ProxyModule {
         sc_address: ManagedAddress,
     ) -> token_manager::Proxy<Self::Api>;
 
-    // TODO: Test that this callback works properly (probably only on devnet)
+    // This was tested on devnet and worked fine
     #[callback]
     fn deploy_remote_token_callback(
         &self,
