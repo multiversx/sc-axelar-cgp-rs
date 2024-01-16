@@ -94,24 +94,30 @@ const getKeccak256Hash = (payload: string = 'commandId') => {
   return createKeccakHash('keccak256').update(Buffer.from(payload)).digest('hex');
 };
 
-test('Execute invalid proof', async () => {
+test('Execute could not decode', async () => {
+  await deployContract();
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'execute',
+    funcArgs: [
+      e.Tuple(e.Buffer(''), e.Buffer('')),
+    ],
+  }).assertFail({ code: 4, message: 'Could not decode execute data' });
+});
+
+test('Execute invalid chain id', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str('Other'),
     e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('approveContractCall')),
-    e.List(),
+    e.List(e.Buffer('')),
   );
 
-  const proofData = Buffer.from(data.toTopHex(), 'hex');
-  const signature = generateSignature(proofData);
-  const proof = e.Tuple(
-    e.List(e.TopBuffer(ALICE_PUB_KEY)),
-    e.List(e.U(11)), // wrong weight
-    e.U(10),
-    e.List(e.TopBuffer(signature)),
-  );
+  const proof = generateProof(data);
 
   await deployer.callContract({
     callee: contract,
@@ -120,7 +126,7 @@ test('Execute invalid proof', async () => {
     funcArgs: [
       e.Tuple(e.Buffer(data.toTopBytes()), e.Buffer(proof.toTopBytes())),
     ],
-  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
+  }).assertFail({ code: 4, message: 'Invalid chain id' });
 });
 
 test('Execute invalid commands', async () => {
@@ -156,6 +162,35 @@ test('Execute invalid commands', async () => {
       e.Tuple(e.Buffer(data.toTopBytes()), e.Buffer(proof.toTopBytes())),
     ],
   }).assertFail({ code: 4, message: 'Invalid commands' });
+});
+
+test('Execute invalid proof', async () => {
+  await deployContract();
+
+  const data = e.Tuple(
+    e.Str(CHAIN_ID),
+    e.List(e.TopBuffer(COMMAND_ID)),
+    e.List(e.Str('approveContractCall')),
+    e.List(e.Buffer('')),
+  );
+
+  const proofData = Buffer.from(data.toTopHex(), 'hex');
+  const signature = generateSignature(proofData);
+  const proof = e.Tuple(
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
+    e.List(e.U(11)), // wrong weight
+    e.U(10),
+    e.List(e.TopBuffer(signature)),
+  );
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'execute',
+    funcArgs: [
+      e.Tuple(e.Buffer(data.toTopBytes()), e.Buffer(proof.toTopBytes())),
+    ],
+  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 });
 
 test('Execute command already executed', async () => {
@@ -213,6 +248,28 @@ test('Execute command already executed', async () => {
       e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(0)),
     ],
   });
+});
+
+test('Execute approve contract call could not decode', async () => {
+  await deployContract();
+
+  const data = e.Tuple(
+    e.Str(CHAIN_ID),
+    e.List(e.TopBuffer(COMMAND_ID)),
+    e.List(e.Str('approveContractCall')),
+    e.List(e.Buffer('')),
+  );
+
+  const proof = generateProof(data);
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 15_000_000,
+    funcName: 'execute',
+    funcArgs: [
+      e.Tuple(e.Buffer(data.toTopBytes()), e.Buffer(proof.toTopBytes())),
+    ],
+  }).assertFail({ code: 4, message: 'Could not decode approve contract call' });
 });
 
 test('Execute approve contract call', async () => {
@@ -373,7 +430,6 @@ test('Execute transfer operatorship', async () => {
   assertAccount(kvs, {
     balance: 0,
     allKvs: [
-      // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
       e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash2)).Value(e.U64(16)),
       e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash3)).Value(e.U64(17)),
@@ -384,11 +440,12 @@ test('Execute transfer operatorship', async () => {
     ],
   });
 
-  // Using old proof will not work anymore
+  // Using old operators to generate proof will not work anymore
   const dataOther = e.Tuple(
-    e.List(e.Str('commandId')),
-    e.List(e.Str('deployToken'), e.Str('mintToken')),
-    e.List(),
+    e.Str(CHAIN_ID),
+    e.List(e.TopBuffer(COMMAND_ID)),
+    e.List(e.Str('approveContractCall')),
+    e.List(e.Buffer('')),
   );
 
   const proofOld = generateProof(dataOther);
@@ -408,7 +465,11 @@ test('Execute multiple commands', async () => {
 
   const data = e.Tuple(
     e.Str(CHAIN_ID),
-    e.List(e.TopBuffer(COMMAND_ID), e.TopBuffer(getKeccak256Hash('commandIdInvalid')), e.TopBuffer(getKeccak256Hash('commandId3'))),
+    e.List(
+      e.TopBuffer(COMMAND_ID),
+      e.TopBuffer(getKeccak256Hash('commandIdInvalid')),
+      e.TopBuffer(getKeccak256Hash('commandId3')),
+    ),
     e.List(e.Str('approveContractCall'), e.Str('deployToken'), e.Str('approveContractCall')),
     e.List(
       e.Buffer(
