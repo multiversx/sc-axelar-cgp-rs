@@ -127,7 +127,7 @@ export const setupITSCommands = (program: Command) => {
       callee: envChain.select(data.addressIts),
       code: data.codeIts,
       codeMetadata: ['upgradeable'],
-      gasLimit: 100_000_000,
+      gasLimit: 300_000_000,
       codeArgs: [],
     });
     console.log('Result:', result);

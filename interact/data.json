@@ -1,7 +1,7 @@
 {
   "codeGateway": "file:gateway/output/gateway.wasm",
   "codeAuth": "file:auth/output/auth.wasm",
-  "codeGasReceiver": "file:gas-service/output/gas-service.wasm",
+  "codeGasService": "file:gas-service/output/gas-service.wasm",
   "codeBaseTokenManager": "file:token-manager/output/token-manager.wasm",
   "codeIts": "file:interchain-token-service/output/interchain-token-service.wasm",
   "codeInterchainTokenFactory": "file:interchain-token-factory/output/interchain-token-factory.wasm",
