@@ -2,7 +2,6 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use gas_service::ProxyTrait as _;
 use gateway::ProxyTrait as _;
-use token_manager::constants::TokenManagerType;
 use token_manager::flow_limit::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
@@ -255,13 +254,6 @@ pub trait ProxyModule:
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
             .execute_on_dest_context::<()>();
-    }
-
-    // TODO
-    fn token_manager_implementation_type(&self, sc_address: ManagedAddress) -> TokenManagerType {
-        self.token_manager_proxy(sc_address)
-            .implementation_type()
-            .execute_on_dest_context()
     }
 
     fn executable_contract_execute_with_interchain_token(

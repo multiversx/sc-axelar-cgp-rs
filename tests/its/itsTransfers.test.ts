@@ -267,6 +267,259 @@ describe('Interchain transfer', () => {
       esdts: [{ id: TOKEN_ID, amount: 1_000 }],
     }).assertFail({ code: 4, message: 'Untrusted chain' });
   });
+
+  test('Gas token errors', async () => {
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'No payment sent' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      value: 100,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(100),
+      ],
+    }).assertFail({ code: 4, message: 'Invalid gas value' });
+
+    const tempUser = user = await world.createWallet({
+      balance: BigInt('10000000000000000'),
+      kvs: [
+        e.kvs.Esdts([
+          { id: TOKEN_ID, amount: 100_000 },
+          { id: TOKEN_ID2, amount: 10_000 },
+          { id: 'TOKEN3-987654', amount: 10_000 },
+          { id: 'NFT-123456', amount: 1, nonce: 1 },
+        ]),
+      ],
+    });
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(0),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID2, amount: 1_000 },
+        { id: 'TOKEN3-987654', amount: 1_000, }
+      ],
+    }).assertFail({ code: 4, message: 'A maximum of two esdt payments are supported' });
+
+    // One ESDT sent
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(0),
+      ],
+      esdts: [
+        { id: 'NFT-123456', amount: 1, nonce: 1 },
+      ],
+    }).assertFail({ code: 4, message: 'Only fungible esdts are supported' });
+
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(1_000),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+      ],
+    }).assertFail({ code: 4, message: 'Invalid gas value' });
+
+    // Two ESDTs sent
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(0),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: 'NFT-123456', amount: 1, nonce: 1 },
+      ],
+    }).assertFail({ code: 4, message: 'Only fungible esdts are supported' });
+
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(0),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID2, amount: 100 },
+      ],
+    }).assertFail({ code: 4, message: 'Invalid gas value' });
+  });
+
+  test('Gas token egld', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+      world,
+      user,
+      false,
+      'EGLD'
+    );
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      value: 1_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(20),
+      ],
+    });
+
+    // Assert EGLD gas was paid for cross chain call
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 20,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 980,
+      allKvs: [
+        ...baseTokenManagerKvs,
+      ],
+    });
+  });
+
+  test('Gas token one esdt', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(20),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+      ],
+    });
+
+    // Assert ESDT gas was paid for cross chain call
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+
+        e.kvs.Esdts([
+          { id: TOKEN_ID, amount: 20 },
+        ]),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      allKvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 980 }]),
+      ],
+    });
+  });
+
+  test('Gas token two esdts', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(100),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID2, amount: 100 },
+      ],
+    });
+
+    // Assert 2nd ESDT gas was paid for cross chain call
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+
+        e.kvs.Esdts([
+          { id: TOKEN_ID2, amount: 100 },
+        ]),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      allKvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
+  });
 });
 
 describe('Call contract with interchain token', () => {
@@ -370,5 +623,258 @@ describe('Call contract with interchain token', () => {
       ],
       esdts: [{ id: TOKEN_ID, amount: 1_000 }],
     }).assertFail({ code: 4, message: 'Untrusted chain' });
+  });
+
+  test('Gas token errors', async () => {
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'No payment sent' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      value: 100,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(100),
+      ],
+    }).assertFail({ code: 4, message: 'Invalid gas value' });
+
+    const tempUser = user = await world.createWallet({
+      balance: BigInt('10000000000000000'),
+      kvs: [
+        e.kvs.Esdts([
+          { id: TOKEN_ID, amount: 100_000 },
+          { id: TOKEN_ID2, amount: 10_000 },
+          { id: 'TOKEN3-987654', amount: 10_000 },
+          { id: 'NFT-123456', amount: 1, nonce: 1 },
+        ]),
+      ],
+    });
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(0),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID2, amount: 1_000 },
+        { id: 'TOKEN3-987654', amount: 1_000, }
+      ],
+    }).assertFail({ code: 4, message: 'A maximum of two esdt payments are supported' });
+
+    // One ESDT sent
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(0),
+      ],
+      esdts: [
+        { id: 'NFT-123456', amount: 1, nonce: 1 },
+      ],
+    }).assertFail({ code: 4, message: 'Only fungible esdts are supported' });
+
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(1_000),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+      ],
+    }).assertFail({ code: 4, message: 'Invalid gas value' });
+
+    // Two ESDTs sent
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(0),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: 'NFT-123456', amount: 1, nonce: 1 },
+      ],
+    }).assertFail({ code: 4, message: 'Only fungible esdts are supported' });
+
+    await tempUser.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(INTERCHAIN_TOKEN_ID),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(0),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID2, amount: 100 },
+      ],
+    }).assertFail({ code: 4, message: 'Invalid gas value' });
+  });
+
+  test('Gas token egld', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+      world,
+      user,
+      false,
+      'EGLD'
+    );
+
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      value: 1_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(20),
+      ],
+    });
+
+    // Assert EGLD gas was paid for cross chain call
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 20,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 980,
+      allKvs: [
+        ...baseTokenManagerKvs,
+      ],
+    });
+  });
+
+  test('Gas token one esdt', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(20),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+      ],
+    });
+
+    // Assert ESDT gas was paid for cross chain call
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+
+        e.kvs.Esdts([
+          { id: TOKEN_ID, amount: 20 },
+        ]),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      allKvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 980 }]),
+      ],
+    });
+  });
+
+  test('Gas token two esdts', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(100),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID2, amount: 100 },
+      ],
+    });
+
+    // Assert 2nd ESDT gas was paid for cross chain call
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0,
+      allKvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+
+        e.kvs.Esdts([
+          { id: TOKEN_ID2, amount: 100 },
+        ]),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      allKvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
   });
 });

@@ -504,7 +504,6 @@ pub trait InterchainTokenServiceContract:
         );
     }
 
-    // TODO: Add tests for all these cases
     fn get_transfer_and_gas_tokens(
         &self,
         gas_value: &BigUint,
@@ -534,7 +533,7 @@ pub trait InterchainTokenServiceContract:
 
                 let first_payment = esdts.get(0);
 
-                require!(first_payment.token_nonce == 0, "Non fungible esdt sent");
+                require!(first_payment.token_nonce == 0, "Only fungible esdts are supported");
 
                 let token_identifier =
                     EgldOrEsdtTokenIdentifier::esdt(first_payment.token_identifier);
@@ -554,7 +553,7 @@ pub trait InterchainTokenServiceContract:
 
                 let second_payment = second_payment.unwrap();
 
-                require!(second_payment.token_nonce == 0, "Non fungible esdt sent");
+                require!(second_payment.token_nonce == 0, "Only fungible esdts are supported");
                 require!(&second_payment.amount == gas_value, "Invalid gas value");
 
                 return (

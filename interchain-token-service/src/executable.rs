@@ -185,7 +185,7 @@ pub trait ExecutableModule:
         arguments.push_arg(self.blockchain().get_sc_address());
         arguments.push_arg(token_manager_type);
         arguments.push_arg(token_id);
-        arguments.push_arg(params.clone()); // TODO: Try to do this without clone
+        arguments.push_arg(&params);
 
         let (address, _) = self.send_raw().deploy_from_source_contract(
             self.blockchain().get_gas_left(),
@@ -209,7 +209,6 @@ pub trait ExecutableModule:
         address
     }
 
-    // TODO:
     #[view(tokenManagerImplementation)]
     #[storage_mapper("token_manager")]
     fn token_manager(&self) -> SingleValueMapper<ManagedAddress>;

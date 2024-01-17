@@ -566,7 +566,6 @@ describe('Deploy interchain token', () => {
 });
 
 describe('Deploy remote interchain token', () => {
-  // TODO: Test this on devnet
   test('No original chain name no minter', async () => {
     await deployAndMockTokenManagerMintBurn(true);
 
@@ -875,7 +874,6 @@ describe('Register canonical interchain token', () => {
 });
 
 describe('Deploy remote canonical interchain token', () => {
-  // TODO: Test this on devnet
   test('No original chain name', async () => {
     await deployAndMockTokenManagerLockUnlock(TOKEN_ID, CHAIN_NAME, CANONICAL_INTERCHAIN_TOKEN_ID);
 
