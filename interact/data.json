@@ -17,37 +17,37 @@
     "mainnet": ""
   },
   "addressGateway": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqqqsm476xr8rhx4fj7favff0ux9t0rc4tkklsc6axy3",
+    "devnet": "erd1qqqqqqqqqqqqqpgqhxy6dv9k5p3u4d6rawnwjyp0j3sunu9dkklspga3t9",
     "testnet": "",
     "mainnet": ""
   },
   "addressAuth": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqwuxl3snp5chsd0lkag9wl7pw8r9hkvuekklsn4d6vl",
+    "devnet": "erd1qqqqqqqqqqqqqpgqehceexve3lsu7few7fayld6gkw984fyrkklsyp8lr9",
     "testnet": "",
     "mainnet": ""
   },
   "addressGasService": {
-    "devnet": "erd1qqqqqqqqqqqqqpgq8eylwsw70uw878r2l0chjf3a7s6zjsrykklsymyndm",
+    "devnet": "erd1qqqqqqqqqqqqqpgqsrhknrwuvy606ar5l2kuaz4glgyyye9vkkls5ng86g",
     "testnet": "",
     "mainnet": ""
   },
   "addressBaseTokenManager": {
-    "devnet": "erd1qqqqqqqqqqqqqpgq3mskd6zyd903mkqlgqqcfxtmy97ylhhnkkls5r3dje",
+    "devnet": "erd1qqqqqqqqqqqqqpgqqqsm476xr8rhx4fj7favff0ux9t0rc4tkklsc6axy3",
     "testnet": "",
     "mainnet": ""
   },
   "addressIts": {
-    "devnet": "erd1qqqqqqqqqqqqqpgq79ev5npzfche4uxddcsrvgyhx70avmudkklsra8cs2",
+    "devnet": "erd1qqqqqqqqqqqqqpgqw08zahneragk9rnaujwe8qcyu84ehw2lkklsvca0jx",
     "testnet": "",
     "mainnet": ""
   },
   "addressInterchainTokenFactory": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqz4z5msnxx2uujck00zl4kkxhxzz8f8xvkklsyrrwal",
+    "devnet": "erd1qqqqqqqqqqqqqpgq8eylwsw70uw878r2l0chjf3a7s6zjsrykklsymyndm",
     "testnet": "",
     "mainnet": ""
   },
   "addressPingPongInterchain": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqrkvz88xyvsue0te2slx6e5el7dfjmgexkklsvts4lu",
+    "devnet": "",
     "testnet": "",
     "mainnet": ""
   },
@@ -55,11 +55,11 @@
     "devnet": {
       "EGLD": {
         "tokenId": "a5c60f3b87f8bd9ae6d97755143b9842902b228c46beb7abf63f12e0904c19b1",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqgyy8uwl2qcz39fuz6rvly9scz4ay4xnykklsypt4se"
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqvepwc5nahtpmv7gl74unkyex48k473cjkklsh9gp9d"
       },
-      "ITSTT-9296fd": {
+      "ITSTT-9a9969": {
         "tokenId": "9beb1db4db80c00d179db0f03a8ed4e0a3f868bc7a3a01ba7773cc157812a729",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgq7qdk93a6e3kvdre32kkj30j4wav0k2n8kkls929ymc"
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqym0z6cpgmxr7zqzy94rhdymaxgq0qwn2kklsk2wxyc"
       }
     },
     "testnet": {},

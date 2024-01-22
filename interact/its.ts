@@ -40,7 +40,7 @@ const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
   const result = await deployer.deployContract({
     code: data.codeIts,
     codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
+    gasLimit: 200_000_000,
     codeArgs: [
       e.Addr(envChain.select(data.addressGateway)),
       e.Addr(envChain.select(data.addressGasService)),
@@ -65,7 +65,7 @@ const deployInterchainTokenFactory = async (deployer: Wallet, its: string) => {
   const result = await deployer.deployContract({
     code: data.codeInterchainTokenFactory,
     codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
+    gasLimit: 200_000_000,
     codeArgs: [
       e.Addr(its),
     ],
@@ -358,7 +358,7 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
         callee: envChain.select(data.addressInterchainTokenFactory),
         funcName: 'deployInterchainToken',
         gasLimit: 150_000_000,
-        // value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost (only on 2nd transaction)
+        value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost (only on 2nd transaction)
         funcArgs: [
           e.TopBuffer(getKeccak256Hash('ITSTT')),
           e.Str('ITSTestToken'),
