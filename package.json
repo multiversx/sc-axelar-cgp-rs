@@ -1,14 +1,16 @@
 {
   "private": true,
   "scripts": {
-    "build": "npm run build:gateway && npm run build:auth && npm run build:gas-service",
+    "build": "npm run build:gateway && npm run build:auth && npm run build:gas-service && npm run build:governance",
     "build:gateway": "cd gateway && mxpy contract build",
     "build:auth": "cd auth && mxpy contract build",
     "build:gas-service": "cd gas-service && mxpy contract build",
-    "build:ci": "npm run build:ci:gateway && npm run build:ci:auth && npm run build:ci:gas-service",
+    "build:governance": "cd governance && mxpy contract build",
+    "build:ci": "npm run build:ci:gateway && npm run build:ci:auth && npm run build:ci:gas-service && npm run build:ci:governance",
     "build:ci:gateway": "cd gateway && python3 -m multiversx_sdk_cli.cli contract build",
     "build:ci:auth": "cd auth && python3 -m multiversx_sdk_cli.cli contract build",
     "build:ci:gas-service": "cd gas-service && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:governance": "cd governance && python3 -m multiversx_sdk_cli.cli contract build",
     "test": "vitest run",
     "test:cargo": "cargo test",
     "test:all": "npm run build && npm run test && npm run test:cargo",

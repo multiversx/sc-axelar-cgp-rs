@@ -679,6 +679,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "governance"
+version = "0.0.0"
+dependencies = [
+ "gateway",
+ "multiversx-sc",
+]
+
+[[package]]
+name = "governance-meta"
+version = "0.0.0"
+dependencies = [
+ "governance",
+ "multiversx-sc-meta",
+]
+
+[[package]]
 name = "h2"
 version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
