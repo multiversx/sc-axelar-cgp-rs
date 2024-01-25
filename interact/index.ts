@@ -85,6 +85,45 @@ program.command('deploy').action(async () => {
   console.log('Deployed Gas Receiver Contract:', resultGasReceiver.address);
 });
 
+program.command('deployGovernance').action(async () => {
+  const wallet = await loadWallet();
+
+  const resultGovernance = await wallet.deployContract({
+    code: data.codeGovernance,
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      e.Addr(envChain.select(data.addressGateway)),
+      e.Str(envChain.select(data.governance.chain)),
+      e.Str(envChain.select(data.governance.address)),
+      e.U64(envChain.select(data.governance.minimumTimeDelay)),
+    ],
+  });
+  console.log('Result Governance:', resultGovernance);
+
+  // Change owner of gateway contract to be governance contract
+  const resultChangeOwner = await wallet.callContract({
+    callee: e.Addr(envChain.select(data.addressGateway)),
+    value: 0,
+    gasLimit: 6_000_000,
+    funcName: 'ChangeOwnerAddress',
+    funcArgs: [e.Addr(resultGovernance.address)],
+  });
+  console.log('Result Change Owner Gateway:', resultChangeOwner);
+
+  // Change owner of governance contract to be itself
+  const resultChangeOwnerGovernance = await wallet.callContract({
+    callee: resultGovernance.address,
+    value: 0,
+    gasLimit: 6_000_000,
+    funcName: 'ChangeOwnerAddress',
+    funcArgs: [e.Addr(resultGovernance.address)],
+  });
+  console.log('Result Change Owner Governance:', resultChangeOwnerGovernance);
+
+  console.log('Deployed Governance Contract:', resultGovernance.address);
+});
+
 program.command('upgrade').action(async () => {
   const wallet = await loadWallet();
   const result = await wallet.upgradeContract({

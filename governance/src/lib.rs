@@ -5,12 +5,12 @@ pub mod events;
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-use crate::events::ProposalExecutedData;
+use crate::events::ProposalEventData;
 use gateway::ProxyTrait as _;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[derive(TypeAbi, TopDecode, NestedDecode)]
-enum GovernanceCommand {
+pub enum GovernanceCommand {
     ScheduleTimeLockProposal,
     CancelTimeLockProposal,
 }
@@ -57,6 +57,9 @@ pub trait Governance: events::Events {
             .set_if_empty(self.crypto().keccak256(&governance_address));
     }
 
+    #[upgrade]
+    fn upgrade(&self) {}
+
     #[payable("EGLD")]
     #[endpoint(executeProposal)]
     fn execute_proposal(
@@ -67,12 +70,12 @@ pub trait Governance: events::Events {
     ) {
         let proposal_hash = self.get_proposal_hash(&target, &call_data, &native_value);
 
-        self.finalize_time_lock(&proposal_hash);
+        let eta = self.finalize_time_lock(&proposal_hash);
 
         self.proposal_executed_event(
             &proposal_hash,
             &target,
-            ProposalExecutedData {
+            ProposalEventData {
                 call_data: &call_data,
                 value: &native_value,
             },
@@ -85,7 +88,12 @@ pub trait Governance: events::Events {
             .contract_call::<()>(target, call_data.endpoint_name)
             .with_egld_transfer(native_value)
             .with_raw_arguments(call_data.arguments.into())
-            .execute_on_dest_context::<()>();
+            .async_call()
+            .with_callback(
+                self.callbacks()
+                    .execute_proposal_callback(&proposal_hash, eta),
+            )
+            .call_and_exit();
     }
 
     // Can only be called by self (through the execute_proposal endpoint)
@@ -107,6 +115,8 @@ pub trait Governance: events::Events {
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
+        self.only_governance(&source_chain, &source_address);
+
         let payload_hash = self.crypto().keccak256(&payload);
 
         require!(
@@ -116,22 +126,94 @@ pub trait Governance: events::Events {
             "Not approved by gateway"
         );
 
-        self.only_governance(&source_chain, &source_address);
-
-        let execute_payload: ExecutePayload<Self::Api> = ExecutePayload::<Self::Api>::top_decode(payload)
-            .unwrap_or_else(|_| sc_panic!("Could not decode execute payload"));
+        let execute_payload: ExecutePayload<Self::Api> =
+            ExecutePayload::<Self::Api>::top_decode(payload)
+                .unwrap_or_else(|_| sc_panic!("Could not decode execute payload"));
 
         require!(!execute_payload.target.is_zero(), "Invalid target");
 
         self.process_command(execute_payload);
     }
 
-    fn only_governance(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
-        require!(
-            self.crypto().keccak256(source_chain) == self.governance_chain_hash().get()
-                && self.crypto().keccak256(source_address) == self.governance_address_hash().get(),
-            "Not governance"
+    fn process_command(&self, execute_payload: ExecutePayload<Self::Api>) {
+        let proposal_hash = self.get_proposal_hash(
+            &execute_payload.target,
+            &execute_payload.call_data,
+            &execute_payload.native_value,
         );
+
+        match execute_payload.command {
+            GovernanceCommand::ScheduleTimeLockProposal => {
+                let eta = self.schedule_time_lock(&proposal_hash, execute_payload.eta);
+
+                self.proposal_scheduled_event(
+                    &proposal_hash,
+                    &execute_payload.target,
+                    eta,
+                    ProposalEventData {
+                        call_data: &execute_payload.call_data,
+                        value: &execute_payload.native_value,
+                    },
+                );
+            }
+            GovernanceCommand::CancelTimeLockProposal => {
+                self.cancel_time_lock(&proposal_hash);
+
+                self.proposal_cancelled_event(
+                    &proposal_hash,
+                    &execute_payload.target,
+                    execute_payload.eta,
+                    ProposalEventData {
+                        call_data: &execute_payload.call_data,
+                        value: &execute_payload.native_value,
+                    },
+                );
+            }
+        }
+    }
+
+    fn schedule_time_lock(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        mut eta: u64,
+    ) -> u64 {
+        require!(!hash.is_empty(), "Invalid time lock hash");
+
+        let time_lock_eta_mapper = self.time_lock_eta(hash);
+
+        require!(
+            time_lock_eta_mapper.is_empty(),
+            "Time lock already scheduled"
+        );
+
+        let minimum_eta =
+            self.blockchain().get_block_timestamp() + self.minimum_time_lock_delay().get();
+
+        if eta < minimum_eta {
+            eta = minimum_eta;
+        }
+
+        time_lock_eta_mapper.set(eta);
+
+        eta
+    }
+
+    fn cancel_time_lock(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) {
+        require!(!hash.is_empty(), "Invalid time lock hash");
+
+        self.time_lock_eta(hash).clear();
+    }
+
+    fn finalize_time_lock(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> u64 {
+        let eta = self.time_lock_eta(hash).take();
+
+        require!(!hash.is_empty() && eta != 0, "Invalid time lock hash");
+        require!(
+            self.blockchain().get_block_timestamp() >= eta,
+            "Time lock not ready"
+        );
+
+        eta
     }
 
     fn get_proposal_hash(
@@ -149,22 +231,32 @@ pub trait Governance: events::Events {
         self.crypto().keccak256(encoded)
     }
 
-    fn finalize_time_lock(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) {
-        let eta = self.time_lock_eta(hash).take();
-
-        require!(!hash.is_empty() && eta != 0, "Invalid time lock hash");
+    fn only_governance(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
         require!(
-            self.blockchain().get_block_timestamp() < eta,
-            "Time lock not ready"
+            self.crypto().keccak256(source_chain) == self.governance_chain_hash().get()
+                && self.crypto().keccak256(source_address) == self.governance_address_hash().get(),
+            "Not governance"
         );
     }
 
-    fn process_command(&self, execute_payload: ExecutePayload<Self::Api>) {
-        let proposal_hash = self.get_proposal_hash(&execute_payload.target, &execute_payload.call_data, &execute_payload.native_value);
-        
-        match execute_payload.command {
-            GovernanceCommand::ScheduleTimeLockProposal => {}
-            GovernanceCommand::CancelTimeLockProposal => {}
+    #[callback]
+    fn execute_proposal_callback(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        eta: u64,
+        #[call_result] call_result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
+    ) {
+        match call_result {
+            ManagedAsyncCallResult::Ok(results) => {
+                self.execute_proposal_success_event(hash, results);
+            }
+            ManagedAsyncCallResult::Err(err) => {
+                // Let call be retried in case of failure, mostly because async call
+                // can fail with out of gas since it can be triggered by anyone
+                self.time_lock_eta(hash).set(eta);
+
+                self.execute_proposal_error_event(hash, err.err_code, err.err_msg);
+            }
         }
     }
 

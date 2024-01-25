@@ -2,10 +2,28 @@
   "codeGateway": "file:gateway/output/gateway.wasm",
   "codeAuth": "file:auth/output/auth.wasm",
   "codeGasReceiver": "file:gas-service/output/gas-service.wasm",
+  "codeGovernance": "file:governance/output/governance.wasm",
   "chainId": {
     "devnet": "D",
     "testnet": "T",
     "mainnet": "1"
+  },
+  "governance": {
+    "chain": {
+      "devnet": "Axelar",
+      "testnet": "",
+      "mainnet": ""
+    },
+    "address": {
+      "devnet": "axelar1u5jhn5876mjzmgw7j37mdvqh4qp5y6z2gc6rc3",
+      "testnet": "",
+      "mainnet": ""
+    },
+    "minimumTimeDelay": {
+      "devnet": 7200,
+      "testnet": 7200,
+      "mainnet": 172800
+    }
   },
   "gasCollector": {
     "devnet": "erd1medg4x6ft60dmf94kl7zm24ten928mnk5pfkpfny9cakc6n84pxszdgjht",
@@ -24,6 +42,11 @@
   },
   "addressGasService": {
     "devnet": "erd1qqqqqqqqqqqqqpgqx4cfm0rlj8myv0ft7qs8jvsersfwcm5jkklsn9paj0",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressGovernance": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqcwpm529augh68lnfxgl8k7rjms47xmsfkklsrwkrgt",
     "testnet": "",
     "mainnet": ""
   }

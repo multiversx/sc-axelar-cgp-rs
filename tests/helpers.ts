@@ -28,6 +28,8 @@ export const PAYLOAD_HASH: string = '07b8e6f7ea72578a764983050201bba8fda552f6510
 
 export const MULTIVERSX_SIGNED_MESSAGE_PREFIX = '\x19MultiversX Signed Message:\n';
 
+export const ADDRESS_ZERO = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu';
+
 export const generateMessageHash = (data: Buffer): string => {
   const messageHashData = Buffer.concat([
     Buffer.from(MULTIVERSX_SIGNED_MESSAGE_PREFIX),
@@ -82,4 +84,8 @@ export const generateProof = (data: Encodable | Buffer): TupleEncodable => {
     e.U(10),
     e.List(e.Bytes(signature)),
   );
+};
+
+export const getKeccak256Hash = (payload: string = 'commandId') => {
+  return createKeccakHash('keccak256').update(Buffer.from(payload)).digest('hex');
 };
