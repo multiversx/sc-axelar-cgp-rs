@@ -23,9 +23,8 @@ import {
   interchainTokenFactory,
   its, TOKEN_MANAGER_TYPE_LOCK_UNLOCK, TOKEN_MANAGER_TYPE_MINT_BURN,
   tokenManager,
-  tokenManager,
 } from '../itsHelpers';
-import { Encodable } from 'xsuite/dist/data/Encodable';
+import { Encodable } from 'xsuite';
 import createKeccakHash from 'keccak';
 
 let world: SWorld;

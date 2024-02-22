@@ -3,13 +3,13 @@
   "scripts": {
     "build": "npm run build:gateway && npm run build:auth && npm run build:gas-service && npm run build:its && npm run build:interchain-token-factory && npm run build:token-manager && npm run build:ping-pong",
     "build:cgp": "npm run build:gateway && npm run build:auth && npm run build:gas-service",
-    "build:gateway": "cd gateway && mxpy contract build",
-    "build:auth": "cd auth && mxpy contract build",
-    "build:gas-service": "cd gas-service && mxpy contract build",
-    "build:its": "cd interchain-token-service && mxpy contract build",
-    "build:interchain-token-factory": "cd interchain-token-factory && mxpy contract build",
-    "build:token-manager": "cd token-manager && mxpy contract build",
-    "build:ping-pong": "cd ping-pong-interchain && mxpy contract build",
+    "build:gateway": "cd gateway && xsuite build",
+    "build:auth": "cd auth && xsuite build",
+    "build:gas-service": "cd gas-service && xsuite build",
+    "build:its": "cd interchain-token-service && xsuite build",
+    "build:interchain-token-factory": "cd interchain-token-factory && xsuite build",
+    "build:token-manager": "cd token-manager && xsuite build",
+    "build:ping-pong": "cd ping-pong-interchain && xsuite build",
     "build:ci": "npm run build:ci:gateway && npm run build:ci:auth && npm run build:ci:gas-service && npm run build:ci:its && npm run build:ci:interchain-token-factory && npm run build:ci:token-manager && npm run build:ci:ping-pong",
     "build:ci:gateway": "cd gateway && python3 -m multiversx_sdk_cli.cli contract build",
     "build:ci:auth": "cd auth && python3 -m multiversx_sdk_cli.cli contract build",
@@ -36,7 +36,7 @@
     "tsx": "^3.12.7",
     "typescript": "^5.0.4",
     "vitest": "^0.33.0",
-    "xsuite": "0.0.43",
+    "xsuite": "0.0.50",
     "keccak": "^3.0.3"
   }
 }

@@ -16,7 +16,7 @@ import {
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { Kvs } from 'xsuite/dist/data/kvs';
-import { AddressEncodable } from 'xsuite/dist/data/AddressEncodable';
+import { Encodable } from 'xsuite';
 
 export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
 
@@ -371,7 +371,7 @@ export const itsDeployTokenManagerMintBurn = async (world, user: SWallet, flowLi
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
 };
 
-export const computeInterchainTokenId = (user: AddressEncodable, salt = TOKEN_SALT) => {
+export const computeInterchainTokenId = (user: Encodable, salt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_ID).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
@@ -394,7 +394,7 @@ export const computeExpressExecuteHash = (payload: string) => {
   return createKeccakHash('keccak256').update(data).digest('hex');
 };
 
-export const computeInterchainTokenSalt = (chain_name: string, user: AddressEncodable, salt = TOKEN_SALT) => {
+export const computeInterchainTokenSalt = (chain_name: string, user: Encodable, salt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_SALT).digest('hex');
   const chain_name_hash = createKeccakHash('keccak256').update(chain_name).digest('hex');
   const buffer = Buffer.concat([
