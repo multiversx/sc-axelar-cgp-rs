@@ -10,13 +10,13 @@ import {
   OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
-  TOKEN_ID_MANAGER_ADDRESS,
+  TOKEN_MANAGER_ADDRESS,
   TOKEN_SALT,
 } from './helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { Kvs } from 'xsuite/dist/data/kvs';
-import { AddressEncodable } from 'xsuite/dist/data/AddressEncodable';
+import { Encodable } from 'xsuite';
 
 export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
 
@@ -297,7 +297,7 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addT
     ],
   });
 
-  const tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
   const baseTokenManagerKvs = [
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
@@ -349,7 +349,7 @@ export const itsDeployTokenManagerMintBurn = async (world, user: SWallet, flowLi
     ],
   });
 
-  const tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
   const baseTokenManagerKvs = [
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
@@ -371,7 +371,7 @@ export const itsDeployTokenManagerMintBurn = async (world, user: SWallet, flowLi
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
 };
 
-export const computeInterchainTokenId = (user: AddressEncodable, salt = TOKEN_SALT) => {
+export const computeInterchainTokenId = (user: Encodable, salt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_ID).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
@@ -394,7 +394,7 @@ export const computeExpressExecuteHash = (payload: string) => {
   return createKeccakHash('keccak256').update(data).digest('hex');
 };
 
-export const computeInterchainTokenSalt = (chain_name: string, user: AddressEncodable, salt = TOKEN_SALT) => {
+export const computeInterchainTokenSalt = (chain_name: string, user: Encodable, salt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_SALT).digest('hex');
   const chain_name_hash = createKeccakHash('keccak256').update(chain_name).digest('hex');
   const buffer = Buffer.concat([
@@ -434,6 +434,6 @@ export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory
 
     ...(interchainTokenFactory ? [e.kvs.Mapper('interchain_token_factory').Value(interchainTokenFactory)] : []),
     ...(computedTokenId ? [e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(
-      TOKEN_ID_MANAGER_ADDRESS))] : []),
+      TOKEN_MANAGER_ADDRESS))] : []),
   ];
 };

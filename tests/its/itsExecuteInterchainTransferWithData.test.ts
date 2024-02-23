@@ -216,29 +216,15 @@ test('Transfer with data contract error', async () => {
     ],
   });
 
-  // TODO: This works correctly on Devnet but doesn't work in tests for some reason
   // Assert its doesn't have balance
-  const kvs = await its.getAccountWithKvs();
-  assertAccount(kvs, {
-    // balance: 0n,
-    allKvs: [
+  assertAccount(await its.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
-
-      // These keys should not have been set, the callback should have been executed
-      e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
-        e.Str('execute_with_token_callback'),
-        e.U32(4),
-        e.Buffer(COMMAND_ID),
-        e.Buffer(computedTokenId),
-        e.Str('EGLD'),
-        e.U(1_000),
-      )),
     ],
   });
-
   // Assert ping pong was NOT called
-  const pingPongKvs = await pingPong.getAccountWithKvs();
-  assertAccount(pingPongKvs, {
+  assertAccount(await pingPong.getAccountWithKvs(), {
     balance: 0,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
@@ -248,15 +234,13 @@ test('Transfer with data contract error', async () => {
       e.kvs.Mapper('maxFunds').Value(e.Option(null)),
     ],
   });
-
-  // const tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  // assertAccount(tokenManagerKvs, {
-  //   balance: 100_000,
-  //   kvs: [
-  //     ...baseTokenManagerKvs,
-  //   ],
-  // });
-
+  // Assert token manager still has tokens
+  assertAccount(await tokenManager.getAccountWithKvs(), {
+    balance: 100_000,
+    kvs: [
+      ...baseTokenManagerKvs,
+    ],
+  });
   // Gateway contract call approved key was removed
   const gatewayKvs = await gateway.getAccountWithKvs();
   assertAccount(gatewayKvs, {
