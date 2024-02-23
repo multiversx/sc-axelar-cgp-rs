@@ -10,7 +10,7 @@ import {
   OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
-  TOKEN_ID_MANAGER_ADDRESS,
+  TOKEN_MANAGER_ADDRESS,
   TOKEN_SALT,
 } from './helpers';
 import createKeccakHash from 'keccak';
@@ -297,7 +297,7 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addT
     ],
   });
 
-  const tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
   const baseTokenManagerKvs = [
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
@@ -349,7 +349,7 @@ export const itsDeployTokenManagerMintBurn = async (world, user: SWallet, flowLi
     ],
   });
 
-  const tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
   const baseTokenManagerKvs = [
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
@@ -434,6 +434,6 @@ export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory
 
     ...(interchainTokenFactory ? [e.kvs.Mapper('interchain_token_factory').Value(interchainTokenFactory)] : []),
     ...(computedTokenId ? [e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(
-      TOKEN_ID_MANAGER_ADDRESS))] : []),
+      TOKEN_MANAGER_ADDRESS))] : []),
   ];
 };

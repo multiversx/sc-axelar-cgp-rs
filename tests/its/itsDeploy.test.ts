@@ -7,8 +7,7 @@ import {
   OTHER_CHAIN_TOKEN_ADDRESS,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID2_MANAGER_ADDRESS,
-  TOKEN_ID_MANAGER_ADDRESS,
+  TOKEN_MANAGER_ADDRESS, TOKEN_MANAGER_ADDRESS_2,
   TOKEN_SALT,
 } from '../helpers';
 import {
@@ -106,11 +105,11 @@ describe('Deploy token manager', () => {
       allKvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
       ],
     });
 
-    const tokenManager = await world.newContract(TOKEN_ID2_MANAGER_ADDRESS);
+    const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
@@ -155,9 +154,9 @@ describe('Deploy token manager', () => {
       allKvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
         e.kvs.Mapper('token_manager_address', e.TopBuffer(result.returnData[0])).Value(e.Addr(
-          'erd1qqqqqqqqqqqqqpgqzyg3zygqqqqqqqqqqqqq2qqqqqqqqqqpqqqq03de6q')),
+          TOKEN_MANAGER_ADDRESS_2)),
       ],
     });
   });
@@ -246,7 +245,7 @@ describe('Deploy token manager', () => {
       allKvs: [
         ...baseItsKvs(deployer, user),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_ID2_MANAGER_ADDRESS)),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
       ],
     });
   });
@@ -261,9 +260,9 @@ describe('Deploy token manager remote', () => {
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
-          TOKEN_ID_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS)),
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(e.Addr(
-          TOKEN_ID2_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS_2)),
       ],
     });
 
@@ -298,9 +297,9 @@ describe('Deploy token manager remote', () => {
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
-          TOKEN_ID_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS)),
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(e.Addr(
-          TOKEN_ID2_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS_2)),
       ],
     });
 
@@ -343,9 +342,9 @@ describe('Deploy token manager remote', () => {
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
-          TOKEN_ID_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS)),
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(e.Addr(
-          TOKEN_ID2_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS_2)),
       ],
     });
   });
@@ -378,7 +377,7 @@ describe('Deploy token manager remote', () => {
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
-          TOKEN_ID_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS)),
       ],
     });
 
@@ -442,7 +441,7 @@ describe('Deploy interchain token', () => {
       ],
     });
 
-    const tokenManager = world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+    const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
@@ -481,7 +480,7 @@ describe('Deploy interchain token', () => {
       ],
     });
 
-    const tokenManager = world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+    const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
@@ -543,7 +542,7 @@ describe('Deploy interchain token', () => {
     let kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      hasKvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(tokenManager),
@@ -599,19 +598,16 @@ describe('Deploy interchain token', () => {
       ],
     });
 
-    let kvs = await its.getAccountWithKvs();
-    assertAccount(kvs, {
+    assertAccount(await its.getAccountWithKvs(), {
       balance: 0n,
-      allKvs: [
+      hasKvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(tokenManager),
       ],
     });
-
     // Assert endpoint to deploy ESDT was called
-    kvs = await tokenManager.getAccountWithKvs();
-    assertAccount(kvs, {
+    assertAccount(await tokenManager.getAccountWithKvs(), {
       balance: 0n,
       hasKvs: [
         ...baseTokenManagerKvs,
@@ -626,6 +622,9 @@ describe('Deploy interchain token', () => {
           e.TopBuffer('00000000'),
         )),
       ],
+    });
+    assertAccount(await user.getAccountWithKvs(), {
+      balance: BigInt('50000000000000000'), // balance was changed
     });
   });
 
@@ -679,9 +678,9 @@ describe('Deploy interchain token remote', () => {
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(
-          TOKEN_ID_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS)),
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId2)).Value(e.Addr(
-          TOKEN_ID2_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS_2)),
       ],
     });
 
@@ -708,9 +707,9 @@ describe('Deploy interchain token remote', () => {
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(
-          TOKEN_ID_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS)),
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId2)).Value(e.Addr(
-          TOKEN_ID2_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS_2)),
       ],
     });
 
@@ -747,9 +746,9 @@ describe('Deploy interchain token remote', () => {
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(
-          TOKEN_ID_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS)),
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId2)).Value(e.Addr(
-          TOKEN_ID2_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS_2)),
       ],
     });
 
@@ -785,7 +784,7 @@ describe('Deploy interchain token remote', () => {
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
-          TOKEN_ID_MANAGER_ADDRESS)),
+          TOKEN_MANAGER_ADDRESS)),
       ],
     });
 
