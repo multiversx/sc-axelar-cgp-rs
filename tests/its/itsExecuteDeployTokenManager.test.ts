@@ -10,7 +10,7 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID_MANAGER_ADDRESS,
+  TOKEN_MANAGER_ADDRESS,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
@@ -142,7 +142,7 @@ test('Execute', async () => {
     ],
   });
 
-  const tokenManager = world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
   const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0,

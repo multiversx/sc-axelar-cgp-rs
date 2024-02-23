@@ -9,7 +9,7 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID_MANAGER_ADDRESS,
+  TOKEN_MANAGER_ADDRESS, TOKEN_MANAGER_ADDRESS_2,
   TOKEN_SALT,
 } from '../helpers';
 import {
@@ -23,9 +23,8 @@ import {
   interchainTokenFactory,
   its, TOKEN_MANAGER_TYPE_LOCK_UNLOCK, TOKEN_MANAGER_TYPE_MINT_BURN,
   tokenManager,
-  tokenManager,
 } from '../itsHelpers';
-import { Encodable } from 'xsuite/dist/data/Encodable';
+import { Encodable } from 'xsuite';
 import createKeccakHash from 'keccak';
 
 let world: SWorld;
@@ -705,7 +704,7 @@ describe('Set flow limits', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     });
 
@@ -720,7 +719,7 @@ describe('Set flow limits', () => {
         e.Buffer(e.Tuple(
           e.Option(otherUser),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     });
 
@@ -741,7 +740,7 @@ describe('Set flow limits', () => {
       ],
     });
 
-    let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+    let tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
@@ -757,7 +756,7 @@ describe('Set flow limits', () => {
       ],
     });
 
-    tokenManager = await world.newContract('erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqpqqqqdz2m2t');
+    tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS_2);
     tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
@@ -835,7 +834,7 @@ describe('Set flow limits', () => {
     });
 
     // Remove its as flow limiter for token manager
-    let tokenManager = await world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+    let tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
     await user.callContract({
       callee: tokenManager,
       funcName: 'removeFlowLimiter',

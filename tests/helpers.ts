@@ -3,8 +3,7 @@ import { UserSecretKey } from '@multiversx/sdk-wallet/out';
 import createKeccakHash from 'keccak';
 import { e } from 'xsuite';
 import { Buffer } from 'buffer';
-import { Encodable } from 'xsuite/dist/data/Encodable';
-import { TupleEncodable } from 'xsuite/dist/data/TupleEncodable';
+import { Encodable } from 'xsuite';
 
 export const MOCK_CONTRACT_ADDRESS_1: string = 'erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax';
 export const MOCK_CONTRACT_ADDRESS_2: string = 'erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh';
@@ -19,15 +18,15 @@ export const MULTISIG_PROVER_PUB_KEY_2 = 'ef637606f3144ee46343ba4a25c261b5c400ad
 
 export const TOKEN_SALT: string = '91b44915de5f5bb438be952d4cda1bcc08829495e8704e40751dcee97aa83886';
 export const TOKEN_ID: string = 'WEGLD-123456';
+export const TOKEN_ID2: string = 'OTHER-654321';
+
 export const INTERCHAIN_TOKEN_ID: string = '01b3d64c8c6530a3aad5909ae7e0985d4438ce8eafd90e51ce48fbc809bced39';
 export const CANONICAL_INTERCHAIN_TOKEN_ID: string = 'ab13e48029a0672cd3a669e258a97696dc33b4f72f4d758f92ee4afc8a026dc1';
-export const TOKEN_ID_MANAGER_ADDRESS: string = 'erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02';
 
-export const TOKEN_ID2: string = 'OTHER-654321';
-export const TOKEN_ID2_MANAGER_ADDRESS: string = 'erd1qqqqqqqqqqqqqqqqzyg3zygqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrva02';
+export const TOKEN_MANAGER_ADDRESS: string = 'erd1qqqqqqqqqqqqqpgqzyg3zygqqqqqqqqqqqqq2qqqqqqqqqqqqqqqtstllp';
+export const TOKEN_MANAGER_ADDRESS_2: string = 'erd1qqqqqqqqqqqqqpgqzyg3zygqqqqqqqqqqqqq2qqqqqqqqqqpqqqq03de6q';
 
 export const ADDRESS_ZERO: string = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu';
-export const ADDRESS_MOCK_SC: string = 'erd1qqqqqqqqqqqqqpgqpv09kfzry5y4sj05udcngesat07umyj70n4sa2c0rp';
 
 export const CHAIN_NAME: string = 'MultiversX';
 export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
@@ -85,7 +84,7 @@ export const getOperatorsHash = (pubKeys: string[], weights: number[], threshold
   return createKeccakHash('keccak256').update(data).digest();
 };
 
-export const generateProof = (data: Encodable | Buffer): TupleEncodable => {
+export const generateProof = (data: Encodable | Buffer): Encodable => {
   if (data instanceof Encodable) {
     data = Buffer.from(data.toTopHex(), 'hex');
   }

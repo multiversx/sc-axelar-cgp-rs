@@ -10,7 +10,7 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_ID_MANAGER_ADDRESS,
+  TOKEN_MANAGER_ADDRESS,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
@@ -140,7 +140,7 @@ test('Only deploy token manager', async () => {
     ],
   });
 
-  const tokenManager = world.newContract(TOKEN_ID_MANAGER_ADDRESS);
+  const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
   const tokenManagerKvs = await tokenManager.getAccountWithKvs();
   assertAccount(tokenManagerKvs, {
     balance: 0,
@@ -193,20 +193,17 @@ test('Only issue esdt', async () => {
   });
 
   // Nothing was changed for its
-  const kvs = await its.getAccountWithKvs();
-  assertAccount(kvs, {
+  assertAccount(await its.getAccountWithKvs(), {
     balance: 0n,
-    allKvs: [
+    hasKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
       e.kvs.Mapper('token_manager_address', e.TopBuffer(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
   });
-
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  assertAccount(tokenManagerKvs, {
+  assertAccount(await tokenManager.getAccountWithKvs(), {
     balance: 0,
-    kvs: [
+    hasKvs: [
       ...baseTokenManagerKvs,
 
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user & its
@@ -218,6 +215,9 @@ test('Only issue esdt', async () => {
         e.TopBuffer('00000000'),
       )),
     ],
+  });
+  assertAccount(await user.getAccountWithKvs(), {
+    balance: BigInt('50000000000000000'), // balance was changed
   });
 
   // Gateway contract call approved key was removed
@@ -294,7 +294,7 @@ test('Errors', async () => {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
-      e.kvs.Mapper('token_manager_address', e.TopBuffer(INTERCHAIN_TOKEN_ID)).Value(e.Addr(TOKEN_ID_MANAGER_ADDRESS)),
+      e.kvs.Mapper('token_manager_address', e.TopBuffer(INTERCHAIN_TOKEN_ID)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
     ],
   });
 
