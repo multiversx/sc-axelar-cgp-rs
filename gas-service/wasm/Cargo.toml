@@ -5,7 +5,7 @@
 # ##########################################
 
 [package]
-name = "gateway-wasm"
+name = "gas-service-wasm"
 version = "0.0.0"
 edition = "2018"
 publish = false
@@ -21,7 +21,7 @@ debug = false
 panic = "abort"
 overflow-checks = false
 
-[dependencies.gateway]
+[dependencies.gas-service]
 path = ".."
 
 [dependencies.multiversx-sc-wasm-adapter]

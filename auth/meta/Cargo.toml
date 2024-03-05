@@ -1,5 +1,5 @@
 [package]
-name = "gateway-meta"
+name = "auth-meta"
 version = "0.0.0"
 edition = "2018"
 publish = false
@@ -7,7 +7,7 @@ authors = [ "you",]
 
 [dev-dependencies]
 
-[dependencies.gateway]
+[dependencies.auth]
 path = ".."
 
 [dependencies.multiversx-sc-meta]

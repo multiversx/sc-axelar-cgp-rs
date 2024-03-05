@@ -1,23 +1,32 @@
 {
   "private": true,
   "scripts": {
-    "build": "npm run build:gateway",
+    "build": "npm run build:gateway && npm run build:auth && npm run build:gas-service",
     "build:gateway": "cd gateway && mxpy contract build",
+    "build:auth": "cd auth && mxpy contract build",
+    "build:gas-service": "cd gas-service && mxpy contract build",
+    "build:ci": "npm run build:ci:gateway && npm run build:ci:auth && npm run build:ci:gas-service",
+    "build:ci:gateway": "cd gateway && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:auth": "cd auth && python3 -m multiversx_sdk_cli.cli contract build",
+    "build:ci:gas-service": "cd gas-service && python3 -m multiversx_sdk_cli.cli contract build",
     "test": "vitest run",
-    "test:contract": "cd gateway && cargo test",
-    "test:scenarios": "cd gateway && mxpy contract test",
-    "test:all": "npm run build && npm run test:scenarios && npm run test && npm run test:contract",
+    "test:cargo": "cargo test",
+    "test:all": "npm run build && npm run test && npm run test:cargo",
     "typecheck": "tsc --noEmit",
     "interact:devnet": "CHAIN=devnet tsx interact/index.ts",
     "interact:testnet": "CHAIN=testnet tsx interact/index.ts",
     "interact:mainnet": "CHAIN=mainnet tsx interact/index.ts"
   },
   "devDependencies": {
+    "@multiversx/sdk-core": "^12.5.0",
+    "@multiversx/sdk-wallet": "^4.2.0",
     "@types/node": "^18.16.18",
-    "commander": "11.0.0",
+    "commander": "^11.1.0",
     "tsx": "^3.12.7",
     "typescript": "^5.0.4",
     "vitest": "^0.33.0",
-    "xsuite": "0.0.28"
+    "xsuite": "0.0.46",
+    "keccak": "^3.0.3",
+    "@types/keccak": "^3.0.3"
   }
 }

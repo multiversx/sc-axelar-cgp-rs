@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                            8
+// Endpoints:                            6
 // Async Callback (empty):               1
-// Total number of exported functions:  10
+// Total number of exported functions:   8
 
 #![no_std]
 #![allow(internal_features)]
@@ -17,17 +17,15 @@ multiversx_sc_wasm_adapter::allocator!();
 multiversx_sc_wasm_adapter::panic_handler!();
 
 multiversx_sc_wasm_adapter::endpoints! {
-    gateway
+    auth
     (
         init => init
         upgrade => upgrade
-        callContract => call_contract
-        validateContractCall => validate_contract_call
-        execute => execute
-        isCommandExecuted => is_command_executed
-        isContractCallApproved => is_contract_call_approved
-        chain_id => chain_id
-        authModule => auth_module
+        validateProof => validate_proof
+        transferOperatorship => transfer_operatorship
+        epoch_for_hash => epoch_for_hash
+        hash_for_epoch => hash_for_epoch
+        current_epoch => current_epoch
     )
 }
 

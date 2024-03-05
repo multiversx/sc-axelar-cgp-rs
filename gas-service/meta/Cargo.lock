@@ -557,17 +557,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "gateway"
+name = "gas-service"
 version = "0.0.0"
 dependencies = [
  "multiversx-sc",
 ]
 
 [[package]]
-name = "gateway-meta"
+name = "gas-service-meta"
 version = "0.0.0"
 dependencies = [
- "gateway",
+ "gas-service",
  "multiversx-sc-meta",
 ]
 

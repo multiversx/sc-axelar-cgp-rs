@@ -1,7 +1,29 @@
 {
-  "code": "file:gateway/output/gateway.wasm",
-  "address": {
-    "devnet": "",
+  "codeGateway": "file:gateway/output/gateway.wasm",
+  "codeAuth": "file:auth/output/auth.wasm",
+  "codeGasReceiver": "file:gas-service/output/gas-service.wasm",
+  "chainId": {
+    "devnet": "D",
+    "testnet": "T",
+    "mainnet": "1"
+  },
+  "gasCollector": {
+    "devnet": "erd1medg4x6ft60dmf94kl7zm24ten928mnk5pfkpfny9cakc6n84pxszdgjht",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressGateway": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqalsythuk40ml99au5w7s6mecw4na2zc9kklsraky5m",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressAuth": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqr2cdta7yhnu7em9rdx9tw4kh0xphulawkkls0vtey4",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressGasService": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqx4cfm0rlj8myv0ft7qs8jvsersfwcm5jkklsn9paj0",
     "testnet": "",
     "mainnet": ""
   }
