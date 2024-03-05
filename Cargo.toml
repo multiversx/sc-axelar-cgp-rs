@@ -8,4 +8,12 @@ members = [
     "gas-service/meta",
     "gateway",
     "gateway/meta",
+    "interchain-token-service",
+    "interchain-token-service/meta",
+    "ping-pong-interchain",
+    "ping-pong-interchain/meta",
+    "token-manager",
+    "token-manager/meta",
+    "interchain-token-factory",
+    "interchain-token-factory/meta"
 ]

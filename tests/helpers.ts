@@ -2,8 +2,8 @@ import fs from 'fs';
 import { UserSecretKey } from '@multiversx/sdk-wallet/out';
 import createKeccakHash from 'keccak';
 import { e } from 'xsuite';
-import { Encodable } from 'xsuite/dist/data/Encodable';
-import { TupleEncodable } from 'xsuite/dist/data/TupleEncodable';
+import { Buffer } from 'buffer';
+import { Encodable } from 'xsuite';
 
 export const MOCK_CONTRACT_ADDRESS_1: string = 'erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax';
 export const MOCK_CONTRACT_ADDRESS_2: string = 'erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh';
@@ -16,9 +16,24 @@ export const MOCK_PUB_KEY_2 = '00000000000000000500f12dd10c4d2be8264fe339da14b9f
 export const MULTISIG_PROVER_PUB_KEY_1 = 'ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6';
 export const MULTISIG_PROVER_PUB_KEY_2 = 'ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449';
 
-export const TOKEN_SYMBOL: string = 'WEGLD';
+export const TOKEN_SALT: string = '91b44915de5f5bb438be952d4cda1bcc08829495e8704e40751dcee97aa83886';
 export const TOKEN_ID: string = 'WEGLD-123456';
 export const TOKEN_ID2: string = 'OTHER-654321';
+
+export const INTERCHAIN_TOKEN_ID: string = '01b3d64c8c6530a3aad5909ae7e0985d4438ce8eafd90e51ce48fbc809bced39';
+export const CANONICAL_INTERCHAIN_TOKEN_ID: string = 'ab13e48029a0672cd3a669e258a97696dc33b4f72f4d758f92ee4afc8a026dc1';
+
+export const TOKEN_MANAGER_ADDRESS: string = 'erd1qqqqqqqqqqqqqpgqzyg3zygqqqqqqqqqqqqq2qqqqqqqqqqqqqqqtstllp';
+export const TOKEN_MANAGER_ADDRESS_2: string = 'erd1qqqqqqqqqqqqqpgqzyg3zygqqqqqqqqqqqqq2qqqqqqqqqqpqqqq03de6q';
+
+export const ADDRESS_ZERO: string = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu';
+
+export const CHAIN_NAME: string = 'MultiversX';
+export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
+export const OTHER_CHAIN_NAME: string = 'Ethereum';
+export const OTHER_CHAIN_ADDRESS: string = '0x032fF26CbbdcE740e1Ff0A069Ad3fCf886fde220';
+export const OTHER_CHAIN_ADDRESS_HASH: string = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS).digest('hex');
+export const OTHER_CHAIN_TOKEN_ADDRESS: string = '0x79563F018EA5312cD84d7Ca9ecdB37c74A786B72';
 
 export const CHAIN_ID: string = 'D';
 
@@ -31,7 +46,7 @@ export const MULTIVERSX_SIGNED_MESSAGE_PREFIX = '\x19MultiversX Signed Message:\
 export const generateMessageHash = (data: Buffer): string => {
   const messageHashData = Buffer.concat([
     Buffer.from(MULTIVERSX_SIGNED_MESSAGE_PREFIX),
-    data,
+    data
   ]);
 
   return createKeccakHash('keccak256').update(messageHashData).digest('hex');
@@ -63,13 +78,13 @@ export const getOperatorsHash = (pubKeys: string[], weights: number[], threshold
 
       return Buffer.from(weightHex, 'hex');
     }),
-    Buffer.from(thresholdHex, 'hex'),
+    Buffer.from(thresholdHex, 'hex')
   ]);
 
   return createKeccakHash('keccak256').update(data).digest();
 };
 
-export const generateProof = (data: Encodable | Buffer): TupleEncodable => {
+export const generateProof = (data: Encodable | Buffer): Encodable => {
   if (data instanceof Encodable) {
     data = Buffer.from(data.toTopHex(), 'hex');
   }
@@ -77,9 +92,13 @@ export const generateProof = (data: Encodable | Buffer): TupleEncodable => {
   const signature = generateSignature(data);
 
   return e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
-    e.List(e.Bytes(signature)),
+    e.List(e.TopBuffer(signature)),
   );
+};
+
+export const getCommandId = (commandId: string = 'commandId') => {
+  return createKeccakHash('keccak256').update(Buffer.from(commandId)).digest('hex');
 };
