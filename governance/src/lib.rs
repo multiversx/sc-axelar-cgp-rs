@@ -16,7 +16,7 @@ pub enum GovernanceCommand {
 }
 
 #[derive(TypeAbi, TopDecode)]
-pub struct CallData<M: ManagedTypeApi> {
+pub struct DecodedCallData<M: ManagedTypeApi> {
     pub endpoint_name: ManagedBuffer<M>,
     pub arguments: ManagedVec<M, ManagedBuffer<M>>,
 }
@@ -29,6 +29,9 @@ pub struct ExecutePayload<M: ManagedTypeApi> {
     pub native_value: BigUint<M>,
     pub eta: u64,
 }
+
+const EXECUTE_PROPOSAL_CALLBACK_GAS: u64 = 5_000_000; // This is overkill, but the callback should be prevented from failing at all costs
+const KEEP_EXTRA_GAS: u64 = 15_000_000; // Extra gas to keep in contract before registering async promise. This needs to be a somewhat larger value
 
 #[multiversx_sc::contract]
 pub trait Governance: events::Events {
@@ -45,16 +48,16 @@ pub trait Governance: events::Events {
             "Invalid address"
         );
 
-        self.gateway().set_if_empty(gateway);
+        self.gateway().set(gateway);
         self.minimum_time_lock_delay()
-            .set_if_empty(minimum_time_delay);
+            .set(minimum_time_delay);
 
-        self.governance_chain().set_if_empty(&governance_chain);
-        self.governance_address().set_if_empty(&governance_address);
+        self.governance_chain().set(&governance_chain);
+        self.governance_address().set(&governance_address);
         self.governance_chain_hash()
-            .set_if_empty(self.crypto().keccak256(&governance_chain));
+            .set(self.crypto().keccak256(&governance_chain));
         self.governance_address_hash()
-            .set_if_empty(self.crypto().keccak256(&governance_address));
+            .set(self.crypto().keccak256(&governance_address));
     }
 
     #[upgrade]
@@ -81,19 +84,23 @@ pub trait Governance: events::Events {
             },
         );
 
-        let call_data: CallData<Self::Api> = CallData::<Self::Api>::top_decode(call_data)
+        let decoded_call_data: DecodedCallData<Self::Api> = DecodedCallData::<Self::Api>::top_decode(call_data)
             .unwrap_or_else(|_| sc_panic!("Could not decode call data"));
 
+        let gas_limit = self.blockchain().get_gas_left() - EXECUTE_PROPOSAL_CALLBACK_GAS - KEEP_EXTRA_GAS;
+
         self.send()
-            .contract_call::<()>(target, call_data.endpoint_name)
+            .contract_call::<()>(target, decoded_call_data.endpoint_name)
             .with_egld_transfer(native_value)
-            .with_raw_arguments(call_data.arguments.into())
-            .async_call()
+            .with_raw_arguments(decoded_call_data.arguments.into())
+            .with_gas_limit(gas_limit)
+            .async_call_promise()
             .with_callback(
                 self.callbacks()
                     .execute_proposal_callback(&proposal_hash, eta),
             )
-            .call_and_exit();
+            .with_extra_gas_for_callback(EXECUTE_PROPOSAL_CALLBACK_GAS)
+            .register_promise();
     }
 
     // Can only be called by self (through the execute_proposal endpoint)
@@ -239,7 +246,7 @@ pub trait Governance: events::Events {
         );
     }
 
-    #[callback]
+    #[promises_callback]
     fn execute_proposal_callback(
         &self,
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -275,27 +282,27 @@ pub trait Governance: events::Events {
     #[storage_mapper("gateway")]
     fn gateway(&self) -> SingleValueMapper<ManagedAddress>;
 
-    #[view]
+    #[view(getMinimumTimeLockDelay)]
     #[storage_mapper("minimum_time_lock_delay")]
     fn minimum_time_lock_delay(&self) -> SingleValueMapper<u64>;
 
-    #[view]
+    #[view(getGovernanceChain)]
     #[storage_mapper("governance_chain")]
     fn governance_chain(&self) -> SingleValueMapper<ManagedBuffer>;
 
-    #[view]
+    #[view(getGovernanceAddress)]
     #[storage_mapper("governance_address")]
     fn governance_address(&self) -> SingleValueMapper<ManagedBuffer>;
 
-    #[view]
+    #[view(getGovernanceChainHash)]
     #[storage_mapper("governance_chain_hash")]
     fn governance_chain_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
-    #[view]
+    #[view(getGovernanceAddressHash)]
     #[storage_mapper("governance_address_hash")]
     fn governance_address_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
-    #[view]
+    #[view(getTimeLockEta)]
     #[storage_mapper("time_lock_eta")]
     fn time_lock_eta(
         &self,

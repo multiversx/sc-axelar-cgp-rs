@@ -6,8 +6,9 @@
 
 // Init:                                 1
 // Endpoints:                           12
-// Async Callback:                       1
-// Total number of exported functions:  14
+// Async Callback (empty):               1
+// Promise callbacks:                    1
+// Total number of exported functions:  15
 
 #![no_std]
 #![allow(internal_features)]
@@ -26,13 +27,14 @@ multiversx_sc_wasm_adapter::endpoints! {
         execute => execute
         getProposalEta => get_proposal_eta
         gateway => gateway
-        minimum_time_lock_delay => minimum_time_lock_delay
-        governance_chain => governance_chain
-        governance_address => governance_address
-        governance_chain_hash => governance_chain_hash
-        governance_address_hash => governance_address_hash
-        time_lock_eta => time_lock_eta
+        getMinimumTimeLockDelay => minimum_time_lock_delay
+        getGovernanceChain => governance_chain
+        getGovernanceAddress => governance_address
+        getGovernanceChainHash => governance_chain_hash
+        getGovernanceAddressHash => governance_address_hash
+        getTimeLockEta => time_lock_eta
+        execute_proposal_callback => execute_proposal_callback
     )
 }
 
-multiversx_sc_wasm_adapter::async_callback! { governance }
+multiversx_sc_wasm_adapter::async_callback_empty! {}
