@@ -18,6 +18,7 @@ jobs:
     with:
       rust-toolchain: nightly-2023-12-11
       vmtools-version: v1.5.24
+      pip-mxpy-args: "multiversx-sdk-cli==v9.3.1"
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -30,7 +31,7 @@ jobs:
       - name: Install rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-05-26
+          toolchain: nightly-2023-12-11
           target: wasm32-unknown-unknown
 
       - name: Setup the PATH variable
