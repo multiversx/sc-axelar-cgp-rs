@@ -280,7 +280,7 @@ describe('Interchain transfer', () => {
         e.Buffer(''),
         e.U(0),
       ],
-    }).assertFail({ code: 4, message: 'No payment sent' });
+    }).assertFail({ code: 4, message: 'Invalid gas value' });
 
     await user.callContract({
       callee: its,
@@ -637,7 +637,7 @@ describe('Call contract with interchain token', () => {
         e.Str('sth'),
         e.U(0),
       ],
-    }).assertFail({ code: 4, message: 'No payment sent' });
+    }).assertFail({ code: 4, message: 'Invalid gas value' });
 
     await user.callContract({
       callee: its,

@@ -9,13 +9,13 @@ publish = false
 path = "src/lib.rs"
 
 [dependencies.multiversx-sc]
-version = "0.46.1"
+version = "0.47.7"
 
 [dependencies.multiversx-sc-modules]
-version = "0.46.1"
+version = "0.47.7"
 
 [dev-dependencies.multiversx-sc-scenario]
-version = "0.46.1"
+version = "0.47.7"
 
 [dependencies.operatable]
 path = "../modules/operatable"

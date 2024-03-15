@@ -4,8 +4,9 @@ use crate::constants::{Hash, ManagedBufferAscii, TokenId};
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use interchain_token_service::proxy::ProxyTrait as _;
 use interchain_token_service::ProxyTrait as _;
+use interchain_token_service::proxy_its::ProxyTrait as _;
+use interchain_token_service::user_functions::ProxyTrait as _;
 use operatable::ProxyTrait as _;
 use token_manager::constants::TokenManagerType;
 use token_manager::mintership::ProxyTrait as _;

@@ -9,7 +9,7 @@ use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, TokenId,
 };
-use crate::{address_tracker, events, express_executor_tracker, proxy};
+use crate::{address_tracker, events, express_executor_tracker, proxy_cgp, proxy_its};
 
 multiversx_sc::imports!();
 
@@ -18,7 +18,8 @@ pub trait ExecutableModule:
     express_executor_tracker::ExpressExecutorTracker
     + multiversx_sc_modules::pause::PauseModule
     + events::EventsModule
-    + proxy::ProxyModule
+    + proxy_cgp::ProxyCgpModule
+    + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
     fn process_interchain_transfer_payload(
