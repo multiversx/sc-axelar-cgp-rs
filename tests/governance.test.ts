@@ -92,14 +92,14 @@ const deployContract = async () => {
 };
 
 const mockCallApprovedByGateway = async (payload: BytesEncodable) => {
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopBytes())).digest('hex');
+  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopU8A())).digest('hex');
 
   // Mock call approved by gateway
   let data = Buffer.concat([
     Buffer.from(COMMAND_ID, 'hex'),
     Buffer.from(GOVERNANCE_CHAIN),
     Buffer.from(GOVERNANCE_ADDRESS),
-    contract.toTopBytes(),
+    contract.toTopU8A(),
     Buffer.from(payloadHash, 'hex'),
   ]);
 
@@ -163,7 +163,7 @@ test('Execute proposal errors', async () => {
 
   const wrongCallData = e.TopBuffer(e.Tuple(
     e.Str('endpoint'),
-  ).toTopBytes());
+  ).toTopU8A());
 
   await deployer.callContract({
     callee: contract,
@@ -177,9 +177,9 @@ test('Execute proposal errors', async () => {
   }).assertFail({ code: 4, message: 'Invalid time lock hash' });
 
   const buffer = Buffer.concat([
-    gateway.toTopBytes(),
-    wrongCallData.toTopBytes(),
-    e.U(0).toTopBytes(),
+    gateway.toTopU8A(),
+    wrongCallData.toTopU8A(),
+    e.U(0).toTopU8A(),
   ]);
   const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
@@ -230,12 +230,12 @@ test('Execute proposal upgrade gateway', async () => {
       e.Buffer(gatewayCode), // code
       e.Buffer('0100'), // upgrade metadata (upgradable)
     ),
-  ).toTopBytes());
+  ).toTopU8A());
 
   const buffer = Buffer.concat([
-    gateway.toTopBytes(),
-    callData.toTopBytes(),
-    e.U(0).toTopBytes(),
+    gateway.toTopU8A(),
+    callData.toTopU8A(),
+    e.U(0).toTopU8A(),
   ]);
   const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
@@ -250,6 +250,17 @@ test('Execute proposal upgrade gateway', async () => {
   });
   // Increase timestamp so finalize_time_lock passes
   await world.setCurrentBlockInfo({ timestamp: 1 });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 20_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      gateway,
+      callData,
+      e.U(0),
+    ],
+  }).assertFail({ code: 4, message: 'Not enough gas left for async call' });
 
   await deployer.callContract({
     callee: contract,
@@ -282,12 +293,12 @@ test('Execute proposal upgrade gateway error', async () => {
       e.Buffer('0100'), // upgrade metadata (upgradable)
       e.Str('wrongArgs'),
     ),
-  ).toTopBytes());
+  ).toTopU8A());
 
   const buffer = Buffer.concat([
-    gateway.toTopBytes(),
-    callData.toTopBytes(),
-    e.U(0).toTopBytes(),
+    gateway.toTopU8A(),
+    callData.toTopU8A(),
+    e.U(0).toTopU8A(),
   ]);
   const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
@@ -346,12 +357,12 @@ test('Withdraw', async () => {
       e.Buffer(deployer.toNestBytes()),
       e.U(100),
     ),
-  ).toTopBytes());
+  ).toTopU8A());
 
   const buffer = Buffer.concat([
-    contract.toTopBytes(),
-    callData.toTopBytes(),
-    e.U(0).toTopBytes(),
+    contract.toTopU8A(),
+    callData.toTopU8A(),
+    e.U(0).toTopU8A(),
   ]);
   const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
@@ -454,7 +465,7 @@ test('Execute errors', async () => {
     e.Buffer(''),
     e.U(0),
     e.U64(0),
-  ).toTopBytes());
+  ).toTopU8A());
   await mockCallApprovedByGateway(payload);
 
   await deployer.callContract({
@@ -480,7 +491,7 @@ test('Execute schedule time lock proposal min eta', async () => {
     callData,
     e.U(0),
     e.U64(1), // will use min eta instead
-  ).toTopBytes());
+  ).toTopU8A());
   await mockCallApprovedByGateway(payload);
 
   await deployer.callContract({
@@ -496,9 +507,9 @@ test('Execute schedule time lock proposal min eta', async () => {
   });
 
   const buffer = Buffer.concat([
-    gateway.toTopBytes(),
-    callData.toTopBytes(),
-    e.U(0).toTopBytes(),
+    gateway.toTopU8A(),
+    callData.toTopU8A(),
+    e.U(0).toTopU8A(),
   ]);
   const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
@@ -523,7 +534,7 @@ test('Execute schedule time lock proposal eta', async () => {
     callData,
     e.U(0),
     e.U64(11),
-  ).toTopBytes());
+  ).toTopU8A());
   await mockCallApprovedByGateway(payload);
 
   await deployer.callContract({
@@ -539,9 +550,9 @@ test('Execute schedule time lock proposal eta', async () => {
   });
 
   const buffer = Buffer.concat([
-    gateway.toTopBytes(),
-    callData.toTopBytes(),
-    e.U(0).toTopBytes(),
+    gateway.toTopU8A(),
+    callData.toTopU8A(),
+    e.U(0).toTopU8A(),
   ]);
   const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
@@ -590,14 +601,14 @@ test('Execute cancel time lock proposal', async () => {
     callData,
     e.U(0),
     e.U64(0),
-  ).toTopBytes());
+  ).toTopU8A());
   await mockCallApprovedByGateway(payload);
 
   // Mock time lock era set
   const buffer = Buffer.concat([
-    gateway.toTopBytes(),
-    callData.toTopBytes(),
-    e.U(0).toTopBytes(),
+    gateway.toTopU8A(),
+    callData.toTopU8A(),
+    e.U(0).toTopU8A(),
   ]);
   const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 

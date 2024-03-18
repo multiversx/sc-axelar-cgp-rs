@@ -30,7 +30,8 @@ pub struct ExecutePayload<M: ManagedTypeApi> {
     pub eta: u64,
 }
 
-const EXECUTE_PROPOSAL_CALLBACK_GAS: u64 = 5_000_000; // This is overkill, but the callback should be prevented from failing at all costs
+const EXECUTE_PROPOSAL_CALLBACK_GAS: u64 = 5_000_000;
+// This is overkill, but the callback should be prevented from failing at all costs
 const KEEP_EXTRA_GAS: u64 = 15_000_000; // Extra gas to keep in contract before registering async promise. This needs to be a somewhat larger value
 
 #[multiversx_sc::contract]
@@ -49,8 +50,7 @@ pub trait Governance: events::Events {
         );
 
         self.gateway().set(gateway);
-        self.minimum_time_lock_delay()
-            .set(minimum_time_delay);
+        self.minimum_time_lock_delay().set(minimum_time_delay);
 
         self.governance_chain().set(&governance_chain);
         self.governance_address().set(&governance_address);
@@ -84,10 +84,18 @@ pub trait Governance: events::Events {
             },
         );
 
-        let decoded_call_data: DecodedCallData<Self::Api> = DecodedCallData::<Self::Api>::top_decode(call_data)
-            .unwrap_or_else(|_| sc_panic!("Could not decode call data"));
+        let decoded_call_data: DecodedCallData<Self::Api> =
+            DecodedCallData::<Self::Api>::top_decode(call_data)
+                .unwrap_or_else(|_| sc_panic!("Could not decode call data"));
 
-        let gas_limit = self.blockchain().get_gas_left() - EXECUTE_PROPOSAL_CALLBACK_GAS - KEEP_EXTRA_GAS;
+        let gas_left = self.blockchain().get_gas_left();
+
+        require!(
+            gas_left > EXECUTE_PROPOSAL_CALLBACK_GAS + KEEP_EXTRA_GAS,
+            "Not enough gas left for async call"
+        );
+
+        let gas_limit = gas_left - EXECUTE_PROPOSAL_CALLBACK_GAS - KEEP_EXTRA_GAS;
 
         self.send()
             .contract_call::<()>(target, decoded_call_data.endpoint_name)
