@@ -9,7 +9,7 @@ import {
   getOperatorsHash,
   MULTISIG_PROVER_PUB_KEY_1,
   MULTISIG_PROVER_PUB_KEY_2,
-} from './helpers';
+} from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -50,15 +50,15 @@ const deployContract = async () => {
 const getHashAndProof = () => {
   const signature = generateSignature(Buffer.from('hash'));
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
-    e.List(e.Bytes(signature)),
+    e.List(e.TopBuffer(signature)),
   );
 
   const hash = generateMessageHash(Buffer.from('hash'));
 
-  return { hash: e.Bytes(hash), data };
+  return { hash: e.TopBuffer(hash), data };
 };
 
 test('Validate proof no epoch', async () => {
@@ -85,7 +85,7 @@ test('Validate proof old epoch', async () => {
     ...await contract.getAccount(),
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(17)),
     ],
@@ -107,7 +107,7 @@ test('Validate proof old epoch', async () => {
   assertAccount(pairs, {
     balance: 0,
     allKvs: [
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(17)),
     ],
@@ -122,7 +122,7 @@ test('Validate proof wrong operators weight', async () => {
     ...await contract.getAccount(),
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -130,10 +130,10 @@ test('Validate proof wrong operators weight', async () => {
 
   const signature = generateSignature(Buffer.from('wrongHash'));
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(9)), // Wrong weight here
     e.U(10),
-    e.List(e.Bytes(signature)),
+    e.List(e.TopBuffer(signature)),
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -142,7 +142,7 @@ test('Validate proof wrong operators weight', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateProof',
     funcArgs: [
-      e.Bytes(hash),
+      e.TopBuffer(hash),
       data,
     ],
   }).assertFail({ code: 4, message: 'Invalid operators' });
@@ -151,7 +151,7 @@ test('Validate proof wrong operators weight', async () => {
   assertAccount(pairs, {
     balance: 0,
     allKvs: [
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -166,7 +166,7 @@ test('Validate proof invalid signature', async () => {
     ...await contract.getAccount(),
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -174,10 +174,10 @@ test('Validate proof invalid signature', async () => {
 
   const signature = generateSignature(Buffer.from('wrongHash'));
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10)),
     e.U(10),
-    e.List(e.Bytes(signature)),
+    e.List(e.TopBuffer(signature)),
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -186,7 +186,7 @@ test('Validate proof invalid signature', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateProof',
     funcArgs: [
-      e.Bytes(hash),
+      e.TopBuffer(hash),
       data,
     ],
   }).assertFail({ code: 10, message: 'invalid signature' });
@@ -195,7 +195,7 @@ test('Validate proof invalid signature', async () => {
   assertAccount(pairs, {
     balance: 0,
     allKvs: [
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -210,7 +210,7 @@ test('Validate proof operators repeat', async () => {
     ...await contract.getAccount(),
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -218,10 +218,10 @@ test('Validate proof operators repeat', async () => {
 
   const signature = generateSignature(Buffer.from('hash'));
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY), e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(20),
-    e.List(e.Bytes(signature), e.Bytes(signature)),
+    e.List(e.TopBuffer(signature), e.TopBuffer(signature)),
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -230,7 +230,7 @@ test('Validate proof operators repeat', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateProof',
     funcArgs: [
-      e.Bytes(hash),
+      e.TopBuffer(hash),
       data,
     ],
   }).assertFail({ code: 4, message: 'Malformed signers' });
@@ -239,7 +239,7 @@ test('Validate proof operators repeat', async () => {
   assertAccount(pairs, {
     balance: 0,
     allKvs: [
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -254,7 +254,7 @@ test('Validate proof low signatures weight', async () => {
     ...await contract.getAccount(),
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -262,10 +262,10 @@ test('Validate proof low signatures weight', async () => {
 
   const signature = generateSignature(Buffer.from('hash'));
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY)),
     e.List(e.U(9)),
     e.U(10),
-    e.List(e.Bytes(signature)),
+    e.List(e.TopBuffer(signature)),
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -274,7 +274,7 @@ test('Validate proof low signatures weight', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateProof',
     funcArgs: [
-      e.Bytes(hash),
+      e.TopBuffer(hash),
       data,
     ],
   }).assertFail({ code: 4, message: 'Low signatures weight' });
@@ -283,7 +283,7 @@ test('Validate proof low signatures weight', async () => {
   assertAccount(pairs, {
     balance: 0,
     allKvs: [
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -298,7 +298,7 @@ test('Validate proof only first operator checked', async () => {
     ...await contract.getAccount(),
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(1)),
     ],
@@ -306,10 +306,10 @@ test('Validate proof only first operator checked', async () => {
 
   const signature = generateSignature(Buffer.from('hash'));
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY), e.TopBuffer(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(10),
-    e.List(e.Bytes(signature), e.Bytes(signature)), // wrong signature for bob will not be checked
+    e.List(e.TopBuffer(signature), e.TopBuffer(signature)), // wrong signature for bob will not be checked
   );
   const hash = generateMessageHash(Buffer.from('hash'));
 
@@ -318,7 +318,7 @@ test('Validate proof only first operator checked', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateProof',
     funcArgs: [
-      e.Bytes(hash),
+      e.TopBuffer(hash),
       data,
     ],
   });
@@ -328,7 +328,7 @@ test('Validate proof only first operator checked', async () => {
   assertAccount(pairs, {
     balance: 0,
     allKvs: [
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(1)),
     ],
@@ -343,7 +343,7 @@ test('Validate proof', async () => {
     ...await contract.getAccount(),
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -353,10 +353,10 @@ test('Validate proof', async () => {
   const signature = generateSignature(signatureData);
   const signatureBob = generateSignature(signatureData, './bob.pem');
   const data = e.Tuple(
-    e.List(e.Bytes(ALICE_PUB_KEY), e.Bytes(BOB_PUB_KEY)),
+    e.List(e.TopBuffer(ALICE_PUB_KEY), e.TopBuffer(BOB_PUB_KEY)),
     e.List(e.U(10), e.U(10)),
     e.U(20),
-    e.List(e.Bytes(signature), e.Bytes(signatureBob)),
+    e.List(e.TopBuffer(signature), e.TopBuffer(signatureBob)),
   );
   const hash = generateMessageHash(signatureData);
 
@@ -365,7 +365,7 @@ test('Validate proof', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateProof',
     funcArgs: [
-      e.Bytes(hash),
+      e.TopBuffer(hash),
       data,
     ],
   });
@@ -375,7 +375,7 @@ test('Validate proof', async () => {
   assertAccount(pairs, {
     balance: 0,
     allKvs: [
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -390,7 +390,7 @@ test('Validate proof with multisig prover encoded proof', async () => {
     ...await contract.getAccount(),
     kvs: [
       // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.Bytes(operatorsHash)).Value(e.U64(1)),
+      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
 
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
@@ -419,8 +419,8 @@ test('Validate proof with multisig prover encoded proof', async () => {
     gasLimit: 10_000_000,
     funcName: 'validateProof',
     funcArgs: [
-      e.Bytes(messageHash),
-      e.Bytes(data),
+      e.TopBuffer(messageHash),
+      e.TopBuffer(data)
     ],
   }).assertFail({ code: 10, message: 'invalid signature' });
 });

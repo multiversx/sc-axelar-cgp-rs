@@ -23,6 +23,7 @@ pub trait GasService: events::Events {
     #[endpoint(payGasForContractCall)]
     fn pay_gas_for_contract_call(
         &self,
+        sender: ManagedAddress,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         payload: ManagedBuffer,
@@ -32,7 +33,6 @@ pub trait GasService: events::Events {
 
         require!(gas_fee_amount > 0, "Nothing received");
 
-        let sender = self.blockchain().get_caller();
         let hash = self.crypto().keccak256(&payload);
 
         self.gas_paid_for_contract_call_event(
@@ -52,6 +52,7 @@ pub trait GasService: events::Events {
     #[endpoint(payNativeGasForContractCall)]
     fn pay_native_gas_for_contract_call(
         &self,
+        sender: ManagedAddress,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         payload: ManagedBuffer,
@@ -61,7 +62,6 @@ pub trait GasService: events::Events {
 
         require!(value > 0, "Nothing received");
 
-        let sender = self.blockchain().get_caller();
         let hash = self.crypto().keccak256(&payload);
 
         self.native_gas_paid_for_contract_call_event(
@@ -80,6 +80,7 @@ pub trait GasService: events::Events {
     #[endpoint(payGasForExpressCall)]
     fn pay_gas_for_express_call(
         &self,
+        sender: ManagedAddress,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         payload: ManagedBuffer,
@@ -89,7 +90,6 @@ pub trait GasService: events::Events {
 
         require!(gas_fee_amount > 0, "Nothing received");
 
-        let sender = self.blockchain().get_caller();
         let hash = self.crypto().keccak256(&payload);
 
         self.gas_paid_for_express_call(
@@ -109,6 +109,7 @@ pub trait GasService: events::Events {
     #[endpoint(payNativeGasForExpressCall)]
     fn pay_native_gas_for_express_call(
         &self,
+        sender: ManagedAddress,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         payload: ManagedBuffer,
@@ -118,7 +119,6 @@ pub trait GasService: events::Events {
 
         require!(value > 0, "Nothing received");
 
-        let sender = self.blockchain().get_caller();
         let hash = self.crypto().keccak256(&payload);
 
         self.native_gas_paid_for_express_call(

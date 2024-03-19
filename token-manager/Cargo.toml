@@ -1,0 +1,18 @@
+[package]
+name = "token-manager"
+version = "0.0.0"
+authors = [ "you",]
+edition = "2018"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies.multiversx-sc]
+version = "0.47.7"
+
+[dependencies.operatable]
+path = "../modules/operatable"
+
+[dev-dependencies.multiversx-sc-scenario]
+version = "0.47.7"

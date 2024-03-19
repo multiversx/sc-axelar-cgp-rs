@@ -1,38 +1,37 @@
 # MultiversX Auth Smart Contract
 
-The Auth contract acts like a form of multi sig, making sure that a required number of Axelar network validators approved
+The Auth contract acts like a form of multi sig, making sure that a required number of Axelar Network Validators approved
 a cross-chain command that is about to be executed in a transaction call to the **execute** endpoint of the [Gateway Contract](../gateway).
+
+It is based on the reference [CGP Axelar Auth implementation in Solidity](https://github.com/axelarnetwork/axelar-cgp-solidity/blob/main/contracts/auth/AxelarAuthWeighted.sol)
 
 Internally, the validators are called operators, and they have an associated **weight** to them.
 There is also a **threshold** weight set to make sure that commands are valid only if signed by a minimum number of validators for which their combined weights exceed this threshold.
 
-A hash of the operators, their weights and the threshold is then stored in the contract at a specific internal **epoch** (note: this has nothing to do with the MultiversX epoch).
+A hash of the operators, their weights and the threshold is then stored in the contract at a specific internal **epoch** (note: this has **nothing** to do with the MultiversX epoch).
 The epoch is just an incrementing id that is modified whenever the set of operators changes.
 
 The contract provides 2 endpoints:
-- **validateProof** (message_hash, proof_data) - used to validate that the message that is about to be executed by the Gateway contract above was signed by at least the minimum number of validators depending on their weights and thresholds
-- **transferOperatorship** (transfer_data) - can only be called by the contract owner, which will be the Gateway contract (more details below); used to add new operators with their associated weights and threshold whenever the validators on the Axelar network are changed
+- **validateProof** (message_hash, proof_data) - used to validate that the message that is about to be executed by the Gateway contract above was signed by at least the minimum number of validators depending on their weights and the configured threshold
+- **transferOperatorship** (transfer_data) - can only be called by the contract owner, which will be the Gateway contract (more details below); used to add new operators with their associated weights and threshold whenever the validators on the Axelar Network are changed
 
 ## Deployment of Auth contract
 When the contract is first deployed, multiple sets of recent operators with their associated weights and thresholds need to be sent:
 ```rust
 #[init]
-fn init(&self, recent_operators: MultiValueEncoded<TransferData<Self::Api>>) {
-    for operator in recent_operators.into_iter() {
-        self.transfer_operatorship(operator);
-    }
-}
+fn init(&self, recent_operators: MultiValueEncoded<TransferData<Self::Api>>);
 ```
 
 This **TransferData** struct has the following fields:
 ```rust
 #[derive(TypeAbi, TopDecode, TopEncode, Debug)]
 pub struct TransferData<M: ManagedTypeApi> {
-    pub new_operators: ManagedVec<M, ManagedAddress<M>>,
+    pub new_operators: ManagedVec<M, Operator<M>>,
     pub new_weights: ManagedVec<M, BigUint<M>>,
     pub new_threshold: BigUint<M>,
 }
 ```
+Where **Operator** is an ed25519 public key: `pub type Operator<M> = ManagedByteArray<M, ED25519_KEY_BYTE_LEN>;`
 
 The operators hash will then be computed and set in storage for the current epoch (starts at 1), which will then be incremented.
 
@@ -47,14 +46,14 @@ fn validate_proof(
     &self,
     message_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     proof_data: ProofData<Self::Api>,
-) -> bool
+) -> bool;
 ```
 
 The **ProofData** struct has the following fields:
 ```rust
 #[derive(TypeAbi, TopDecode, Debug)]
 pub struct ProofData<M: ManagedTypeApi> {
-    pub operators: ManagedVec<M, ManagedAddress<M>>,
+    pub operators: ManagedVec<M, Operator<M>>,
     pub weights: ManagedVec<M, BigUint<M>>,
     pub threshold: BigUint<M>,
     pub signatures: ManagedVec<M, ManagedByteArray<M, ED25519_SIGNATURE_BYTE_LEN>>,
@@ -71,4 +70,5 @@ The endpoint also returns a **bool**, which is true if the epoch found for the p
 
 ## Transfer operatorship
 The **transferOperatorship** endpoint can only be called by the owner of the Auth contract, which should be the Gateway contract.
+
 This will add a new set of operators and increment the current epoch. It is the same operation that is also called when deploying the Auth contract and has the same **TransferData** struct as a parameter.
