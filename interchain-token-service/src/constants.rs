@@ -192,7 +192,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployTokenManagerPayload<M> {
             &[
                 ParamType::Uint256,
                 ParamType::Bytes32,
-                ParamType::Uint8, // TODO: Change implementationType to Uint256?
+                ParamType::Uint8,
                 ParamType::Bytes,
             ],
             &payload,

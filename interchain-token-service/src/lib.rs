@@ -215,7 +215,8 @@ pub trait InterchainTokenServiceContract:
         self.only_remote_service(&source_chain, &source_address);
         self.require_not_paused();
 
-        // TODO: Is this decoding fine? Since on EVM this structure is slightly different for some reason
+        // Using the same struct as in the `expressExecute` endpoint for consistency,
+        // even though in the Solidity implementation this decoding is slightly different
         let interchain_transfer_payload = InterchainTransferPayload::abi_decode(payload);
 
         require!(

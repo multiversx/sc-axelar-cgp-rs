@@ -4,13 +4,15 @@ The gas service contract is responsible for handling cross-chain gas payments.
 Before a cross-chain call is made (before the Gateway contract **callContract** endpoint is called), the cross-chain gas should
 be paid using one of the endpoints of this contract.
 
-The endpoints in this contract emit events which will later be catched by Relayers and forwarded to Validators (TBD)
+The endpoints in this contract emit events which will later be caught by Relayers, which will forward the call cross-chain only if the necessary gas amount was paid.
+
+It is based on the reference [CGP Axelar Gas Service implementation in Solidity](https://github.com/axelarnetwork/axelar-cgp-solidity/blob/main/contracts/gas-service/AxelarGasService.sol)
 
 ## Important endpoints
 
 The most used endpoints are:
-- **payGasForContractCall** (destination_chain, destination_address, payload, refund_address) - accepts ESDT payment
-- **payNativeGasForContractCall** (destination_chain, destination_address, payload, refund_address) - accepts EGLD payment
+- **payGasForContractCall** (sender, destination_chain, destination_address, payload, refund_address) - accepts ESDT payment
+- **payNativeGasForContractCall** (sender, destination_chain, destination_address, payload, refund_address) - accepts EGLD payment
 
 These endpoints look like this:
 ```rust
@@ -18,11 +20,12 @@ These endpoints look like this:
 #[endpoint(payGasForContractCall)]
 fn pay_gas_for_contract_call(
     &self,
+    sender: ManagedAddress,
     destination_chain: ManagedBuffer,
     destination_address: ManagedBuffer,
     payload: ManagedBuffer,
     refund_address: ManagedAddress,
-)
+);
 ```
 
 It will emit a **gas_paid_for_contract_call_event**:
@@ -54,6 +57,7 @@ The endpoint for paying gas with native token (EGLD) is similar:
 #[endpoint(payNativeGasForContractCall)]
 fn pay_native_gas_for_contract_call(
     &self,
+    sender: ManagedAddress,
     destination_chain: ManagedBuffer,
     destination_address: ManagedBuffer,
     payload: ManagedBuffer,

@@ -133,7 +133,10 @@ impl<M: ManagedTypeApi> Token<M> {
     fn pad_biguint(value: &BigUint<M>) -> Word {
         let bytes = value.to_bytes_be_buffer();
 
-        // TODO: How to better handle this?
+        // EVM only supports 32 bytes long (uint256) numbers, so we need this check here to
+        // ensure compatibility. Most tokens on MultiversX have 18 decimal, the same as on EVM,
+        // so this shouldn't cause any issues, only with extreme outlier tokens that have an
+        // unfathomably large supply
         if bytes.len() > 32 {
             panic!("Unsupported number size");
         }

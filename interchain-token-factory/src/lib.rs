@@ -146,7 +146,8 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
                 "Not minter"
             );
 
-            // TODO: Here the MultiversX address is used as the destination chain address which doesn't seem right...
+            // The MultiversX address is used here as destination address, which means that this
+            // token can only be managed by this address from MultiversX network
             minter_raw = minter.as_managed_buffer();
         }
 

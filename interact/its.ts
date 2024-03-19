@@ -123,14 +123,23 @@ export const setupITSCommands = (program: Command) => {
   program.command('upgradeIts').action(async () => {
     const wallet = await loadWallet();
 
-    const result = await wallet.upgradeContract({
+    let result = await wallet.upgradeContract({
       callee: envChain.select(data.addressIts),
       code: data.codeIts,
       codeMetadata: ['upgradeable'],
       gasLimit: 300_000_000,
       codeArgs: [],
     });
-    console.log('Result:', result);
+    console.log('Result ITS:', result);
+
+    result = await wallet.upgradeContract({
+      callee: envChain.select(data.addressInterchainTokenFactory),
+      code: data.codeInterchainTokenFactory,
+      codeMetadata: ['upgradeable'],
+      gasLimit: 300_000_000,
+      codeArgs: [],
+    });
+    console.log('Result Interchain Token Factory:', result);
   });
 
   program.command('upgradeBaseTokenManager').action(async () => {

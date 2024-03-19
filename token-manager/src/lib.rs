@@ -70,6 +70,7 @@ pub trait TokenManagerLockUnlockContract:
         }
     }
 
+    // Upgrade endpoint needed because this is called when ITS deploys this contract from source
     #[upgrade]
     fn upgrade(
         &self,
