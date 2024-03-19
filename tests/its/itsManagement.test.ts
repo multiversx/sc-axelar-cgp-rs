@@ -255,7 +255,7 @@ describe('Operatorship', () => {
     await user.callContract({
       callee: its,
       funcName: 'proposeOperatorship',
-      gasLimit: 5_000_000,
+      gasLimit: 10_000_000,
       funcArgs: [
         user,
       ],
@@ -264,7 +264,7 @@ describe('Operatorship', () => {
     await deployer.callContract({
       callee: its,
       funcName: 'proposeOperatorship',
-      gasLimit: 5_000_000,
+      gasLimit: 10_000_000,
       funcArgs: [
         user,
       ],
@@ -284,7 +284,7 @@ describe('Operatorship', () => {
     await user.callContract({
       callee: its,
       funcName: 'proposeOperatorship',
-      gasLimit: 5_000_000,
+      gasLimit: 10_000_000,
       funcArgs: [
         user,
       ],
@@ -294,7 +294,7 @@ describe('Operatorship', () => {
     await deployer.callContract({
       callee: its,
       funcName: 'proposeOperatorship',
-      gasLimit: 5_000_000,
+      gasLimit: 10_000_000,
       funcArgs: [
         otherUser,
       ],

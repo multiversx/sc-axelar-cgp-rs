@@ -4,10 +4,11 @@ use token_manager::constants::TokenManagerType;
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, Metadata,
-    MetadataVersion, TokenId, LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    MetadataVersion, TokenId, TransferAndGasTokens, LATEST_METADATA_VERSION,
+    MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+    MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
-use crate::{address_tracker, events, express_executor_tracker, proxy};
+use crate::{address_tracker, events, express_executor_tracker, proxy_cgp, proxy_its};
 
 multiversx_sc::imports!();
 
@@ -16,16 +17,18 @@ pub trait RemoteModule:
     express_executor_tracker::ExpressExecutorTracker
     + multiversx_sc_modules::pause::PauseModule
     + events::EventsModule
-    + proxy::ProxyModule
+    + proxy_cgp::ProxyCgpModule
+    + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
     fn deploy_remote_token_manager(
         &self,
         token_id: &TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
-        gas_value: &BigUint,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
+        gas_token: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
     ) {
         let _ = self.valid_token_manager_address(token_id);
 
@@ -42,6 +45,7 @@ pub trait RemoteModule:
             &destination_chain,
             &payload,
             MetadataVersion::ContractCall,
+            gas_token,
             gas_value,
         );
 
@@ -61,7 +65,8 @@ pub trait RemoteModule:
         decimals: u8,
         minter: ManagedBuffer,
         destination_chain: ManagedBuffer,
-        gas_value: &BigUint,
+        gas_token: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
     ) {
         self.valid_token_manager_address(token_id);
 
@@ -80,6 +85,7 @@ pub trait RemoteModule:
             &destination_chain,
             &payload,
             MetadataVersion::ContractCall,
+            gas_token,
             gas_value,
         );
 
@@ -99,10 +105,9 @@ pub trait RemoteModule:
         source_address: ManagedAddress,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
-        amount: BigUint,
+        transfer_and_gas_tokens: TransferAndGasTokens<Self::Api>,
         metadata_version: MetadataVersion,
         data: ManagedBuffer,
-        _gas_value: BigUint, // TODO: Handle gas
     ) {
         let data_hash = if data.is_empty() {
             ManagedByteArray::from(&[0; KECCAK256_RESULT_LEN])
@@ -115,18 +120,18 @@ pub trait RemoteModule:
             token_id: token_id.clone(),
             source_address: source_address.as_managed_buffer().clone(),
             destination_address: destination_address.clone(),
-            amount: amount.clone(),
+            amount: transfer_and_gas_tokens.transfer_amount.clone(),
             data,
         };
 
         let payload = payload.abi_encode();
 
-        // TODO: What gas value should we use here? Since we can not have both EGLD and ESDT payment in the same contract call
         self.call_contract(
             &destination_chain,
             &payload,
             metadata_version,
-            &BigUint::zero(),
+            transfer_and_gas_tokens.gas_token,
+            transfer_and_gas_tokens.gas_amount,
         );
 
         self.emit_interchain_transfer_event(
@@ -134,7 +139,7 @@ pub trait RemoteModule:
             source_address,
             destination_chain,
             destination_address,
-            amount,
+            transfer_and_gas_tokens.transfer_amount,
             data_hash,
         );
     }

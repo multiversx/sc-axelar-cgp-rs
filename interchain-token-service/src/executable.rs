@@ -9,7 +9,7 @@ use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, TokenId,
 };
-use crate::{address_tracker, events, express_executor_tracker, proxy};
+use crate::{address_tracker, events, express_executor_tracker, proxy_cgp, proxy_its};
 
 multiversx_sc::imports!();
 
@@ -18,7 +18,8 @@ pub trait ExecutableModule:
     express_executor_tracker::ExpressExecutorTracker
     + multiversx_sc_modules::pause::PauseModule
     + events::EventsModule
-    + proxy::ProxyModule
+    + proxy_cgp::ProxyCgpModule
+    + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
     fn process_interchain_transfer_payload(
@@ -185,7 +186,7 @@ pub trait ExecutableModule:
         arguments.push_arg(self.blockchain().get_sc_address());
         arguments.push_arg(token_manager_type);
         arguments.push_arg(token_id);
-        arguments.push_arg(params.clone()); // TODO: Try to do this without clone
+        arguments.push_arg(&params);
 
         let (address, _) = self.send_raw().deploy_from_source_contract(
             self.blockchain().get_gas_left(),
@@ -209,7 +210,6 @@ pub trait ExecutableModule:
         address
     }
 
-    // TODO:
     #[view(tokenManagerImplementation)]
     #[storage_mapper("token_manager")]
     fn token_manager(&self) -> SingleValueMapper<ManagedAddress>;

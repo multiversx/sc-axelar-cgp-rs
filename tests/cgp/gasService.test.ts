@@ -61,6 +61,7 @@ test('Pay gas for contract call no esdts', async () => {
     gasLimit: 10_000_000,
     funcName: 'payGasForContractCall',
     funcArgs: [
+      deployer,
       e.Str('ethereum'),
       e.Str('mockAddress'),
       e.Str('payload'),
@@ -85,6 +86,7 @@ test('Pay gas for contract call', async () => {
     gasLimit: 10_000_000,
     funcName: 'payGasForContractCall',
     funcArgs: [
+      deployer,
       e.Str('ethereum'),
       e.Str('mockAddress'),
       e.Str('payload'),
@@ -119,6 +121,7 @@ test('Pay native gas for contract call no value', async () => {
     gasLimit: 10_000_000,
     funcName: 'payNativeGasForContractCall',
     funcArgs: [
+      deployer,
       e.Str('ethereum'),
       e.Str('mockAddress'),
       e.Str('payload'),
@@ -143,6 +146,7 @@ test('Pay native gas for contract call', async () => {
     gasLimit: 10_000_000,
     funcName: 'payNativeGasForContractCall',
     funcArgs: [
+      deployer,
       e.Str('ethereum'),
       e.Str('mockAddress'),
       e.Str('payload'),
@@ -168,6 +172,7 @@ test('Pay gas for express contract call no esdts', async () => {
     gasLimit: 10_000_000,
     funcName: 'payGasForExpressCall',
     funcArgs: [
+      deployer,
       e.Str('ethereum'),
       e.Str('mockAddress'),
       e.Str('payload'),
@@ -192,6 +197,7 @@ test('Pay gas for express contract call', async () => {
     gasLimit: 10_000_000,
     funcName: 'payGasForExpressCall',
     funcArgs: [
+      deployer,
       e.Str('ethereum'),
       e.Str('mockAddress'),
       e.Str('payload'),
@@ -226,6 +232,7 @@ test('Pay native gas for express contract call no value', async () => {
     gasLimit: 10_000_000,
     funcName: 'payNativeGasForExpressCall',
     funcArgs: [
+      deployer,
       e.Str('ethereum'),
       e.Str('mockAddress'),
       e.Str('payload'),
@@ -250,6 +257,7 @@ test('Pay native gas for express contract call', async () => {
     gasLimit: 10_000_000,
     funcName: 'payNativeGasForExpressCall',
     funcArgs: [
+      deployer,
       e.Str('ethereum'),
       e.Str('mockAddress'),
       e.Str('payload'),

@@ -78,35 +78,42 @@ program.command('deploy').action(async () => {
   });
   console.log('Result Change Owner:', resultChangeOwner);
 
-  // Deploy gas receiver
-  const resultGasReceiver = await wallet.deployContract({
-    code: data.codeGasReceiver,
+  // Deploy gas service
+  const resultGasService = await wallet.deployContract({
+    code: data.codeGasService,
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
       e.Addr(envChain.select(data.gasCollector)),
     ],
   });
-  console.log('Result Gas Receiver:', resultGasReceiver);
+  console.log('Result Gas Service:', resultGasService);
 
   console.log('Deployed Auth Contract:', resultAuth.address);
   console.log('Deployed Gateway Contract:', resultGateway.address);
-  console.log('Deployed Gas Receiver Contract:', resultGasReceiver.address);
+  console.log('Deployed Gas Service Contract:', resultGasService.address);
 });
 
 program.command('upgrade').action(async () => {
   const wallet = await loadWallet();
-  const result = await wallet.upgradeContract({
+
+  let result = await wallet.upgradeContract({
+    callee: envChain.select(data.addressGasService),
+    code: data.codeGasService,
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [],
+  });
+  console.log('Result Gas Service:', result);
+
+  result = await wallet.upgradeContract({
     callee: envChain.select(data.addressGateway),
     code: data.codeGateway,
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
-    codeArgs: [
-      envChain.select(data.addressAuth),
-      e.Str(envChain.select(data.chainId)),
-    ],
+    codeArgs: [],
   });
-  console.log('Result:', result);
+  console.log('Result Gateway:', result);
 });
 
 program.command('ClaimDeveloperRewards').action(async () => {

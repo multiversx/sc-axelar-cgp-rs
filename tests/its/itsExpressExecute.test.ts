@@ -261,17 +261,14 @@ test('Express execute with data error', async () => {
   });
 
   // Assert express execute hash NOT set
-  const kvs = await its.getAccountWithKvs();
-  assertAccount(kvs, {
-    // balance: 0n,
+  assertAccount(await its.getAccountWithKvs(), {
+    balance: 0n,
     allKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
     ],
   });
-
   // Assert ping pong was NOT called
-  const pingPongKvs = await pingPong.getAccountWithKvs();
-  assertAccount(pingPongKvs, {
+  assertAccount(await pingPong.getAccountWithKvs(), {
     balance: 0,
     allKvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
@@ -281,10 +278,8 @@ test('Express execute with data error', async () => {
       e.kvs.Mapper('maxFunds').Value(e.Option(null)),
     ],
   });
-
   // Assert user still has initial balance
-  const userKvs = await user.getAccountWithKvs();
-  assertAccount(userKvs, {
+  assertAccount(await user.getAccountWithKvs(), {
     balance: BigInt('10000000000000000'),
   });
 });
