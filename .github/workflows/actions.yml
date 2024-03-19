@@ -54,7 +54,7 @@ jobs:
 
           cargo install twiggy
           
-          cargo install multiversx-sc-meta
+          cargo install multiversx-sc-meta --locked
           
           which wasm-opt
           which wasm2wat

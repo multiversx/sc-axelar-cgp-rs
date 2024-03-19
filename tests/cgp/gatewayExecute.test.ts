@@ -13,7 +13,8 @@ import {
   MULTISIG_PROVER_PUB_KEY_1,
   MULTISIG_PROVER_PUB_KEY_2,
   PAYLOAD_HASH,
-  TOKEN_ID
+  TOKEN_ID,
+  getKeccak256Hash,
 } from '../helpers';
 
 let world: SWorld;
@@ -88,10 +89,6 @@ const deployContract = async () => {
       e.kvs.Mapper('current_epoch').Value(e.U64(16)),
     ],
   });
-};
-
-const getKeccak256Hash = (payload: string = 'commandId') => {
-  return createKeccakHash('keccak256').update(Buffer.from(payload)).digest('hex');
 };
 
 test('Execute could not decode', async () => {

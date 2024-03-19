@@ -99,6 +99,6 @@ export const generateProof = (data: Encodable | Buffer): Encodable => {
   );
 };
 
-export const getCommandId = (commandId: string = 'commandId') => {
-  return createKeccakHash('keccak256').update(Buffer.from(commandId)).digest('hex');
+export const getKeccak256Hash = (payload: string = 'commandId') => {
+  return createKeccakHash('keccak256').update(Buffer.from(payload)).digest('hex');
 };
