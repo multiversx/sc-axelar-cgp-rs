@@ -397,10 +397,13 @@ describe('Give token lock unlock', () => {
     const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
 
     // Ensure token manager has tokens
-    await user.transfer({
-      receiver: tokenManager,
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-      gasLimit: 5_000_000,
+    await tokenManager.setAccount({
+      ...await tokenManager.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ]
     });
 
     await user.callContract({
@@ -436,10 +439,13 @@ describe('Give token lock unlock', () => {
     const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
 
     // Ensure token manager has tokens
-    await user.transfer({
-      receiver: tokenManager,
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-      gasLimit: 5_000_000,
+    await tokenManager.setAccount({
+      ...await tokenManager.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ]
     });
 
     // Set flow limit

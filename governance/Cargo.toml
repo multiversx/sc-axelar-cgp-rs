@@ -9,7 +9,7 @@ publish = false
 path = "src/lib.rs"
 
 [dependencies.multiversx-sc]
-version = "0.47.7"
+version = "0.50.0"
 
 [dependencies.gateway]
 path = "../gateway"

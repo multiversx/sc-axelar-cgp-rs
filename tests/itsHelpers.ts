@@ -17,6 +17,7 @@ import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { Kvs } from 'xsuite/dist/data/kvs';
 import { Encodable } from 'xsuite';
+import { EncodableKvs } from 'xsuite/dist/data/encoding';
 
 export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
 
@@ -157,7 +158,7 @@ export const deployTokenManagerLockUnlock = async (
   operator: SWallet = deployer,
   tokenId: string = TOKEN_ID,
   interchainTokenId: string = INTERCHAIN_TOKEN_ID,
-): Promise<Kvs> => {
+): Promise<EncodableKvs> => {
   ({ contract: tokenManager, address } = await deployer.deployContract({
     code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
@@ -186,7 +187,7 @@ export const deployTokenManagerLockUnlock = async (
   const kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: baseKvs,
+    kvs: baseKvs,
   });
 
   return baseKvs;
