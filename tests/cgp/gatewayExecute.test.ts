@@ -4,12 +4,12 @@ import createKeccakHash from 'keccak';
 import {
   ALICE_PUB_KEY,
   BOB_PUB_KEY,
-  CHAIN_ID,
+  DOMAIN_SEPARATOR,
   COMMAND_ID,
   generateMessageHash,
   generateProof,
   generateSignature,
-  getOperatorsHash,
+  getSignersHash,
   MULTISIG_PROVER_PUB_KEY_1,
   MULTISIG_PROVER_PUB_KEY_2,
   PAYLOAD_HASH,
@@ -62,7 +62,7 @@ const deployContract = async () => {
     gasLimit: 100_000_000,
     codeArgs: [
       e.Addr(addressAuth),
-      e.Str(CHAIN_ID),
+      e.Str(DOMAIN_SEPARATOR),
     ],
   }));
 
@@ -71,12 +71,12 @@ const deployContract = async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
     ],
   });
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
-  const operatorsHashCanTransfer = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHashCanTransfer = getSignersHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
   // Set gateway contract as owner of auth contract for transfer operatorship
   await contractAuth.setAccount({
     ...await contractAuth.getAccount(),
@@ -130,7 +130,7 @@ test('Execute invalid commands', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('deployToken'), e.Str('mintToken')),
     e.List(),
@@ -165,7 +165,7 @@ test('Execute invalid proof', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('approveContractCall')),
     e.List(e.Buffer('')),
@@ -196,7 +196,7 @@ test('Execute command already executed', async () => {
   const commandId = getKeccak256Hash();
 
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(e.TopBuffer(commandId)),
     e.List(e.Str('deployToken')),
     e.List(
@@ -220,7 +220,7 @@ test('Execute command already executed', async () => {
     owner: address,
     kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(0)),
     ],
@@ -240,7 +240,7 @@ test('Execute command already executed', async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(0)),
     ],
@@ -251,7 +251,7 @@ test('Execute approve contract call could not decode', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('approveContractCall')),
     e.List(e.Buffer('')),
@@ -273,7 +273,7 @@ test('Execute approve contract call', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('approveContractCall')),
     e.List(
@@ -317,7 +317,7 @@ test('Execute approve contract call', async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       e.kvs.Mapper('command_executed', e.TopBuffer(commandIdHash)).Value(e.U8(1)),
 
@@ -330,7 +330,7 @@ test('Execute transfer operatorship old proof', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(e.TopBuffer(COMMAND_ID), e.TopBuffer(getKeccak256Hash('commandIdInvalid'))),
     e.List(e.Str('transferOperatorship'), e.Str('transferOperatorship')),
     e.List(
@@ -355,7 +355,7 @@ test('Execute transfer operatorship old proof', async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID))
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR))
     ],
   });
 });
@@ -365,7 +365,7 @@ test('Execute transfer operatorship', async () => {
 
   // Second transferOperatorship command will be ignored
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(e.TopBuffer(COMMAND_ID), e.TopBuffer(getKeccak256Hash('commandId2'))),
     e.List(e.Str('transferOperatorship'), e.Str('transferOperatorship')),
     e.List(
@@ -412,15 +412,15 @@ test('Execute transfer operatorship', async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       e.kvs.Mapper('command_executed', e.TopBuffer(commandIdHash)).Value(e.U8(1)),
     ],
   });
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
-  const operatorsHash2 = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
-  const operatorsHash3 = getOperatorsHash([BOB_PUB_KEY], [2], 2);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash2 = getSignersHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
+  const operatorsHash3 = getSignersHash([BOB_PUB_KEY], [2], 2);
 
   // Check that Auth contract was updated
   kvs = await contractAuth.getAccountWithKvs();
@@ -439,7 +439,7 @@ test('Execute transfer operatorship', async () => {
 
   // Using old operators to generate proof will not work anymore
   const dataOther = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(e.TopBuffer(COMMAND_ID)),
     e.List(e.Str('approveContractCall')),
     e.List(e.Buffer('')),
@@ -461,7 +461,7 @@ test('Execute multiple commands', async () => {
   await deployContract();
 
   const data = e.Tuple(
-    e.Str(CHAIN_ID),
+    e.Str(DOMAIN_SEPARATOR),
     e.List(
       e.TopBuffer(COMMAND_ID),
       e.TopBuffer(getKeccak256Hash('commandIdInvalid')),
@@ -529,7 +529,7 @@ test('Execute multiple commands', async () => {
     balance: 0,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       e.kvs.Mapper('command_executed', e.TopBuffer(commandIdHash)).Value(e.U8(1)),
       e.kvs.Mapper('command_executed', e.TopBuffer(commandId3Hash)).Value(e.U8(1)),
@@ -588,7 +588,7 @@ test('Execute approve contract call with multisig prover encoded data', async ()
     balance: 0,
     hasKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(1)),
 
@@ -641,15 +641,15 @@ test('Execute transfer operatorship with multisig prover encoded data', async ()
     balance: 0,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(1)),
     ],
   });
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
-  const operatorsHash2 = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
-  const operatorsHash3 = getOperatorsHash([MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2], [10, 10], 20);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash2 = getSignersHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
+  const operatorsHash3 = getSignersHash([MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2], [10, 10], 20);
 
   // Check that Auth contract was updated
   kvs = await contractAuth.getAccountWithKvs();
@@ -687,7 +687,7 @@ test('View functions', async () => {
     codeMetadata: ['payable'],
     kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       e.kvs.Mapper('contract_call_approved', e.TopBuffer(approvedDataHash)).Value(e.U8(1)),
 

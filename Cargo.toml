@@ -2,8 +2,6 @@
 resolver = "2"
 
 members = [
-    "auth",
-    "auth/meta",
     "gas-service",
     "gas-service/meta",
     "gateway",

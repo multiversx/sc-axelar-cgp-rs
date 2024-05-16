@@ -1,33 +1,91 @@
 #![no_std]
 
-use core::ops::Deref;
-
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use crate::constants::*;
-use crate::events::ContractCallData;
 
 multiversx_sc::imports!();
 
+mod auth;
 mod constants;
 mod events;
-mod proxy;
+mod operator;
 
 #[multiversx_sc::contract]
-pub trait Gateway: proxy::ProxyModule + events::Events {
+pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events {
     #[init]
-    fn init(&self, auth_module: &ManagedAddress, chain_id: &ManagedBuffer) {
-        require!(
-            self.blockchain().is_smart_contract(auth_module),
-            "Invalid auth module"
-        );
+    fn init(
+        &self,
+        previous_signers_rotation: BigUint,
+        domain_separator: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        minimum_rotation_delay: u64,
+        operator: ManagedAddress,
+        signers: MultiValueEncoded<WeightedSigners<Self::Api>>,
+    ) {
+        self.previous_signers_retention()
+            .set(previous_signers_rotation);
+        self.domain_separator().set(domain_separator);
+        self.minimum_rotation_delay().set(minimum_rotation_delay);
 
-        self.auth_module().set_if_empty(auth_module);
-        self.chain_id().set_if_empty(chain_id);
+        self.upgrade(operator, signers);
     }
 
     #[upgrade]
-    fn upgrade(&self) {}
+    fn upgrade(
+        &self,
+        operator: ManagedAddress,
+        signers: MultiValueEncoded<WeightedSigners<Self::Api>>,
+    ) {
+        if !operator.is_zero() {
+            self.transfer_operatorship_raw(operator);
+        }
+
+        for signer in signers.into_iter() {
+            self.rotate_signers_raw(signer, false);
+        }
+    }
+
+    /// External Functions
+
+    #[endpoint(approveMessages)]
+    fn approve_messages(&self, messages: ManagedBuffer, proof: Proof<Self::Api>) {
+        let data_hash = self.get_data_hash(CommandType::ApproveMessages, &messages);
+
+        // Decode manually since it is more efficient to do it after we calculate the above hash
+        let messages: ManagedVec<Self::Api, Message<Self::Api>> =
+            ManagedVec::<Self::Api, Message<Self::Api>>::top_decode(messages)
+                .unwrap_or_else(|_| sc_panic!("Could not decode messages"));
+
+        let _ = self.validate_proof(data_hash, proof);
+
+        require!(!messages.is_empty(), "Invalid messages");
+
+        for message in messages.into_iter() {
+            self.approve_message(message);
+        }
+    }
+
+    #[endpoint(rotateSigners)]
+    fn rotate_signers(&self, new_signers: ManagedBuffer, proof: Proof<Self::Api>) {
+        let data_hash = self.get_data_hash(CommandType::RotateSigners, &new_signers);
+
+        // Decode manually since it is more efficient to do it after we calculate the above hash
+        let new_signers: WeightedSigners<Self::Api> =
+            WeightedSigners::<Self::Api>::top_decode(new_signers)
+                .unwrap_or_else(|_| sc_panic!("Could not decode new signers"));
+
+        let enfore_rotation_delay = self.blockchain().get_caller() != self.operator().get();
+        let is_latest_signers = self.validate_proof(data_hash, proof);
+
+        require!(
+            !enfore_rotation_delay || is_latest_signers,
+            "Not latest signers"
+        );
+
+        self.rotate_signers_raw(new_signers, enfore_rotation_delay);
+    }
+
+    /// Public Methods
 
     #[endpoint(callContract)]
     fn call_contract(
@@ -36,158 +94,89 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
         destination_contract_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
-        let caller = self.blockchain().get_caller();
-
         self.contract_call_event(
-            caller,
+            self.blockchain().get_caller(),
             destination_chain,
             destination_contract_address,
-            ContractCallData {
-                hash: self.crypto().keccak256(&payload),
-                payload,
-            },
+            self.crypto().keccak256(&payload),
+            payload,
         );
     }
 
     // Can only be called by the appropriate contract address
-    #[endpoint(validateContractCall)]
-    fn validate_contract_call(
+    #[endpoint(validateMessage)]
+    fn validate_message(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
-        let contract_address = &self.blockchain().get_caller();
+        let command_id = self.message_to_command_id(source_chain, message_id);
 
-        let hash = self.get_is_contract_call_approved_key(
-            command_id,
+        let message_hash = self.message_hash(
             source_chain,
+            message_id,
             source_address,
-            contract_address,
+            &self.blockchain().get_caller(),
             payload_hash,
         );
 
-        let valid = self.contract_call_approved().contains(&hash);
+        let messages_mapper = self.messages(&command_id);
+        let valid = messages_mapper.get() == MessageState::Approved(message_hash);
 
         if valid {
-            self.contract_call_approved().remove(&hash);
+            messages_mapper.set(MessageState::Executed);
 
-            self.contract_call_executed_event(command_id);
+            self.message_executed_event(&command_id, source_chain, message_id);
         }
 
         valid
     }
 
-    // External Functions
-
-    #[endpoint(execute)]
-    fn execute(&self, input: ExecuteInput<Self::Api>) {
-        let message_hash = self.get_message_hash(&input.data);
-
-        let execute_data: ExecuteData<Self::Api> = ExecuteData::<Self::Api>::top_decode(input.data)
-            .unwrap_or_else(|_| sc_panic!("Could not decode execute data"));
-
-        require!(
-            execute_data.chain_id == self.chain_id().get(),
-            "Invalid chain id"
-        );
-
-        let commands_length = execute_data.command_ids.len();
-
-        require!(
-            commands_length == execute_data.commands.len()
-                && commands_length == execute_data.params.len(),
-            "Invalid commands"
-        );
-
-        let mut allow_operatorship_transfer: bool =
-            self.auth_validate_proof(&message_hash, &input.proof);
-
-        let selector_approve_contract_call =
-            &ManagedBuffer::new_from_bytes(SELECTOR_APPROVE_CONTRACT_CALL);
-        let selector_transfer_operatorship =
-            &ManagedBuffer::new_from_bytes(SELECTOR_TRANSFER_OPERATORSHIP);
-
-        let command_executed_mapper = self.command_executed();
-        for index in 0..commands_length {
-            let command_id_ref = execute_data.command_ids.get(index);
-            let command_id = command_id_ref.deref();
-
-            if command_executed_mapper.contains(command_id) {
-                continue;
-            }
-
-            let command_ref = execute_data.commands.get(index);
-            let command = command_ref.deref();
-
-            if command == selector_approve_contract_call {
-                self.approve_contract_call(execute_data.params.get(index).deref(), command_id);
-            } else if command == selector_transfer_operatorship {
-                if !allow_operatorship_transfer {
-                    continue;
-                }
-
-                allow_operatorship_transfer = false;
-                self.transfer_operatorship(execute_data.params.get(index).deref());
-            } else {
-                continue; // ignore if unknown command received
-            }
-
-            command_executed_mapper.add(command_id);
-
-            self.executed_event(command_id);
-        }
-    }
-
     // Self Functions
 
-    fn approve_contract_call(
-        &self,
-        params_raw: &ManagedBuffer,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) {
-        let params: ApproveContractCallParams<Self::Api> =
-            ApproveContractCallParams::<Self::Api>::top_decode(params_raw.clone())
-                .unwrap_or_else(|_| sc_panic!("Could not decode approve contract call"));
+    fn approve_message(&self, message: Message<Self::Api>) {
+        let command_id = self.message_to_command_id(&message.source_chain, &message.message_id);
 
-        let hash = self.get_is_contract_call_approved_key(
-            command_id,
-            &params.source_chain,
-            &params.source_address,
-            &params.contract_address,
-            &params.payload_hash,
+        let messages_mapper = self.messages(&command_id);
+
+        if messages_mapper.get() != MessageState::NonExistent {
+            return;
+        }
+
+        let message_hash = self.message_hash(
+            &message.source_chain,
+            &message.message_id,
+            &message.source_address,
+            &message.contract_address,
+            &message.payload_hash,
         );
 
-        self.contract_call_approved().add(&hash);
+        messages_mapper.set(MessageState::Approved(message_hash));
 
-        self.contract_call_approved_event(
-            command_id,
-            params.source_chain,
-            params.source_address,
-            params.contract_address,
-            params.payload_hash,
+        self.message_approved_event(
+            &command_id,
+            message.source_chain,
+            message.message_id,
+            message.source_address,
+            message.contract_address,
+            message.payload_hash,
         );
     }
 
-    fn transfer_operatorship(&self, params: &ManagedBuffer) {
-        self.auth_transfer_operatorship(params);
-
-        self.operatorship_transferred_event(params);
-    }
-
-    fn get_is_contract_call_approved_key(
+    fn message_hash(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        encoded.append(command_id.as_managed_buffer());
         encoded.append(source_chain);
+        encoded.append(message_id);
         encoded.append(source_address);
         encoded.append(contract_address.as_managed_buffer());
         encoded.append(payload_hash.as_managed_buffer());
@@ -195,47 +184,74 @@ pub trait Gateway: proxy::ProxyModule + events::Events {
         self.crypto().keccak256(encoded)
     }
 
-    fn get_message_hash(&self, data: &ManagedBuffer) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+    fn get_data_hash(
+        &self,
+        command_type: CommandType,
+        buffer: &ManagedBuffer,
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        encoded.append(&ManagedBuffer::from(MULTIVERSX_SIGNED_MESSAGE_PREFIX));
-        encoded.append(data);
+        let result = command_type.top_encode(&mut encoded);
+
+        require!(result.is_ok(), "Cnould not encode data hash");
+
+        encoded.append(buffer);
 
         self.crypto().keccak256(encoded)
     }
 
-    #[view(isCommandExecuted)]
-    fn is_command_executed(&self, command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> bool {
-        self.command_executed().contains(command_id)
+    fn message_to_command_id(
+        &self,
+        source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
+    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+        // Axelar doesn't allow `sourceChain` to contain '_', hence this encoding is umambiguous
+        let mut encoded = ManagedBuffer::new();
+
+        encoded.append(source_chain);
+        encoded.append(&ManagedBuffer::from("_"));
+        encoded.append(message_id);
+
+        self.crypto().keccak256(encoded)
     }
 
-    #[view(isContractCallApproved)]
-    fn is_contract_call_approved(
+    #[view(isMessageApproved)]
+    fn is_message_approved(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
-        let hash = self.get_is_contract_call_approved_key(
-            command_id,
+        let command_id = self.message_to_command_id(source_chain, message_id);
+
+        let message_hash = self.message_hash(
             source_chain,
+            message_id,
             source_address,
             contract_address,
             payload_hash,
         );
 
-        self.contract_call_approved().contains(&hash)
+        self.messages(&command_id).get() == MessageState::Approved(message_hash)
     }
 
-    #[storage_mapper("command_executed")]
-    fn command_executed(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
+    #[view(isMessageExecuted)]
+    fn is_message_executed(
+        &self,
+        source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
+    ) -> bool {
+        self.messages(&self.message_to_command_id(&source_chain, &message_id))
+            .get()
+            == MessageState::Executed
+    }
 
-    #[storage_mapper("contract_call_approved")]
-    fn contract_call_approved(&self) -> WhitelistMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
-
-    #[view]
-    #[storage_mapper("chain_id")]
-    fn chain_id(&self) -> SingleValueMapper<ManagedBuffer>;
+    #[view(messages)]
+    #[storage_mapper("messages")]
+    fn messages(
+        &self,
+        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> SingleValueMapper<MessageState<Self::Api>>;
 }

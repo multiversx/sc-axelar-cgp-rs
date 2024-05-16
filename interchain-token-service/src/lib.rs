@@ -120,8 +120,8 @@ pub trait InterchainTokenServiceContract:
     #[endpoint]
     fn execute(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {

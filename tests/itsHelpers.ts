@@ -1,6 +1,6 @@
 import { assertAccount, e, SContract, SWallet } from 'xsuite';
 import {
-  CHAIN_ID,
+  DOMAIN_SEPARATOR,
   CHAIN_NAME,
   CHAIN_NAME_HASH,
   COMMAND_ID,
@@ -48,7 +48,7 @@ export const deployGatewayContract = async (deployer: SWallet) => {
     gasLimit: 100_000_000,
     codeArgs: [
       e.Addr(MOCK_CONTRACT_ADDRESS_1),
-      e.Str(CHAIN_ID),
+      e.Str(DOMAIN_SEPARATOR),
     ],
   }));
 
@@ -57,7 +57,7 @@ export const deployGatewayContract = async (deployer: SWallet) => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
     ],
   });
 };

@@ -6,7 +6,7 @@ import {
   COMMAND_ID,
   generateMessageHash,
   generateSignature,
-  getOperatorsHash,
+  getSignersHash,
   MULTISIG_PROVER_PUB_KEY_1,
   MULTISIG_PROVER_PUB_KEY_2,
 } from '../helpers';
@@ -80,7 +80,7 @@ test('Validate proof no epoch', async () => {
 test('Validate proof old epoch', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [
@@ -117,7 +117,7 @@ test('Validate proof old epoch', async () => {
 test('Validate proof wrong operators weight', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [
@@ -161,7 +161,7 @@ test('Validate proof wrong operators weight', async () => {
 test('Validate proof invalid signature', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [
@@ -205,7 +205,7 @@ test('Validate proof invalid signature', async () => {
 test('Validate proof operators repeat', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY, ALICE_PUB_KEY], [10, 10], 20);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY, ALICE_PUB_KEY], [10, 10], 20);
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [
@@ -249,7 +249,7 @@ test('Validate proof operators repeat', async () => {
 test('Validate proof low signatures weight', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [9], 10);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [9], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [
@@ -293,7 +293,7 @@ test('Validate proof low signatures weight', async () => {
 test('Validate proof only first operator checked', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 10], 10);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [
@@ -338,7 +338,7 @@ test('Validate proof only first operator checked', async () => {
 test('Validate proof', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 10], 20);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 10], 20);
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [
@@ -385,7 +385,7 @@ test('Validate proof', async () => {
 test('Validate proof with multisig prover encoded proof', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2], [10, 10], 10);
+  const operatorsHash = getSignersHash([MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2], [10, 10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [

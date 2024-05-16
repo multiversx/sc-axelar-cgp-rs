@@ -1,6 +1,6 @@
 import { afterEach, assert, beforeEach, test } from 'vitest';
 import { assertAccount, d, e, SContract, SWallet, SWorld } from 'xsuite';
-import { ADDRESS_ZERO, CHAIN_ID, COMMAND_ID, getKeccak256Hash, MOCK_CONTRACT_ADDRESS_1 } from './helpers';
+import { ADDRESS_ZERO, DOMAIN_SEPARATOR, COMMAND_ID, getKeccak256Hash, MOCK_CONTRACT_ADDRESS_1 } from './helpers';
 import createKeccakHash from 'keccak';
 import fs from 'fs';
 import { BytesEncodable } from 'xsuite/dist/data/BytesEncodable';
@@ -48,7 +48,7 @@ const deployGateway = async () => {
     gasLimit: 100_000_000,
     codeArgs: [
       e.Addr(MOCK_CONTRACT_ADDRESS_1),
-      e.Str(CHAIN_ID),
+      e.Str(DOMAIN_SEPARATOR),
     ],
   }));
 
@@ -57,7 +57,7 @@ const deployGateway = async () => {
     balance: 0n,
     allKvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
     ],
     owner: deployer,
   });
@@ -110,7 +110,7 @@ const mockCallApprovedByGateway = async (payload: BytesEncodable) => {
     codeMetadata: ['payable'],
     kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       // Manually approve call
       e.kvs.Mapper('contract_call_approved', e.Bytes(dataHash)).Value(e.U8(1)),

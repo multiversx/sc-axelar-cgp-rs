@@ -2,7 +2,7 @@ import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import createKeccakHash from 'keccak';
 import {
-  CHAIN_ID,
+  DOMAIN_SEPARATOR,
   COMMAND_ID,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
@@ -110,7 +110,7 @@ const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
     codeMetadata: [],
     kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
       // Manually approve call
       e.kvs.Mapper('contract_call_approved', e.TopBuffer(dataHash)).Value(e.U8(1)),
@@ -187,7 +187,7 @@ test('Transfer with data', async () => {
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
     ],
   });
 });
@@ -246,7 +246,7 @@ test('Transfer with data contract error', async () => {
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
     ],
   });
 });
@@ -310,7 +310,7 @@ test('Express executor', async () => {
   assertAccount(gatewayKvs, {
     kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
     ],
   });
 

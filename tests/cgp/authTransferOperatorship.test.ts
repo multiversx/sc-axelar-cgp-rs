@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
-import { ALICE_PUB_KEY, BOB_PUB_KEY, getOperatorsHash, MOCK_PUB_KEY_1, MOCK_PUB_KEY_2 } from '../helpers';
+import { ALICE_PUB_KEY, BOB_PUB_KEY, getSignersHash, MOCK_PUB_KEY_1, MOCK_PUB_KEY_2 } from '../helpers';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -182,7 +182,7 @@ test('Transfer operatorship invalid threshold less', async () => {
 test('Transfer operatorship duplicate operators', async () => {
   await deployContract();
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
   await contract.setAccount({
     ...await contract.getAccount(),
     owner: deployer,
@@ -226,7 +226,7 @@ test('Transfer operatorship', async () => {
     ],
   });
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
@@ -263,8 +263,8 @@ test('Deploy with recent operators', async () => {
     ],
   }));
 
-  const operatorsHash = getOperatorsHash([ALICE_PUB_KEY], [10], 10);
-  const operatorsHash2 = getOperatorsHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
+  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
+  const operatorsHash2 = getSignersHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {

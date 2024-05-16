@@ -35,7 +35,7 @@ export const OTHER_CHAIN_ADDRESS: string = '0x032fF26CbbdcE740e1Ff0A069Ad3fCf886
 export const OTHER_CHAIN_ADDRESS_HASH: string = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS).digest('hex');
 export const OTHER_CHAIN_TOKEN_ADDRESS: string = '0x79563F018EA5312cD84d7Ca9ecdB37c74A786B72';
 
-export const CHAIN_ID: string = 'D';
+export const DOMAIN_SEPARATOR: string = '209d8e45d084f6d3171d9e862bce4c3b17bf03ab71a687406c111f55b8dceb76';
 
 export const COMMAND_ID: string = '8e45d084f6d317209d1d9e862bce4c3b17bf03ab71a687406c111f55b8dceb76';
 
@@ -46,7 +46,7 @@ export const MULTIVERSX_SIGNED_MESSAGE_PREFIX = '\x19MultiversX Signed Message:\
 export const generateMessageHash = (data: Buffer): string => {
   const messageHashData = Buffer.concat([
     Buffer.from(MULTIVERSX_SIGNED_MESSAGE_PREFIX),
-    data
+    data,
   ]);
 
   return createKeccakHash('keccak256').update(messageHashData).digest('hex');
@@ -61,24 +61,26 @@ export const generateSignature = (data: Buffer, signerPem = './alice.pem'): Buff
   return privateKey.sign(Buffer.from(messageHash, 'hex'));
 };
 
-export const getOperatorsHash = (pubKeys: string[], weights: number[], threshold: number) => {
+export const getSignersHash = (signers: { signer: string, weight: number } [], threshold: number, nonce: string) => {
   let thresholdHex = threshold.toString(16);
   if (thresholdHex.length % 2) {
     thresholdHex = '0' + thresholdHex;
   }
 
   let data = Buffer.concat([
-    // price_keys
-    ...pubKeys.map(pubkey => Buffer.from(pubkey, 'hex')),
-    ...weights.map(weight => {
-      let weightHex = weight.toString(16);
+    ...signers.map(signer => {
+      let weightHex = signer.weight.toString(16);
       if (weightHex.length % 2) {
         weightHex = '0' + weightHex;
       }
 
-      return Buffer.from(weightHex, 'hex');
+      return Buffer.concat([
+        Buffer.from(signer.signer, 'hex'),
+        Buffer.from(weightHex, 'hex'),
+      ]);
     }),
-    Buffer.from(thresholdHex, 'hex')
+    Buffer.from(thresholdHex, 'hex'),
+    Buffer.from(nonce, 'hex'),
   ]);
 
   return createKeccakHash('keccak256').update(data).digest();
