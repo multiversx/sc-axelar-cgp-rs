@@ -2,7 +2,6 @@ import fs from 'fs';
 import { UserSecretKey } from '@multiversx/sdk-wallet/out';
 import createKeccakHash from 'keccak';
 import { e } from 'xsuite';
-import { Buffer } from 'buffer';
 import { Encodable } from 'xsuite';
 
 export const MOCK_CONTRACT_ADDRESS_1: string = 'erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax';
@@ -101,6 +100,6 @@ export const generateProof = (data: Encodable | Buffer): Encodable => {
   );
 };
 
-export const getKeccak256Hash = (payload: string = 'commandId') => {
+export const getKeccak256Hash = (payload: string | Buffer = 'commandId') => {
   return createKeccakHash('keccak256').update(Buffer.from(payload)).digest('hex');
 };

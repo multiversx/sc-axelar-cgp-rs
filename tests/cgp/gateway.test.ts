@@ -8,7 +8,7 @@ import {
   MOCK_CONTRACT_ADDRESS_2,
   PAYLOAD_HASH,
   TOKEN_ID,
-  TOKEN_ID2, ALICE_PUB_KEY, getKeccak256Hash, getSignersHash,
+  TOKEN_ID2, ALICE_PUB_KEY, getKeccak256Hash, getSignersHash, ADDRESS_ZERO, BOB_PUB_KEY,
 } from '../helpers';
 
 let world: SWorld;
@@ -21,7 +21,7 @@ beforeEach(async () => {
   world = await SWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
-    epoch: 0
+    epoch: 0,
   });
 
   deployer = await world.createWallet({
@@ -30,11 +30,11 @@ beforeEach(async () => {
       e.kvs.Esdts([
         {
           id: TOKEN_ID,
-          amount: 100_000
+          amount: 100_000,
         },
         {
           id: TOKEN_ID2,
-          amount: 10_000
+          amount: 10_000,
         },
       ]),
     ],
@@ -53,19 +53,19 @@ const baseKvs = () => {
     e.kvs.Mapper('previous_signers_retention').Value(e.U(16)),
     e.kvs.Mapper('domain_separator').Value(e.TopBuffer(DOMAIN_SEPARATOR)),
     e.kvs.Mapper('minimum_rotation_delay').Value(e.U64(3600)),
-    e.kvs.Mapper('operator').Value(firstUser),
 
+    e.kvs.Mapper('operator').Value(firstUser),
     e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(signersHash)),
     e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(signersHash)).Value(e.U(1)),
     e.kvs.Mapper('epoch').Value(e.U(1)),
   ];
-}
+};
 
 const deployContract = async () => {
   const weightedSigners = e.Tuple(
     e.List(e.Tuple(e.TopBuffer(ALICE_PUB_KEY), e.U(10))),
     e.U(10),
-    e.TopBuffer(getKeccak256Hash('nonce1'))
+    e.TopBuffer(getKeccak256Hash('nonce1')),
   );
 
   ({ contract, address } = await deployer.deployContract({
@@ -81,12 +81,87 @@ const deployContract = async () => {
     ],
   }));
 
-  const pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
+  assertAccount(await contract.getAccountWithKvs(), {
     balance: 0n,
     kvs: baseKvs(),
   });
 };
+
+test('Init', async () => {
+  // With zero address and no signer
+  ({ contract, address } = await deployer.deployContract({
+    code: 'file:gateway/output/gateway.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      e.U(16),
+      e.TopBuffer(DOMAIN_SEPARATOR),
+      e.U64(3600),
+      e.Addr(ADDRESS_ZERO),
+    ],
+  }));
+
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: [
+      e.kvs.Mapper('previous_signers_retention').Value(e.U(16)),
+      e.kvs.Mapper('domain_separator').Value(e.TopBuffer(DOMAIN_SEPARATOR)),
+      e.kvs.Mapper('minimum_rotation_delay').Value(e.U64(3600)),
+    ],
+  });
+});
+
+test('Upgrade', async () => {
+  await deployContract();
+
+  // Upgrade with no operator and no signers
+  await deployer.upgradeContract({
+    callee: contract,
+    code: 'file:gateway/output/gateway.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      e.Addr(ADDRESS_ZERO),
+    ],
+  });
+
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: baseKvs(),
+  });
+
+  const weightedSigners = e.Tuple(
+    e.List(e.Tuple(e.TopBuffer(BOB_PUB_KEY), e.U(5))),
+    e.U(5),
+    e.TopBuffer(getKeccak256Hash('nonce2')),
+  );
+
+  // Upgrade with new operator and new signers
+  await deployer.upgradeContract({
+    callee: contract,
+    code: 'file:gateway/output/gateway.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      deployer,
+      weightedSigners,
+    ],
+  });
+
+  const signersHash = getSignersHash([{ signer: BOB_PUB_KEY, weight: 5 }], 5, getKeccak256Hash('nonce2'));
+
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('operator').Value(deployer),
+      e.kvs.Mapper('signer_hash_by_epoch', e.U(2)).Value(e.TopBuffer(signersHash)),
+      e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(signersHash)).Value(e.U(2)),
+      e.kvs.Mapper('epoch').Value(e.U(2)),
+    ],
+  });
+});
 
 test('Call contract', async () => {
   await deployContract();
@@ -98,121 +173,84 @@ test('Call contract', async () => {
     funcArgs: [
       e.Str('ethereum'),
       e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-      e.Str('payload')
+      e.Str('payload'),
     ],
   });
 
   // This only emits an event, and there is no way to test those currently...
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
+  assertAccount(await contract.getAccountWithKvs(), {
     balance: 0,
     kvs: baseKvs(),
   });
 });
 
-test('Validate contract call invalid', async () => {
+test('Validate message invalid', async () => {
   await deployContract();
 
   const result = await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: 'validateContractCall',
+    funcName: 'validateMessage',
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str('ethereum'),
+      e.Str('messageId'),
       e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-      e.TopBuffer(PAYLOAD_HASH)
+      e.TopBuffer(PAYLOAD_HASH),
     ],
   });
   assert(result.returnData[0] === '');
 
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
+  assertAccount(await contract.getAccountWithKvs(), {
     balance: 0,
-    allKvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR))
-    ]
+    kvs: baseKvs(),
   });
 });
 
-test('Validate contract call valid', async () => {
+test('Validate message valid', async () => {
   await deployContract();
 
-  // get_is_contract_call_approved_key hash
-  let data = Buffer.concat([
-    Buffer.from(COMMAND_ID, 'hex'),
+  const messageData = Buffer.concat([
     Buffer.from('ethereum'),
+    Buffer.from('messageId'),
     Buffer.from('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-    deployer.toTopBytes(),
-    Buffer.from(PAYLOAD_HASH, 'hex')
+    deployer.toTopU8A(),
+    Buffer.from(PAYLOAD_HASH, 'hex'),
   ]);
+  const messageHash = getKeccak256Hash(messageData);
 
-  const dataHash = createKeccakHash('keccak256').update(data).digest('hex');
+  const command_id = getKeccak256Hash('ethereum_messageId');
 
   await contract.setAccount({
     ...await contract.getAccount(),
     codeMetadata: ['payable'],
     kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
+      ...baseKvs(),
 
-      // Manually approve call
-      e.kvs.Mapper('contract_call_approved', e.TopBuffer(dataHash)).Value(e.U8(1))
+      // Manually approve message
+      e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.TopBuffer(messageHash)),
     ],
   });
 
   const result = await deployer.callContract({
     callee: contract,
     gasLimit: 10_000_000,
-    funcName: 'validateContractCall',
+    funcName: 'validateMessage',
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str('ethereum'),
+      e.Str('messageId'),
       e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-      e.TopBuffer(PAYLOAD_HASH)
+      e.TopBuffer(PAYLOAD_HASH),
     ],
   });
   assert(result.returnData[0] === '01');
 
-  let pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
+  assertAccount(await contract.getAccountWithKvs(), {
     balance: 0,
-    allKvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR))
-    ]
-  });
-});
+    kvs: [
+      ...baseKvs(),
 
-test('Upgrade', async () => {
-  await deployContract();
-
-  // Upgrading is not supported with new values
-  await deployer.upgradeContract({
-    callee: contract,
-    code: 'file:gateway/output/gateway.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      e.Addr(MOCK_CONTRACT_ADDRESS_2),
-      e.Str('Sth'),
-    ],
-  }).assertFail({ code: 4, message: 'wrong number of arguments' });
-
-  await deployer.upgradeContract({
-    callee: contract,
-    code: 'file:gateway/output/gateway.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-  });
-
-  const pairs = await contract.getAccountWithKvs();
-  assertAccount(pairs, {
-    balance: 0n,
-    allKvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
+      // Message was executed
+      e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.Str('1')),
     ],
   });
 });
