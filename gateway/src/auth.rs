@@ -80,11 +80,14 @@ pub trait AuthModule: events::Events {
         last_rotation_timestamp_mapper.set(current_timestamp);
     }
 
+    // Signatures need to have the same length as signers, but some signers could have not signed
+    // the message hash, so for those signers we have the signature None instead.
+    // Signers are ordered and the signatures will also need to be in the same order
     fn validate_signatures(
         &self,
         message_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         weighted_signers: WeightedSigners<Self::Api>,
-        signatures: ManagedVec<ManagedByteArray<ED25519_SIGNATURE_BYTE_LEN>>,
+        signatures: ManagedVec<Option<ManagedByteArray<ED25519_SIGNATURE_BYTE_LEN>>>,
     ) {
         let signers = weighted_signers.signers;
 
@@ -96,18 +99,16 @@ pub trait AuthModule: events::Events {
         let mut total_weight = BigUint::zero();
 
         for (signer_index, signature) in signatures.iter().enumerate() {
+            if signature.is_none() {
+                continue;
+            }
+
             let signer = signers.get(signer_index);
 
             self.crypto().verify_ed25519(
                 signer.signer.as_managed_buffer(),
                 message_hash.as_managed_buffer(),
-                signature.as_managed_buffer(),
-            );
-
-            // Check that operators do not repeat
-            require!(
-                signers.find(&signer) == Some(signer_index),
-                "Malformed signers"
+                signature.unwrap().as_managed_buffer(),
             );
 
             total_weight += signer.weight;
@@ -140,26 +141,20 @@ pub trait AuthModule: events::Events {
 
         require!(!signers.is_empty(), "Invalid signers");
 
-        let len = signers.len();
         let mut total_weight = BigUint::zero();
+        let mut prev_signer = BigUint::zero();
 
-        for iindex in 0..len {
-            let weighted_signer = signers.get(iindex);
+        for weighted_signer in signers.into_iter() {
+            let curr_signer =
+                BigUint::from_bytes_be_buffer(weighted_signer.signer.as_managed_buffer());
+
+            require!(curr_signer > prev_signer, "Invalid signers");
+
+            prev_signer = curr_signer;
 
             require!(weighted_signer.weight > 0, "Invalid weights");
 
             total_weight += &weighted_signer.weight;
-
-            // Don't check duplicates for last element
-            if iindex == len - 1 {
-                break;
-            }
-
-            for jindex in (iindex + 1)..len {
-                if weighted_signer.signer == signers.get(jindex).signer {
-                    sc_panic!("Invalid signers");
-                }
-            }
         }
 
         require!(
@@ -215,19 +210,19 @@ pub trait AuthModule: events::Events {
 
     /// @dev Previous signers retention. 0 means only the current signers are valid
     /// @return The number of epochs to keep the signers valid for signature verification
-    #[view]
+    #[view(previousSignersRetention)]
     #[storage_mapper("previous_signers_retention")]
     fn previous_signers_retention(&self) -> SingleValueMapper<BigUint>;
 
     /// @dev The domain separator for the signer proof
     /// @return The domain separator for the signer proof
-    #[view]
+    #[view(domainSeparator)]
     #[storage_mapper("domain_separator")]
     fn domain_separator(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
     /// @dev The minimum delay required between rotations
     /// @return The minimum delay required between rotations
-    #[view]
+    #[view(minimumRotationDelay)]
     #[storage_mapper("minimum_rotation_delay")]
     fn minimum_rotation_delay(&self) -> SingleValueMapper<u64>;
 }

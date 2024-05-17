@@ -8,7 +8,7 @@ multiversx_sc::derive_imports!();
 
 pub const MULTIVERSX_SIGNED_MESSAGE_PREFIX: &[u8; 28] = b"\x19MultiversX Signed Message:\n";
 
-#[derive(TypeAbi, TopEncode)]
+#[derive(TypeAbi, TopEncode, NestedEncode)]
 pub enum CommandType {
     ApproveMessages,
     RotateSigners,
@@ -39,7 +39,7 @@ pub struct WeightedSigners<M: ManagedTypeApi> {
 #[derive(TypeAbi, TopDecode)]
 pub struct Proof<M: ManagedTypeApi> {
     pub signers: WeightedSigners<M>,
-    pub signatures: ManagedVec<M, ManagedByteArray<M, ED25519_SIGNATURE_BYTE_LEN>>,
+    pub signatures: ManagedVec<M, Option<ManagedByteArray<M, ED25519_SIGNATURE_BYTE_LEN>>>,
 }
 
 const MESSAGE_EXECUTED: &[u8; 1] = b"1";

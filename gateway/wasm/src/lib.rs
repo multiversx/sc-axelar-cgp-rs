@@ -33,9 +33,9 @@ multiversx_sc_wasm_adapter::endpoints! {
         lastRotationTimestamp => last_rotation_timestamp
         signerHashByEpoch => signer_hash_by_epoch
         epochBySignerHash => epoch_by_signer_hash
-        previous_signers_retention => previous_signers_retention
-        domain_separator => domain_separator
-        minimum_rotation_delay => minimum_rotation_delay
+        previousSignersRetention => previous_signers_retention
+        domainSeparator => domain_separator
+        minimumRotationDelay => minimum_rotation_delay
         transferOperatorship => transfer_operatorship
         operator => operator
     )

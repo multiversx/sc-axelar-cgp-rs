@@ -16,14 +16,14 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
     #[init]
     fn init(
         &self,
-        previous_signers_rotation: BigUint,
+        previous_signers_retention: BigUint,
         domain_separator: ManagedByteArray<KECCAK256_RESULT_LEN>,
         minimum_rotation_delay: u64,
         operator: ManagedAddress,
         signers: MultiValueEncoded<WeightedSigners<Self::Api>>,
     ) {
         self.previous_signers_retention()
-            .set(previous_signers_rotation);
+            .set(previous_signers_retention);
         self.domain_separator().set(domain_separator);
         self.minimum_rotation_delay().set(minimum_rotation_delay);
 
@@ -56,9 +56,9 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
             ManagedVec::<Self::Api, Message<Self::Api>>::top_decode(messages)
                 .unwrap_or_else(|_| sc_panic!("Could not decode messages"));
 
-        let _ = self.validate_proof(data_hash, proof);
-
         require!(!messages.is_empty(), "Invalid messages");
+
+        let _ = self.validate_proof(data_hash, proof);
 
         for message in messages.into_iter() {
             self.approve_message(message);
@@ -191,9 +191,8 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        let result = command_type.top_encode(&mut encoded);
-
-        require!(result.is_ok(), "Cnould not encode data hash");
+        let result = command_type.dep_encode(&mut encoded);
+        require!(result.is_ok(), "Could not encode data hash");
 
         encoded.append(buffer);
 

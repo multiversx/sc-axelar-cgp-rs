@@ -8,7 +8,7 @@ import {
   ALICE_PUB_KEY,
   BOB_PUB_KEY,
   COMMAND_ID,
-  generateProof,
+  generateProofOld,
   generateSignature,
   MOCK_CONTRACT_ADDRESS_2,
 } from '../tests/helpers';
@@ -202,7 +202,7 @@ program.command('executeApproveContractCall').action(async () => {
     ),
   );
 
-  const proof = generateProof(executeData);
+  const proof = generateProofOld(executeData);
 
   const result = await wallet.callContract({
     callee: envChain.select(data.addressGateway),
@@ -270,7 +270,7 @@ program.command('executeTransferOperatorship')
         e.List(e.TopBuffer(signature), e.TopBuffer(signatureBob)),
       );
     } else {
-      proof = generateProof(executeData);
+      proof = generateProofOld(executeData);
     }
 
     const result = await wallet.callContract({

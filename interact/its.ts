@@ -5,7 +5,7 @@ import { getKeccak256Hash, loadWallet } from './index';
 import { Command } from 'commander';
 import { Wallet } from 'xsuite';
 import { envChain } from 'xsuite/interact';
-import { generateProof, INTERCHAIN_TOKEN_ID } from '../tests/helpers';
+import { generateProofOld, INTERCHAIN_TOKEN_ID } from '../tests/helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { AbiCoder } from 'ethers';
@@ -247,7 +247,7 @@ export const setupITSCommands = (program: Command) => {
       ),
     );
 
-    const { proof } = generateProof(executeData);
+    const { proof } = generateProofOld(executeData);
 
     const result = await wallet.callContract({
       callee: envChain.select(data.address),
@@ -321,7 +321,7 @@ export const setupITSCommands = (program: Command) => {
       ),
     );
 
-    const { proof } = generateProof(executeData);
+    const { proof } = generateProofOld(executeData);
 
     const result = await wallet.callContract({
       callee: envChain.select(data.address),
