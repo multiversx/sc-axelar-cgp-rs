@@ -12,15 +12,17 @@ import {
   generateRotateSignersSignature,
   generateSignature,
   getKeccak256Hash,
-  getSignersHash,
+  getSignersHash, MESSAGE_ID,
   MULTISIG_PROVER_PUB_KEY_1,
-  MULTISIG_PROVER_PUB_KEY_2,
+  MULTISIG_PROVER_PUB_KEY_2, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME,
   PAYLOAD_HASH,
   SIGNATURE_ZERO,
   TOKEN_ID,
   TOKEN_ID2,
 } from '../helpers';
 import createKeccakHash from 'keccak';
+import { deployPingPongInterchain, gateway, its, mockGatewayMessageApproved, pingPong } from '../itsHelpers';
+import { Buffer } from 'buffer';
 
 let world: SWorld;
 let deployer: SWallet;
@@ -351,7 +353,7 @@ describe('Approve messages', () => {
     );
     const messageHash = getKeccak256Hash('mock');
 
-    const command_id = getKeccak256Hash('ethereum_messageId');
+    const commandId = getKeccak256Hash('ethereum_messageId');
 
     // Mock message approved
     await contract.setAccount({
@@ -361,7 +363,7 @@ describe('Approve messages', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
       ],
     });
 
@@ -389,7 +391,7 @@ describe('Approve messages', () => {
         ...baseKvs(),
 
         // Message was executed
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
       ],
     });
   });
@@ -405,7 +407,7 @@ describe('Approve messages', () => {
       e.TopBuffer(PAYLOAD_HASH),
     );
 
-    const command_id = getKeccak256Hash('ethereum_messageId');
+    const commandId = getKeccak256Hash('ethereum_messageId');
 
     // Mock message executed
     await contract.setAccount({
@@ -415,7 +417,7 @@ describe('Approve messages', () => {
         ...baseKvs(),
 
         // Manually execute message
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
       ],
     });
 
@@ -443,7 +445,7 @@ describe('Approve messages', () => {
         ...baseKvs(),
 
         // Message was executed
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
       ],
     });
   });
@@ -467,7 +469,7 @@ describe('Approve messages', () => {
     ]);
     const messageHash = getKeccak256Hash(messageData);
 
-    const command_id = getKeccak256Hash('ethereum_messageId');
+    const commandId = getKeccak256Hash('ethereum_messageId');
 
     await deployer.callContract({
       callee: contract,
@@ -491,7 +493,7 @@ describe('Approve messages', () => {
         ...baseKvs(),
 
         // Message was executed
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
       ],
     });
   });
@@ -1051,7 +1053,7 @@ describe('Validate message', () => {
     ]);
     const messageHash = getKeccak256Hash(messageData);
 
-    const command_id = getKeccak256Hash('ethereum_messageId');
+    const commandId = getKeccak256Hash('ethereum_messageId');
 
     await contract.setAccount({
       ...await contract.getAccount(),
@@ -1060,7 +1062,7 @@ describe('Validate message', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
       ],
     });
 
@@ -1083,7 +1085,7 @@ describe('Validate message', () => {
         ...baseKvs(),
 
         // Message was executed
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
       ],
     });
   });
@@ -1148,7 +1150,7 @@ describe('Operator', () => {
 });
 
 describe('View functions', () => {
-  const command_id = getKeccak256Hash('ethereum_messageId');
+  const commandId = getKeccak256Hash('ethereum_messageId');
 
   test('Message approved', async () => {
     await deployContract();
@@ -1170,7 +1172,7 @@ describe('View functions', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
       ],
     });
 
@@ -1209,7 +1211,7 @@ describe('View functions', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
       ],
     });
 
@@ -1377,6 +1379,141 @@ describe('View functions', () => {
   });
 });
 
+test('Approve validate execute external contract', async () => {
+  await deployContract();
+  await deployPingPongInterchain(deployer, 1_000, contract);
+
+  const otherUser = await world.createWallet();
+
+  const payload = e.Tuple(e.Str('ping'), otherUser).toTopU8A();
+
+  const payloadHash = getKeccak256Hash(Buffer.from(payload));
+
+  const message = e.Tuple(
+    e.Str(OTHER_CHAIN_NAME),
+    e.Str(MESSAGE_ID),
+    e.Str(OTHER_CHAIN_ADDRESS),
+    pingPong,
+    e.TopBuffer(payloadHash),
+  );
+  const messageData = Buffer.concat([
+    Buffer.from(OTHER_CHAIN_NAME),
+    Buffer.from(MESSAGE_ID),
+    Buffer.from(OTHER_CHAIN_ADDRESS),
+    pingPong.toTopU8A(),
+    Buffer.from(payloadHash, 'hex'),
+  ]);
+  const messageHash = getKeccak256Hash(messageData);
+
+  const commandId = getKeccak256Hash(OTHER_CHAIN_NAME + '_' + MESSAGE_ID);
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 15_000_000,
+    funcName: 'approveMessages',
+    funcArgs: [
+      e.List(message),
+      generateProof(
+        defaultWeightedSigners, [
+          generateMessageSignature(defaultSignersHash, e.List(message)),
+          generateMessageSignature(defaultSignersHash, e.List(message), './bob.pem'),
+          null,
+        ],
+      ),
+    ],
+  });
+
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0,
+    kvs: [
+      ...baseKvs(),
+
+      // Message was approved
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+    ],
+  });
+
+  // Mock tokens in Ping Pong for otherUser
+  await pingPong.setAccount({
+    ...await pingPong.getAccount(),
+    balance: 1_000,
+    kvs: [
+      e.kvs.Mapper('interchain_token_service').Value(contract),
+      e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
+      e.kvs.Mapper('deadline').Value(e.U64(10)),
+      e.kvs.Mapper('activationTimestamp').Value(e.U64(0)),
+      e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+
+      // User mapper
+      e.kvs.Mapper('user_address_to_id', otherUser).Value(e.U32(1)),
+      e.kvs.Mapper('user_id_to_address', e.U32(1)).Value(otherUser),
+      e.kvs.Mapper('user_count').Value(e.U32(1)),
+
+      e.kvs.Mapper('userStatus', e.U32(1)).Value(e.U8(1)),
+    ],
+  });
+
+  await deployer.callContract({
+    callee: pingPong,
+    funcName: 'execute',
+    gasLimit: 50_000_000,
+    funcArgs: [
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: "can't withdraw before deadline" });
+
+  await world.setCurrentBlockInfo({
+    timestamp: 10,
+  });
+
+  await deployer.callContract({
+    callee: pingPong,
+    funcName: 'execute',
+    gasLimit: 50_000_000,
+    funcArgs: [
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  });
+
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0,
+    kvs: [
+      ...baseKvs(),
+
+      // Message was executed
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+    ],
+  });
+  // Other user received funds
+  assertAccount(await otherUser.getAccountWithKvs(), {
+    balance: 1_000,
+  });
+  // Ping pong state was modified
+  assertAccount(await pingPong.getAccountWithKvs(), {
+    balance: 0,
+    kvs: [
+      e.kvs.Mapper('interchain_token_service').Value(contract),
+      e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
+      e.kvs.Mapper('deadline').Value(e.U64(10)),
+      e.kvs.Mapper('activationTimestamp').Value(e.U64(0)),
+      e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+
+      // User mapper
+      e.kvs.Mapper('user_address_to_id', otherUser).Value(e.U32(1)),
+      e.kvs.Mapper('user_id_to_address', e.U32(1)).Value(otherUser),
+      e.kvs.Mapper('user_count').Value(e.U32(1)),
+
+      e.kvs.Mapper('userStatus', e.U32(1)).Value(e.U8(2)),
+    ],
+  });
+});
+
 // TODO: Re-enable below tests after updating Amplifier Multisig Prover
 test.skip('Execute approve contract call with multisig prover encoded data', async () => {
   await deployContract();
@@ -1477,7 +1614,7 @@ test.skip('Execute transfer operatorship with multisig prover encoded data', asy
   let kvs = await contract.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
       e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
 
@@ -1493,7 +1630,7 @@ test.skip('Execute transfer operatorship with multisig prover encoded data', asy
   kvs = await contractAuth.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       // Manually add epoch for hash & current epoch
       e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
       e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash2)).Value(e.U64(16)),

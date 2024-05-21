@@ -7,7 +7,6 @@ import { d, e } from 'xsuite/data';
 import {
   ALICE_PUB_KEY,
   BOB_PUB_KEY,
-  COMMAND_ID,
   generateProofOld,
   generateSignature,
   MOCK_CONTRACT_ADDRESS_2,

@@ -1,22 +1,25 @@
-import { assertAccount, e, SContract, SWallet } from 'xsuite';
+import { assertAccount, e, Encodable, SContract, SWallet } from 'xsuite';
 import {
-  DOMAIN_SEPARATOR,
+  ALICE_PUB_KEY,
+  BOB_PUB_KEY,
+  CAROL_PUB_KEY,
   CHAIN_NAME,
   CHAIN_NAME_HASH,
-  COMMAND_ID,
+  DOMAIN_SEPARATOR,
+  getKeccak256Hash,
+  getSignersHash,
   INTERCHAIN_TOKEN_ID,
-  MOCK_CONTRACT_ADDRESS_1,
+  MESSAGE_ID,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_MANAGER_ADDRESS,
-  TOKEN_SALT, ALICE_PUB_KEY, BOB_PUB_KEY, CAROL_PUB_KEY, getKeccak256Hash, getSignersHash,
+  TOKEN_SALT,
 } from './helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { Kvs } from 'xsuite/dist/data/kvs';
-import { Encodable } from 'xsuite';
 import { EncodableKvs } from 'xsuite/dist/data/encoding';
 
 export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
@@ -108,7 +111,7 @@ export const deployGasService = async (deployer: SWallet, collector: SWallet) =>
   const kvs = await gasService.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -150,7 +153,7 @@ export const deployTokenManagerMintBurn = async (
   const kvs = await tokenManager.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: baseKvs,
+    kvs: baseKvs,
   });
 
   // Set mint/burn roles if token is set
@@ -250,7 +253,7 @@ export const deployIts = async (deployer: SWallet) => {
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       ...baseItsKvs(deployer),
     ],
   });
@@ -269,7 +272,7 @@ export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: b
   const kvs = await interchainTokenFactory.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
@@ -288,13 +291,13 @@ export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: b
   }
 };
 
-export const deployPingPongInterchain = async (deployer: SWallet, amount = 1_000) => {
+export const deployPingPongInterchain = async (deployer: SWallet, amount = 1_000, itsContract = its) => {
   ({ contract: pingPong } = await deployer.deployContract({
     code: 'file:ping-pong-interchain/output/ping-ping-interchain.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
-      its,
+      itsContract,
       e.U(amount),
       e.U64(10),
       e.Option(null),
@@ -419,8 +422,8 @@ export const computeInterchainTokenId = (user: Encodable, salt = TOKEN_SALT) => 
 export const computeExpressExecuteHash = (payload: string) => {
   const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest();
   const data = Buffer.concat([
-    Buffer.from(COMMAND_ID, 'hex'),
     Buffer.from(OTHER_CHAIN_NAME),
+    Buffer.from(MESSAGE_ID),
     Buffer.from(OTHER_CHAIN_ADDRESS),
     payloadHash,
   ]);
@@ -471,3 +474,32 @@ export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory
       TOKEN_MANAGER_ADDRESS))] : []),
   ];
 };
+
+export async function mockGatewayMessageApproved(payload: string, operator: SWallet) {
+  const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
+
+  const messageData = Buffer.concat([
+    Buffer.from(OTHER_CHAIN_NAME),
+    Buffer.from(MESSAGE_ID),
+    Buffer.from(OTHER_CHAIN_ADDRESS),
+    its.toTopU8A(),
+    Buffer.from(payloadHash, 'hex'),
+  ]);
+  const messageHash = getKeccak256Hash(messageData);
+
+  const commandId = getKeccak256Hash(OTHER_CHAIN_NAME + '_' + MESSAGE_ID);
+
+  // Mock call approved by gateway
+  await gateway.setAccount({
+    ...await gateway.getAccount(),
+    codeMetadata: ['payable'],
+    kvs: [
+      ...baseGatewayKvs(operator),
+
+      // Manually approve message
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+    ],
+  });
+
+  return { commandId, messageHash };
+}

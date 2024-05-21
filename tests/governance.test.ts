@@ -80,7 +80,7 @@ const mockCallApprovedByGateway = async (payload: Encodable) => {
   ]);
   const messageHash = getKeccak256Hash(messageData);
 
-  const command_id = getKeccak256Hash(GOVERNANCE_CHAIN + '_' + MESSAGE_ID);
+  const commandId = getKeccak256Hash(GOVERNANCE_CHAIN + '_' + MESSAGE_ID);
 
   // Mock call approved by gateway
   await gateway.setAccount({
@@ -90,7 +90,7 @@ const mockCallApprovedByGateway = async (payload: Encodable) => {
       ...baseGatewayKvs(deployer),
 
       // Manually approve message
-      e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.TopBuffer(messageHash)),
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
     ],
   });
 }

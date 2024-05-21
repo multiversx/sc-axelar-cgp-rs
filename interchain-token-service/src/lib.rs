@@ -18,7 +18,7 @@ pub mod constants;
 pub mod events;
 pub mod executable;
 pub mod express_executor_tracker;
-pub mod proxy_cgp;
+pub mod proxy_gmp;
 pub mod proxy_its;
 pub mod remote;
 pub mod user_functions;
@@ -30,7 +30,7 @@ pub trait InterchainTokenServiceContract:
     + operatable::roles::AccountRoles
     + express_executor_tracker::ExpressExecutorTracker
     + address_tracker::AddressTracker
-    + proxy_cgp::ProxyCgpModule
+    + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
     + executable::ExecutableModule
     + events::EventsModule

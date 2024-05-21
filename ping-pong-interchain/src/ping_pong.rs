@@ -7,6 +7,7 @@ mod user_status;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use user_status::UserStatus;
+use gateway::ProxyTrait as _;
 
 #[derive(TypeAbi, TopDecode)]
 pub struct Data<M: ManagedTypeApi> {
@@ -58,6 +59,26 @@ pub trait PingPong {
     }
 
     // TODO: Add execute endpoint and check that it works with Gateway V2
+    #[endpoint(execute)]
+    fn execute(
+        &self,
+        source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
+        source_address: ManagedBuffer,
+        payload: ManagedBuffer,
+    ) {
+        let payload_hash = self.crypto().keccak256(&payload);
+
+        let valid = self.gateway_proxy(self.interchain_token_service().get())
+            .validate_message(source_chain, message_id, source_address, payload_hash)
+            .execute_on_dest_context::<bool>();
+
+        require!(valid, "Not validated by gateway");
+
+        let data = Data::<Self::Api>::top_decode(payload).unwrap();
+
+        self.pong(OptionalValue::Some(data.address));
+    }
 
     #[payable("*")]
     #[endpoint(executeWithInterchainToken)]
@@ -278,4 +299,7 @@ pub trait PingPong {
     #[view(pongAllLastUser)]
     #[storage_mapper("pongAllLastUser")]
     fn pong_all_last_user(&self) -> SingleValueMapper<usize>;
+
+    #[proxy]
+    fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway::Proxy<Self::Api>;
 }

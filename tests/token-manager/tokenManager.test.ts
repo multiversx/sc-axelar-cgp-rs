@@ -135,7 +135,7 @@ describe('Init', () => {
     let kvs = await contract.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(otherUser),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
@@ -163,7 +163,7 @@ describe('Init', () => {
     kvs = await contract2.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(otherUser),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
@@ -193,7 +193,7 @@ describe('Init', () => {
     let kvs = await contract.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(otherUser),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_MINT_BURN)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
@@ -221,7 +221,7 @@ describe('Init', () => {
     kvs = await contract2.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(otherUser),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_MINT_BURN)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
@@ -257,7 +257,7 @@ describe('Flow limit', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
@@ -298,7 +298,7 @@ describe('Flow limit', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000010)), // operator role remained
@@ -318,7 +318,7 @@ describe('Flow limit', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000000)), // flow limit role was removed
@@ -360,7 +360,7 @@ describe('Flow limit', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
@@ -381,7 +381,7 @@ describe('Flow limit', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
@@ -420,7 +420,7 @@ describe('Give token lock unlock', () => {
     const kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 0 }]),
@@ -429,7 +429,7 @@ describe('Give token lock unlock', () => {
 
     const otherUserKvs = await otherUser.getAccountWithKvs();
     assertAccount(otherUserKvs, {
-      allKvs: [
+      kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
       ],
     });
@@ -472,7 +472,7 @@ describe('Give token lock unlock', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -484,7 +484,7 @@ describe('Give token lock unlock', () => {
 
     let otherUserKvs = await otherUser.getAccountWithKvs();
     assertAccount(otherUserKvs, {
-      allKvs: [
+      kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
       ],
     });
@@ -520,7 +520,7 @@ describe('Give token lock unlock', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -533,7 +533,7 @@ describe('Give token lock unlock', () => {
 
     otherUserKvs = await otherUser.getAccountWithKvs();
     assertAccount(otherUserKvs, {
-      allKvs: [
+      kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
       ],
     });
@@ -601,7 +601,7 @@ describe('Take token lock unlock', () => {
     const kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -634,7 +634,7 @@ describe('Take token lock unlock', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -671,7 +671,7 @@ describe('Take token lock unlock', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -747,7 +747,7 @@ describe('Operatorship', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)), // flow limit role remained
@@ -790,7 +790,7 @@ describe('Operatorship', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000010)),
@@ -820,7 +820,7 @@ describe('Operatorship', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000010)),
@@ -881,7 +881,7 @@ describe('Operatorship', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000100)), // flow limit role remained

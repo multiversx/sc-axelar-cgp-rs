@@ -9,7 +9,7 @@ use crate::constants::MetadataVersion;
 multiversx_sc::imports!();
 
 #[multiversx_sc::module]
-pub trait ProxyCgpModule: address_tracker::AddressTracker {
+pub trait ProxyGmpModule: address_tracker::AddressTracker {
     fn gas_service_pay_gas_for_contract_call(
         &self,
         destination_chain: &ManagedBuffer,

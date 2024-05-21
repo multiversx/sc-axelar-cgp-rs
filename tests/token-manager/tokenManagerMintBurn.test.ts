@@ -65,12 +65,12 @@ describe('Give token mint burn', () => {
     const kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: baseKvs,
+      kvs: baseKvs,
     });
 
     const otherUserKvs = await otherUser.getAccountWithKvs();
     assertAccount(otherUserKvs, {
-      allKvs: [
+      kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
       ],
     });
@@ -103,7 +103,7 @@ describe('Give token mint burn', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -113,7 +113,7 @@ describe('Give token mint burn', () => {
 
     let otherUserKvs = await otherUser.getAccountWithKvs();
     assertAccount(otherUserKvs, {
-      allKvs: [
+      kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
       ],
     });
@@ -149,7 +149,7 @@ describe('Give token mint burn', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -160,7 +160,7 @@ describe('Give token mint burn', () => {
 
     otherUserKvs = await otherUser.getAccountWithKvs();
     assertAccount(otherUserKvs, {
-      allKvs: [
+      kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
       ],
     });
@@ -228,7 +228,7 @@ describe('Take token mint burn', () => {
     const kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: baseKvs,
+      kvs: baseKvs,
     });
 
     const userKvs = await user.getAccountWithKvs();
@@ -274,7 +274,7 @@ describe('Take token mint burn', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -309,7 +309,7 @@ describe('Take token mint burn', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('flow_limit').Value(e.U(500)),
@@ -543,7 +543,7 @@ describe('Mint burn', () => {
     const kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: baseKvs,
+      kvs: baseKvs,
     });
 
     // 1_000 tokens were minted and sent to otherUser
@@ -590,7 +590,7 @@ describe('Mint burn', () => {
     const kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: baseKvs,
+      kvs: baseKvs,
     });
 
     // 1_000 tokens were burned
@@ -680,7 +680,7 @@ describe('Mintership', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
@@ -723,7 +723,7 @@ describe('Mintership', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('proposed_roles', user, otherUser).Value(e.U32(0b00000001)),
@@ -753,7 +753,7 @@ describe('Mintership', () => {
     kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('proposed_roles', user, otherUser).Value(e.U32(0b00000001)),
@@ -814,7 +814,7 @@ describe('Mintership', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed

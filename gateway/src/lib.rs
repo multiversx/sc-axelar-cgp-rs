@@ -242,7 +242,7 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
         source_chain: &ManagedBuffer,
         message_id: &ManagedBuffer,
     ) -> bool {
-        self.messages(&self.message_to_command_id(&source_chain, &message_id))
+        self.messages(&self.message_to_command_id(source_chain, message_id))
             .get()
             == MessageState::Executed
     }

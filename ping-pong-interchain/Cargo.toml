@@ -13,3 +13,6 @@ version = "0.50.0"
 
 [dev-dependencies.multiversx-sc-scenario]
 version = "0.50.0"
+
+[dependencies.gateway]
+path = "../gateway"

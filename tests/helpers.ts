@@ -37,7 +37,6 @@ export const OTHER_CHAIN_TOKEN_ADDRESS: string = '0x79563F018EA5312cD84d7Ca9ecdB
 
 export const DOMAIN_SEPARATOR: string = '209d8e45d084f6d3171d9e862bce4c3b17bf03ab71a687406c111f55b8dceb76';
 
-export const COMMAND_ID: string = '8e45d084f6d317209d1d9e862bce4c3b17bf03ab71a687406c111f55b8dceb76';
 export const MESSAGE_ID: string = 'messageId';
 
 export const PAYLOAD_HASH: string = '07b8e6f7ea72578a764983050201bba8fda552f6510db37cca751f0cae27986f';

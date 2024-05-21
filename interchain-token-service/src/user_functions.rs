@@ -11,7 +11,7 @@ use crate::constants::{
     MESSAGE_TYPE_INTERCHAIN_TRANSFER, PREFIX_INTERCHAIN_TOKEN_ID,
 };
 use crate::{
-    address_tracker, events, executable, express_executor_tracker, proxy_cgp, proxy_its, remote,
+    address_tracker, events, executable, express_executor_tracker, proxy_gmp, proxy_its, remote,
 };
 
 multiversx_sc::imports!();
@@ -19,7 +19,7 @@ multiversx_sc::imports!();
 #[multiversx_sc::module]
 pub trait UserFunctionsModule:
     express_executor_tracker::ExpressExecutorTracker
-    + proxy_cgp::ProxyCgpModule
+    + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
     + events::EventsModule

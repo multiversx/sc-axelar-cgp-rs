@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import {
-  COMMAND_ID,
+  getKeccak256Hash,
+  MESSAGE_ID,
   MOCK_CONTRACT_ADDRESS_1,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
@@ -11,6 +12,7 @@ import {
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
+  baseGatewayKvs,
   baseItsKvs,
   computeExpressExecuteHash,
   computeInterchainTokenId,
@@ -21,8 +23,7 @@ import {
   its,
   itsDeployTokenManagerLockUnlock,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-  MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-  MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+  MESSAGE_TYPE_INTERCHAIN_TRANSFER, mockGatewayMessageApproved,
   pingPong,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
@@ -35,7 +36,7 @@ let otherUser: SWallet;
 
 beforeEach(async () => {
   world = await SWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
   });
@@ -103,8 +104,8 @@ test('Express execute', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -117,7 +118,7 @@ test('Express execute', async () => {
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
 
       e.kvs.Mapper('express_execute', e.TopBuffer(expressExecuteHash)).Value(user),
@@ -128,7 +129,7 @@ test('Express execute', async () => {
   const otherUserKvs = await otherUser.getAccountWithKvs();
   assertAccount(otherUserKvs, {
     balance: BigInt('10000000000000000'),
-    allKvs: [
+    kvs: [
       e.kvs.Esdts([{ id: TOKEN_ID, amount: 100_000 }]),
     ],
   });
@@ -161,9 +162,9 @@ test('Express execute with data', async () => {
       MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
-      Buffer.from(pingPong.toTopBytes()),
+      Buffer.from(pingPong.toTopU8A()),
       1_000,
-      Buffer.from(e.Tuple(e.Str('ping'), otherUser).toTopBytes()), // data passed to contract
+      Buffer.from(e.Tuple(e.Str('ping'), otherUser).toTopU8A()), // data passed to contract
     ],
   ).substring(2);
 
@@ -173,8 +174,8 @@ test('Express execute with data', async () => {
     gasLimit: 30_000_000,
     value: 1_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -186,7 +187,7 @@ test('Express execute with data', async () => {
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
 
       e.kvs.Mapper('express_execute', e.TopBuffer(expressExecuteHash)).Value(user),
@@ -197,7 +198,7 @@ test('Express execute with data', async () => {
   const pingPongKvs = await pingPong.getAccountWithKvs();
   assertAccount(pingPongKvs, {
     balance: 1_000,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
       e.kvs.Mapper('deadline').Value(e.U64(10)),
@@ -253,8 +254,8 @@ test('Express execute with data error', async () => {
     gasLimit: 300_000_000,
     value: 1_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -263,14 +264,14 @@ test('Express execute with data error', async () => {
   // Assert express execute hash NOT set
   assertAccount(await its.getAccountWithKvs(), {
     balance: 0n,
-    allKvs: [
+    kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
     ],
   });
   // Assert ping pong was NOT called
   assertAccount(await pingPong.getAccountWithKvs(), {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
       e.kvs.Mapper('deadline').Value(e.U64(10)),
@@ -304,8 +305,8 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -329,8 +330,8 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -358,8 +359,8 @@ test('Express execute errors', async () => {
     gasLimit: 20_000_000,
     value: 100_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -370,8 +371,8 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -384,8 +385,8 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -397,21 +398,24 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
   }).assertFail({ code: 4, message: 'Express executor already set' });
 
-  // Mock command executed
+  const commandId = getKeccak256Hash(OTHER_CHAIN_NAME + '_' + MESSAGE_ID);
+
+  // Mock Gateway message already executed
   await gateway.setAccount({
     ...await gateway.getAccount(),
-    codeMetadata: [],
+    codeMetadata: ['payable'],
     kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
+      ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('command_executed', e.TopBuffer(COMMAND_ID)).Value(e.U8(1)),
+      // Manually approve message
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
     ],
   });
 
@@ -420,8 +424,8 @@ test('Express execute errors', async () => {
     funcName: 'expressExecute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],

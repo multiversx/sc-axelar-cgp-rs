@@ -1,11 +1,8 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
-import createKeccakHash from 'keccak';
 import {
-  DOMAIN_SEPARATOR,
-  COMMAND_ID,
   INTERCHAIN_TOKEN_ID,
-  MOCK_CONTRACT_ADDRESS_1,
+  MESSAGE_ID,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
@@ -14,6 +11,7 @@ import {
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
+  baseGatewayKvs,
   baseItsKvs,
   deployContracts,
   deployTokenManagerMintBurn,
@@ -21,6 +19,7 @@ import {
   interchainTokenFactory,
   its,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+  mockGatewayMessageApproved,
   tokenManager,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
@@ -32,7 +31,7 @@ let user: SWallet;
 
 beforeEach(async () => {
   world = await SWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
     timestamp: 0,
@@ -86,47 +85,25 @@ const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
       'TokenName',
       'SYMBOL',
       18,
-      Buffer.from(user.toTopBytes()), // minter
+      Buffer.from(user.toTopU8A()), // minter
     ],
   ).substring(2);
 
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
+  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  // Mock contract call approved by gateway
-  let data = Buffer.concat([
-    Buffer.from(COMMAND_ID, 'hex'),
-    Buffer.from(OTHER_CHAIN_NAME),
-    Buffer.from(OTHER_CHAIN_ADDRESS),
-    its.toTopBytes(),
-    Buffer.from(payloadHash, 'hex'),
-  ]);
-
-  const dataHash = createKeccakHash('keccak256').update(data).digest('hex');
-  await gateway.setAccount({
-    ...await gateway.getAccount(),
-    codeMetadata: [],
-    kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
-
-      // Manually approve call
-      e.kvs.Mapper('contract_call_approved', e.TopBuffer(dataHash)).Value(e.U8(1)),
-    ],
-  });
-
-  return { payload, dataHash };
+  return { payload, commandId, messageHash };
 };
 
 test('Only deploy token manager', async () => {
-  const { payload, dataHash } = await mockGatewayCall();
+  const { payload, commandId, messageHash } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
     funcName: 'execute',
     gasLimit: 100_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -135,7 +112,7 @@ test('Only deploy token manager', async () => {
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, INTERCHAIN_TOKEN_ID),
     ],
   });
@@ -152,14 +129,12 @@ test('Only deploy token manager', async () => {
     ],
   });
 
-  // Gateway contract call approved key was NOT removed
-  const gatewayKvs = await gateway.getAccountWithKvs();
-  assertAccount(gatewayKvs, {
+  // Gateway message approved key was NOT removed
+  assertAccount(await gateway.getAccountWithKvs(), {
     kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
+      ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('contract_call_approved', e.TopBuffer(dataHash)).Value(e.U8(1)),
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
     ],
   });
 });
@@ -177,7 +152,7 @@ test('Only issue esdt', async () => {
     ],
   });
 
-  const { payload } = await mockGatewayCall();
+  const { payload, commandId } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
@@ -185,8 +160,8 @@ test('Only issue esdt', async () => {
     gasLimit: 600_000_000,
     value: BigInt('50000000000000000'),
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -220,12 +195,12 @@ test('Only issue esdt', async () => {
     balance: BigInt('50000000000000000'), // balance was changed
   });
 
-  // Gateway contract call approved key was removed
-  const gatewayKvs = await gateway.getAccountWithKvs();
-  assertAccount(gatewayKvs, {
+  // Gateway message was marked as executed
+  assertAccount(await gateway.getAccountWithKvs(), {
     kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
+      ...baseGatewayKvs(deployer),
+
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
     ],
   });
 });
@@ -244,8 +219,8 @@ test('Errors', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str('SomeOtherAddress'),
       payload,
     ],
@@ -269,8 +244,8 @@ test('Errors', async () => {
     gasLimit: 100_000_000,
     value: BigInt('50000000000000000'),
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -281,8 +256,8 @@ test('Errors', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -304,8 +279,8 @@ test('Errors', async () => {
     gasLimit: 20_000_000,
     value: BigInt('50000000000000000'),
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],

@@ -1,15 +1,16 @@
 import { afterEach, assert, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, Encodable, SWallet, SWorld } from 'xsuite';
 import {
   ADDRESS_ZERO,
   CHAIN_NAME,
-  COMMAND_ID,
   INTERCHAIN_TOKEN_ID,
+  MESSAGE_ID,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_ID2,
-  TOKEN_MANAGER_ADDRESS, TOKEN_MANAGER_ADDRESS_2,
+  TOKEN_MANAGER_ADDRESS,
+  TOKEN_MANAGER_ADDRESS_2,
   TOKEN_SALT,
 } from '../helpers';
 import {
@@ -21,10 +22,10 @@ import {
   gasService,
   gateway,
   interchainTokenFactory,
-  its, TOKEN_MANAGER_TYPE_LOCK_UNLOCK, TOKEN_MANAGER_TYPE_MINT_BURN,
+  its,
+  TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
   tokenManager,
 } from '../itsHelpers';
-import { Encodable } from 'xsuite';
 import createKeccakHash from 'keccak';
 
 let world: SWorld;
@@ -202,7 +203,7 @@ test('Set interchain token factory', async () => {
 
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
-    allKvs: [
+    kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
     ],
   });
@@ -233,7 +234,7 @@ describe('Operatorship', () => {
     let kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(user, interchainTokenFactory),
       ],
     });
@@ -273,7 +274,7 @@ describe('Operatorship', () => {
     let kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('proposed_roles', deployer, user).Value(e.U32(0b00000010)),
@@ -303,7 +304,7 @@ describe('Operatorship', () => {
     kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('proposed_roles', deployer, user).Value(e.U32(0b00000010)),
@@ -364,7 +365,7 @@ describe('Operatorship', () => {
     let kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(user, interchainTokenFactory),
 
         e.kvs.Mapper('proposed_roles', deployer, otherUser).Value(e.U32(0b00000010)),
@@ -404,7 +405,7 @@ describe('Pause unpause', () => {
     const kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('pause_module:paused').Value(e.Bool(true)),
@@ -456,8 +457,8 @@ describe('Pause unpause', () => {
       funcName: 'expressExecute',
       gasLimit: 20_000_000,
       funcArgs: [
-        e.TopBuffer(COMMAND_ID),
         e.Str(OTHER_CHAIN_NAME),
+        e.Str(MESSAGE_ID),
         e.Str(OTHER_CHAIN_ADDRESS),
         e.Buffer(''),
       ],
@@ -494,8 +495,8 @@ describe('Pause unpause', () => {
       funcName: 'execute',
       gasLimit: 50_000_000,
       funcArgs: [
-        e.TopBuffer(COMMAND_ID),
         e.Str(OTHER_CHAIN_NAME),
+        e.Str(MESSAGE_ID),
         e.Str(OTHER_CHAIN_ADDRESS),
         e.Buffer(''),
       ],
@@ -532,7 +533,7 @@ describe('Pause unpause', () => {
     const kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('pause_module:paused').Value(e.Bool(false)),
@@ -598,7 +599,7 @@ describe('Address tracker', () => {
     const kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('trusted_address_hash', e.Str(someChainName)).Value(e.TopBuffer(someChainAddressHash)),
@@ -640,7 +641,7 @@ describe('Address tracker', () => {
     const kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
         e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
@@ -744,7 +745,7 @@ describe('Set flow limits', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(its),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
@@ -760,7 +761,7 @@ describe('Set flow limits', () => {
     tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(its),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId2)),
