@@ -7,7 +7,7 @@ The contract is made to be permissionless, to allow anyone to register an existi
 a new token, as well as register a token remotely for another chain. The [Interchain Token Factory](../interchain-token-factory) contract exists
 to abstract some functionality regarding deployment of tokens.  
 
-This contract is based on the [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.1/contracts/InterchainTokenService.sol).
+This contract is based on the v1.2.1 reference [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.1/contracts/InterchainTokenService.sol).
 
 ## User callable endpoints
 - **deployTokenManager** (salt, destination_chain, token_manager_type, params) - deploys a custom token manager on MultiversX or another chain
@@ -18,7 +18,7 @@ This contract is based on the [Interchain Token Service implementation in Solidi
   - the generated token id depends on the caller and the salt provided
   - it also takes EGLD payment to pay for cross-chain gas costs (if applicable) OR pay for ESDT issue cost
   - if deploying on MultiversX, **it needs to be called twice**, first time it will deploy the Token Manager and the second time it will issue the ESDT through the Token Manager
-- **expressExecute** (command_id, source_chain, source_address, payload) - can be called by anyone to complete a cross-chain call faster, if they provide the required tokens
+- **expressExecute** (source_chain, message_id, source_address, payload) - can be called by anyone to complete a cross-chain call faster, if they provide the required tokens
   - the caller will get back his tokens after the cross-chain call is fully executed by the Axelar Validators and Relayer services
 - **interchainTransfer** (token_id, destination_chain, destination_address, metadata, gas_value) - initiates a new cross-chain transfer for the received token
   - it will call the appropriate token manager for the token id that will either burn or lock the tokens on MultiversX
@@ -36,7 +36,7 @@ The owner can also add or remove other ITS addresses for other chains as trusted
 ## Execute endpoint
 
 The **execute** endpoint will be cross-chain called by other ITS contracts from other chains:
-- **execute** (command_id, source_chain, source_address, payload)
+- **execute** (source_chain, message_id, source_address, payload)
 
 The source address needs to correspond to the ITS contract of the source chain, which will be checked against an internal stored mapping of ITS addresses from other supported chains. 
 

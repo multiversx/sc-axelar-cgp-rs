@@ -11,7 +11,7 @@ import {
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_MANAGER_ADDRESS,
-  TOKEN_SALT,
+  TOKEN_SALT, ALICE_PUB_KEY, BOB_PUB_KEY, CAROL_PUB_KEY, getKeccak256Hash, getSignersHash,
 } from './helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
@@ -41,24 +41,57 @@ export let tokenManager: SContract;
 export let its: SContract;
 export let pingPong: SContract;
 
+export const defaultWeightedSigners = e.Tuple(
+  e.List(
+    e.Tuple(e.TopBuffer(ALICE_PUB_KEY), e.U(5)),
+    e.Tuple(e.TopBuffer(BOB_PUB_KEY), e.U(6)),
+    e.Tuple(e.TopBuffer(CAROL_PUB_KEY), e.U(7)),
+  ),
+  e.U(10),
+  e.TopBuffer(getKeccak256Hash('nonce1')),
+);
+
+export const defaultSignersHash = getSignersHash(
+  [
+    { signer: ALICE_PUB_KEY, weight: 5 },
+    { signer: BOB_PUB_KEY, weight: 6 },
+    { signer: CAROL_PUB_KEY, weight: 7 },
+  ],
+  10,
+  getKeccak256Hash('nonce1'),
+);
+
+export const baseGatewayKvs = (operator: SWallet) => {
+  return [
+    e.kvs.Mapper('previous_signers_retention').Value(e.U(16)),
+    e.kvs.Mapper('domain_separator').Value(e.TopBuffer(DOMAIN_SEPARATOR)),
+    e.kvs.Mapper('minimum_rotation_delay').Value(e.U64(3600)),
+
+    e.kvs.Mapper('operator').Value(operator),
+    e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(defaultSignersHash)),
+    e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(defaultSignersHash)).Value(e.U(1)),
+    e.kvs.Mapper('epoch').Value(e.U(1)),
+  ];
+};
+
 export const deployGatewayContract = async (deployer: SWallet) => {
   ({ contract: gateway, address } = await deployer.deployContract({
     code: 'file:gateway/output/gateway.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
-      e.Addr(MOCK_CONTRACT_ADDRESS_1),
-      e.Str(DOMAIN_SEPARATOR),
+      e.U(16),
+      e.TopBuffer(DOMAIN_SEPARATOR),
+      e.U64(3600),
+      deployer,
+      defaultWeightedSigners,
     ],
   }));
 
   const kvs = await gateway.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
-    ],
+    kvs: baseGatewayKvs(deployer),
   });
 };
 

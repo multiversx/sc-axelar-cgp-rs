@@ -1,10 +1,9 @@
 {
   "private": true,
   "scripts": {
-    "build": "npm run build:gateway && npm run build:auth && npm run build:gas-service && npm run build:its && npm run build:interchain-token-factory && npm run build:token-manager && npm run build:ping-pong && npm run build:governance",
-    "build:cgp": "npm run build:gateway && npm run build:auth && npm run build:gas-service",
+    "build": "npm run build:gateway && npm run build:gas-service && npm run build:its && npm run build:interchain-token-factory && npm run build:token-manager && npm run build:ping-pong && npm run build:governance",
+    "build:cgp": "npm run build:gateway && npm run build:gas-service",
     "build:gateway": "cd gateway && mxpy contract build",
-    "build:auth": "cd auth && mxpy contract build",
     "build:gas-service": "cd gas-service && mxpy contract build",
     "build:its": "cd interchain-token-service && mxpy contract build",
     "build:interchain-token-factory": "cd interchain-token-factory && mxpy contract build",

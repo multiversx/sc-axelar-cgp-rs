@@ -57,12 +57,14 @@ pub trait PingPong {
         self.max_funds().set(max_funds.into_option());
     }
 
+    // TODO: Add execute endpoint and check that it works with Gateway V2
+
     #[payable("*")]
     #[endpoint(executeWithInterchainToken)]
     fn execute_with_interchain_token(
         &self,
-        _command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         _source_chain: ManagedBuffer,
+        _message_id: ManagedBuffer,
         _source_address: ManagedBuffer,
         data: Data<Self::Api>, // this will be automatically decoded from a ManagedBuffer
         _token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -85,15 +87,15 @@ pub trait PingPong {
     #[endpoint(expressExecuteWithInterchainToken)]
     fn express_execute_with_interchain_token(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         data: Data<Self::Api>,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.execute_with_interchain_token(
-            command_id,
             source_chain,
+            message_id,
             source_address,
             data,
             token_id,

@@ -1,9 +1,9 @@
 import { afterEach, assert, beforeEach, test } from 'vitest';
-import { assertAccount, d, e, SContract, SWallet, SWorld } from 'xsuite';
-import { ADDRESS_ZERO, DOMAIN_SEPARATOR, COMMAND_ID, getKeccak256Hash, MOCK_CONTRACT_ADDRESS_1 } from './helpers';
+import { assertAccount, d, e, Encodable, SContract, SWallet, SWorld } from 'xsuite';
+import { ADDRESS_ZERO, getKeccak256Hash, MESSAGE_ID } from './helpers';
 import createKeccakHash from 'keccak';
 import fs from 'fs';
-import { BytesEncodable } from 'xsuite/dist/data/BytesEncodable';
+import { baseGatewayKvs, deployGatewayContract, gateway } from './itsHelpers';
 
 const GOVERNANCE_CHAIN = 'Axelar';
 const GOVERNANCE_ADDRESS = 'axelar1u5jhn5876mjzmgw7j37mdvqh4qp5y6z2gc6rc3';
@@ -11,7 +11,6 @@ const GOVERNANCE_ADDRESS = 'axelar1u5jhn5876mjzmgw7j37mdvqh4qp5y6z2gc6rc3';
 let world: SWorld;
 let deployer: SWallet;
 let contract: SContract;
-let gateway: SContract;
 let address: string;
 
 beforeEach(async () => {
@@ -41,30 +40,8 @@ const baseKvs = () => {
   ];
 };
 
-const deployGateway = async () => {
-  ({ contract: gateway } = await deployer.deployContract({
-    code: 'file:gateway/output/gateway.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      e.Addr(MOCK_CONTRACT_ADDRESS_1),
-      e.Str(DOMAIN_SEPARATOR),
-    ],
-  }));
-
-  const kvs = await gateway.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0n,
-    allKvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
-    ],
-    owner: deployer,
-  });
-};
-
 const deployContract = async () => {
-  await deployGateway();
+  await deployGatewayContract(deployer);
 
   ({ contract, address } = await deployer.deployContract({
     code: 'file:governance/output/governance.wasm',
@@ -81,7 +58,7 @@ const deployContract = async () => {
   let kvs = await contract.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: baseKvs(),
+    kvs: baseKvs(),
   });
 
   // Change owner of gateway to governance contract so it can upgrade
@@ -91,35 +68,35 @@ const deployContract = async () => {
   });
 };
 
-const mockCallApprovedByGateway = async (payload: BytesEncodable) => {
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload.toTopU8A())).digest('hex');
+const mockCallApprovedByGateway = async (payload: Encodable) => {
+  const payloadHash = getKeccak256Hash(Buffer.from(payload.toTopU8A()));
 
-  // Mock call approved by gateway
-  let data = Buffer.concat([
-    Buffer.from(COMMAND_ID, 'hex'),
+  const messageData = Buffer.concat([
     Buffer.from(GOVERNANCE_CHAIN),
+    Buffer.from(MESSAGE_ID),
     Buffer.from(GOVERNANCE_ADDRESS),
     contract.toTopU8A(),
     Buffer.from(payloadHash, 'hex'),
   ]);
+  const messageHash = getKeccak256Hash(messageData);
 
-  const dataHash = createKeccakHash('keccak256').update(data).digest('hex');
+  const command_id = getKeccak256Hash(GOVERNANCE_CHAIN + '_' + MESSAGE_ID);
 
+  // Mock call approved by gateway
   await gateway.setAccount({
     ...await gateway.getAccount(),
     codeMetadata: ['payable'],
     kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
+      ...baseGatewayKvs(deployer),
 
-      // Manually approve call
-      e.kvs.Mapper('contract_call_approved', e.Bytes(dataHash)).Value(e.U8(1)),
+      // Manually approve message
+      e.kvs.Mapper('messages', e.TopBuffer(command_id)).Value(e.TopBuffer(messageHash)),
     ],
   });
 }
 
 test('Init errors', async () => {
-  await deployGateway();
+  await deployGatewayContract(deployer);
 
   await deployer.deployContract({
     code: 'file:governance/output/governance.wasm',
@@ -224,11 +201,14 @@ test('Execute proposal upgrade gateway', async () => {
 
   const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
 
+  const newOperator = await world.createWallet();
+
   const callData = e.TopBuffer(e.Tuple(
     e.Str('upgradeContract'),
     e.List(
       e.Buffer(gatewayCode), // code
       e.Buffer('0100'), // upgrade metadata (upgradable)
+      e.Buffer(newOperator.toTopU8A()), // Arguments to upgrade function fo Gateway
     ),
   ).toTopU8A());
 
@@ -274,10 +254,14 @@ test('Execute proposal upgrade gateway', async () => {
   });
 
   // Time lock eta was deleted
-  let kvs = await contract.getAccountWithKvs();
-  assertAccount(kvs, {
+  assertAccount(await contract.getAccountWithKvs(), {
     balance: 0n,
     kvs: baseKvs(),
+  });
+
+  // Assert Gateway was successfully upgraded (operator was changed)
+  assertAccount(await gateway.getAccountWithKvs(), {
+    kvs: baseGatewayKvs(newOperator),
   });
 });
 
@@ -413,8 +397,8 @@ test('Execute errors', async () => {
     funcName: 'execute',
     gasLimit: 10_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str('otherChain'),
+      e.Str(MESSAGE_ID),
       e.Str(GOVERNANCE_ADDRESS),
       e.TopBuffer(''),
     ],
@@ -425,8 +409,8 @@ test('Execute errors', async () => {
     funcName: 'execute',
     gasLimit: 10_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(GOVERNANCE_CHAIN),
+      e.Str(MESSAGE_ID),
       e.Str('otherAddress'),
       e.TopBuffer(''),
     ],
@@ -437,8 +421,8 @@ test('Execute errors', async () => {
     funcName: 'execute',
     gasLimit: 10_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(GOVERNANCE_CHAIN),
+      e.Str(MESSAGE_ID),
       e.Str(GOVERNANCE_ADDRESS),
       e.TopBuffer(''),
     ],
@@ -452,8 +436,8 @@ test('Execute errors', async () => {
     funcName: 'execute',
     gasLimit: 10_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(GOVERNANCE_CHAIN),
+      e.Str(MESSAGE_ID),
       e.Str(GOVERNANCE_ADDRESS),
       payload,
     ],
@@ -473,8 +457,8 @@ test('Execute errors', async () => {
     funcName: 'execute',
     gasLimit: 10_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(GOVERNANCE_CHAIN),
+      e.Str(MESSAGE_ID),
       e.Str(GOVERNANCE_ADDRESS),
       payload,
     ],
@@ -497,10 +481,10 @@ test('Execute schedule time lock proposal min eta', async () => {
   await deployer.callContract({
     callee: contract,
     funcName: 'execute',
-    gasLimit: 10_000_000,
+    gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(GOVERNANCE_CHAIN),
+      e.Str(MESSAGE_ID),
       e.Str(GOVERNANCE_ADDRESS),
       payload,
     ],
@@ -540,10 +524,10 @@ test('Execute schedule time lock proposal eta', async () => {
   await deployer.callContract({
     callee: contract,
     funcName: 'execute',
-    gasLimit: 10_000_000,
+    gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(GOVERNANCE_CHAIN),
+      e.Str(MESSAGE_ID),
       e.Str(GOVERNANCE_ADDRESS),
       payload,
     ],
@@ -570,10 +554,10 @@ test('Execute schedule time lock proposal eta', async () => {
   await deployer.callContract({
     callee: contract,
     funcName: 'execute',
-    gasLimit: 10_000_000,
+    gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(GOVERNANCE_CHAIN),
+      e.Str(MESSAGE_ID),
       e.Str(GOVERNANCE_ADDRESS),
       payload,
     ],
@@ -624,10 +608,10 @@ test('Execute cancel time lock proposal', async () => {
   await deployer.callContract({
     callee: contract,
     funcName: 'execute',
-    gasLimit: 10_000_000,
+    gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(GOVERNANCE_CHAIN),
+      e.Str(MESSAGE_ID),
       e.Str(GOVERNANCE_ADDRESS),
       payload,
     ],

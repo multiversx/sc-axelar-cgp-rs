@@ -150,8 +150,8 @@ pub trait UserFunctionsModule:
     #[endpoint(expressExecute)]
     fn express_execute_endpoint(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
@@ -166,7 +166,7 @@ pub trait UserFunctionsModule:
         );
 
         require!(
-            !self.gateway_is_command_executed(&command_id),
+            !self.gateway_is_message_executed(&source_chain, &message_id),
             "Already executed"
         );
 
@@ -174,24 +174,24 @@ pub trait UserFunctionsModule:
         let payload_hash = self.crypto().keccak256(payload);
 
         self.express_executed_event(
-            &command_id,
             &source_chain,
+            &message_id,
             &source_address,
             &payload_hash,
             &express_executor,
         );
 
         let express_hash = self.set_express_executor(
-            &command_id,
             &source_chain,
+            &message_id,
             &source_address,
             &payload_hash,
             &express_executor,
         );
 
         self.express_execute_raw(
-            command_id,
             source_chain,
+            message_id,
             interchain_transfer_payload,
             express_executor,
             express_hash,
@@ -268,8 +268,8 @@ pub trait UserFunctionsModule:
 
     fn express_execute_raw(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         interchain_transfer_payload: InterchainTransferPayload<Self::Api>,
         express_executor: ManagedAddress,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -288,9 +288,9 @@ pub trait UserFunctionsModule:
         );
 
         self.interchain_transfer_received_event(
-            &command_id,
             &interchain_transfer_payload.token_id,
             &source_chain,
+            &message_id,
             &interchain_transfer_payload.source_address,
             &destination_address,
             if interchain_transfer_payload.data.is_empty() {
@@ -305,13 +305,13 @@ pub trait UserFunctionsModule:
             self.executable_contract_express_execute_with_interchain_token(
                 destination_address,
                 source_chain,
+                message_id,
                 interchain_transfer_payload.source_address,
                 interchain_transfer_payload.data,
                 interchain_transfer_payload.token_id,
                 token_identifier,
                 interchain_transfer_payload.amount,
                 express_executor,
-                command_id,
                 express_hash,
             );
 
