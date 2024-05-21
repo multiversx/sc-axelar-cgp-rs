@@ -423,7 +423,7 @@ describe('Pause unpause', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     }).assertFail({ code: 4, message: 'Contract is paused' });
 
@@ -438,7 +438,7 @@ describe('Pause unpause', () => {
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
-        e.TopBuffer(user.toTopBytes()), // minter
+        e.TopBuffer(user.toTopU8A()), // minter
       ],
     }).assertFail({ code: 4, message: 'Contract is paused' });
 
@@ -552,7 +552,7 @@ describe('Pause unpause', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     });
   });
@@ -830,7 +830,7 @@ describe('Set flow limits', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     });
 

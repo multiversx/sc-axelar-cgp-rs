@@ -52,13 +52,16 @@ pub trait TokenManagerLockUnlockContract:
         );
 
         match implementation_type {
+            TokenManagerType::NativeInterchainToken => {
+                require!(params.token_identifier.is_none(), "Invalid token address");
+            }
             TokenManagerType::LockUnlock | TokenManagerType::LockUnlockFee => {
                 require!(params.token_identifier.is_some(), "Invalid token address");
             }
             TokenManagerType::MintBurn | TokenManagerType::MintBurnFrom => {
                 require!(
-                    params.token_identifier.is_none()
-                        || params.token_identifier.clone().unwrap().is_esdt(),
+                    params.token_identifier.is_some()
+                        && params.token_identifier.clone().unwrap().is_esdt(),
                     "Invalid token address"
                 );
             }
@@ -122,7 +125,9 @@ pub trait TokenManagerLockUnlockContract:
 
         let implementation_type = self.implementation_type().get();
         match implementation_type {
-            TokenManagerType::MintBurn | TokenManagerType::MintBurnFrom => {
+            TokenManagerType::NativeInterchainToken
+            | TokenManagerType::MintBurn
+            | TokenManagerType::MintBurnFrom => {
                 self.give_token_mint_burn(&token_identifier, destination_address, &amount);
             }
             // nothing to do for lock/unlock, tokens remain in contract
@@ -145,7 +150,9 @@ pub trait TokenManagerLockUnlockContract:
 
         let implementation_type = self.implementation_type().get();
         match implementation_type {
-            TokenManagerType::MintBurn | TokenManagerType::MintBurnFrom => {
+            TokenManagerType::NativeInterchainToken
+            | TokenManagerType::MintBurn
+            | TokenManagerType::MintBurnFrom => {
                 self.take_token_mint_burn(token_identifier, &amount);
             }
             // nothing to do for lock/unlock, tokens remain in contract
@@ -168,8 +175,8 @@ pub trait TokenManagerLockUnlockContract:
         decimals: u8,
     ) {
         require!(
-            self.implementation_type().get() == TokenManagerType::MintBurn,
-            "Not mint burn token manager"
+            self.implementation_type().get() == TokenManagerType::NativeInterchainToken,
+            "Not native interchain token manager"
         );
 
         require!(
@@ -220,8 +227,8 @@ pub trait TokenManagerLockUnlockContract:
     #[endpoint]
     fn mint(&self, address: ManagedAddress, amount: &BigUint) {
         require!(
-            self.implementation_type().get() == TokenManagerType::MintBurn,
-            "Not mint burn token manager"
+            self.implementation_type().get() == TokenManagerType::NativeInterchainToken,
+            "Not native interchain token manager"
         );
 
         self.only_minter();
@@ -242,8 +249,8 @@ pub trait TokenManagerLockUnlockContract:
     #[endpoint]
     fn burn(&self) {
         require!(
-            self.implementation_type().get() == TokenManagerType::MintBurn,
-            "Not mint burn token manager"
+            self.implementation_type().get() == TokenManagerType::NativeInterchainToken,
+            "Not native interchain token manager"
         );
 
         self.only_minter();

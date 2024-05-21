@@ -92,6 +92,12 @@ pub trait ExecutableModule:
         let deploy_token_manager_payload =
             DeployTokenManagerPayload::<Self::Api>::abi_decode(payload);
 
+        require!(
+            deploy_token_manager_payload.token_manager_type
+                != TokenManagerType::NativeInterchainToken,
+            "Can not deploy"
+        );
+
         self.deploy_token_manager_raw(
             &deploy_token_manager_payload.token_id,
             deploy_token_manager_payload.token_manager_type,
@@ -144,7 +150,11 @@ pub trait ExecutableModule:
             .top_encode(&mut params)
             .unwrap();
 
-            self.deploy_token_manager_raw(&data.token_id, TokenManagerType::MintBurn, params);
+            self.deploy_token_manager_raw(
+                &data.token_id,
+                TokenManagerType::NativeInterchainToken,
+                params,
+            );
 
             return;
         }

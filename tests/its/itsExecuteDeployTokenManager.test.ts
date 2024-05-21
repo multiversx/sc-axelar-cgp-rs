@@ -19,7 +19,8 @@ import {
   its,
   itsDeployTokenManagerLockUnlock,
   MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
-  mockGatewayMessageApproved,
+  mockGatewayMessageApproved, TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
+  TOKEN_MANAGER_TYPE_MINT_BURN,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -75,18 +76,18 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
+const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID, type = TOKEN_MANAGER_TYPE_MINT_BURN) => {
   const payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256', 'bytes32', 'uint8', 'bytes'],
     [
       MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
       Buffer.from(tokenId, 'hex'),
-      0, // Mint/Burn
+      type,
       Buffer.from(
         e.Tuple(
           e.Option(its),
           e.Option(e.Str(TOKEN_ID)),
-        ).toTopBytes(),
+        ).toTopU8A(),
       ),
     ],
   ).substring(2);
@@ -97,7 +98,7 @@ const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
 };
 
 test('Execute', async () => {
-  const { payload, commandId, messageHash} = await mockGatewayCall();
+  const { payload, commandId} = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
@@ -125,6 +126,7 @@ test('Execute', async () => {
     balance: 0,
     kvs: [
       e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
+      e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_MINT_BURN)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
@@ -179,7 +181,7 @@ test('Errors', async () => {
     user,
   );
 
-  const { payload: newPayload } = await mockGatewayCall(computedTokenId);
+  ({ payload } = await mockGatewayCall(computedTokenId, TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN));
 
   await user.callContract({
     callee: its,
@@ -189,7 +191,21 @@ test('Errors', async () => {
       e.Str(OTHER_CHAIN_NAME),
       e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
-      newPayload,
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Can not deploy' });
+
+  ({ payload } = await mockGatewayCall(computedTokenId));
+
+  await user.callContract({
+    callee: its,
+    funcName: 'execute',
+    gasLimit: 50_000_000,
+    funcArgs: [
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
     ],
   }).assertFail({ code: 4, message: 'Token manager already exists' });
 });

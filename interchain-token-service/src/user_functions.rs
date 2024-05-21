@@ -37,6 +37,12 @@ pub trait UserFunctionsModule:
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) -> TokenId<Self::Api> {
+        // Custom token managers can't be deployed with Interchain token mint burn type, which is reserved for interchain tokens
+        require!(
+            token_manager_type != TokenManagerType::NativeInterchainToken,
+            "Can not deploy"
+        );
+
         self.require_not_paused();
 
         let mut deployer = self.blockchain().get_caller();
@@ -122,7 +128,7 @@ pub trait UserFunctionsModule:
                 .top_encode(&mut params)
                 .unwrap();
 
-                self.deploy_token_manager_raw(&token_id, TokenManagerType::MintBurn, params);
+                self.deploy_token_manager_raw(&token_id, TokenManagerType::NativeInterchainToken, params);
 
                 return token_id;
             }

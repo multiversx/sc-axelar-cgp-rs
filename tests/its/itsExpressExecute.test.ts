@@ -93,7 +93,7 @@ test('Express execute', async () => {
       MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
-      Buffer.from(otherUser.toTopBytes()),
+      Buffer.from(otherUser.toTopU8A()),
       100_000,
       Buffer.from(''),
     ],
@@ -151,7 +151,7 @@ test('Express execute with data', async () => {
       e.Buffer(e.Tuple(
         e.Option(user),
         e.Option(e.Str('EGLD')),
-      ).toTopBytes()),
+      ).toTopU8A()),
     ],
   });
 
@@ -231,7 +231,7 @@ test('Express execute with data error', async () => {
       e.Buffer(e.Tuple(
         e.Option(user),
         e.Option(e.Str('EGLD')),
-      ).toTopBytes()),
+      ).toTopU8A()),
     ],
   });
 
@@ -242,9 +242,9 @@ test('Express execute with data error', async () => {
       MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
-      Buffer.from(pingPong.toTopBytes()),
+      Buffer.from(pingPong.toTopU8A()),
       1_000,
-      Buffer.from(e.Tuple(e.Str('wrong')).toTopBytes()), // wrong data passed to contract
+      Buffer.from(e.Tuple(e.Str('wrong')).toTopU8A()), // wrong data passed to contract
     ],
   ).substring(2);
 
@@ -294,7 +294,7 @@ test('Express execute errors', async () => {
       MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
-      Buffer.from(otherUser.toTopBytes()),
+      Buffer.from(otherUser.toTopU8A()),
       100_000,
       Buffer.from(''),
     ],
@@ -319,7 +319,7 @@ test('Express execute errors', async () => {
       MESSAGE_TYPE_INTERCHAIN_TRANSFER,
       Buffer.from(computedTokenId, 'hex'),
       Buffer.from(OTHER_CHAIN_ADDRESS),
-      Buffer.from(otherUser.toTopBytes()),
+      Buffer.from(otherUser.toTopU8A()),
       100_000,
       Buffer.from(''),
     ],
@@ -349,7 +349,7 @@ test('Express execute errors', async () => {
       e.Buffer(e.Tuple(
         e.Option(user),
         e.Option(e.Str(TOKEN_ID)),
-      ).toTopBytes()),
+      ).toTopU8A()),
     ],
   });
 

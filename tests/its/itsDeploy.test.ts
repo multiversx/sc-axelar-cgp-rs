@@ -13,12 +13,12 @@ import {
 import {
   baseItsKvs,
   computeInterchainTokenId,
-  deployContracts,
+  deployContracts, deployTokenManagerInterchainToken,
   deployTokenManagerMintBurn,
   gasService,
   interchainTokenFactory,
-  its,
-  TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
+  its, TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
+  TOKEN_MANAGER_TYPE_LOCK_UNLOCK, TOKEN_MANAGER_TYPE_MINT_BURN,
   tokenManager,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
@@ -91,7 +91,7 @@ describe('Deploy token manager', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     });
 
@@ -140,11 +140,11 @@ describe('Deploy token manager', () => {
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
         e.Str(''), // destination chain empty
-        e.U8(0), // Mint/burn
+        e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
         e.Buffer(e.Tuple(
           e.Option(otherUser),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     });
 
@@ -162,6 +162,22 @@ describe('Deploy token manager', () => {
   });
 
   test('Errors', async () => {
+    // Can not deploy type interchain token
+    await otherUser.callContract({
+      callee: its,
+      funcName: 'deployTokenManager',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(''),
+        e.U8(TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN),
+        e.Buffer(e.Tuple(
+          e.Option(otherUser),
+          e.Option(e.Str(TOKEN_ID2)),
+        ).toTopU8A()),
+      ],
+    }).assertFail({ code: 4, message: 'Can not deploy' });
+
     await user.callContract({
       callee: its,
       funcName: 'deployTokenManager',
@@ -174,7 +190,7 @@ describe('Deploy token manager', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     }).assertFail({ code: 4, message: 'Can not accept EGLD if not cross chain call' });
 
@@ -189,7 +205,7 @@ describe('Deploy token manager', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     });
 
@@ -205,7 +221,7 @@ describe('Deploy token manager', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     }).assertFail({ code: 4, message: 'Token manager already exists' });
   });
@@ -230,7 +246,7 @@ describe('Deploy token manager', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     });
 
@@ -392,7 +408,7 @@ describe('Deploy token manager remote', () => {
         e.Buffer(e.Tuple(
           e.Option(user),
           e.Option(e.Str(TOKEN_ID2)),
-        ).toTopBytes()),
+        ).toTopU8A()),
       ],
     }).assertFail({ code: 4, message: 'Untrusted chain' });
   });
@@ -412,7 +428,7 @@ describe('Deploy interchain token', () => {
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
-        e.TopBuffer(user.toTopBytes()), // minter
+        e.TopBuffer(user.toTopU8A()), // minter
       ],
     }).assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
 
@@ -427,7 +443,7 @@ describe('Deploy interchain token', () => {
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
-        e.TopBuffer(user.toTopBytes()), // minter
+        e.TopBuffer(user.toTopU8A()), // minter
       ],
     });
 
@@ -494,7 +510,7 @@ describe('Deploy interchain token', () => {
   });
 
   test('Only issue esdt minter', async () => {
-    const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
+    const baseTokenManagerKvs = await deployTokenManagerInterchainToken(deployer, its);
 
     const computedTokenId = computeInterchainTokenId(user);
 
@@ -520,7 +536,7 @@ describe('Deploy interchain token', () => {
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
-        e.TopBuffer(user.toTopBytes()), // minter
+        e.TopBuffer(user.toTopU8A()), // minter
       ],
     }).assertFail({ code: 10, message: 'failed transfer (insufficient funds)' });
 
@@ -535,7 +551,7 @@ describe('Deploy interchain token', () => {
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
-        e.TopBuffer(user.toTopBytes()), // minter
+        e.TopBuffer(user.toTopU8A()), // minter
       ],
     });
 
@@ -569,7 +585,7 @@ describe('Deploy interchain token', () => {
   });
 
   test('Only issue esdt no minter', async () => {
-    const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
+    const baseTokenManagerKvs = await deployTokenManagerInterchainToken(deployer, its);
 
     const computedTokenId = computeInterchainTokenId(user);
 
@@ -648,7 +664,7 @@ describe('Deploy interchain token', () => {
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
-        e.TopBuffer(user.toTopBytes()), // minter
+        e.TopBuffer(user.toTopU8A()), // minter
       ],
     });
 

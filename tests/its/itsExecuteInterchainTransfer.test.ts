@@ -88,7 +88,7 @@ const mockGatewayCall = async (interchainTokenId: string, payload: string | null
         MESSAGE_TYPE_INTERCHAIN_TRANSFER,
         Buffer.from(interchainTokenId, 'hex'),
         Buffer.from(OTHER_CHAIN_ADDRESS),
-        Buffer.from(otherUser.toTopBytes()),
+        Buffer.from(otherUser.toTopU8A()),
         1_000,
         Buffer.from(''),
       ],
