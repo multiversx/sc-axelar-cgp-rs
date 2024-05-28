@@ -13,7 +13,7 @@ import { Buffer } from 'buffer';
 import {
   baseGatewayKvs,
   baseItsKvs,
-  deployContracts,
+  deployContracts, deployTokenManagerInterchainToken,
   deployTokenManagerMintBurn,
   gateway,
   interchainTokenFactory,
@@ -140,7 +140,7 @@ test('Only deploy token manager', async () => {
 });
 
 test('Only issue esdt', async () => {
-  const baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
+  const baseTokenManagerKvs = await deployTokenManagerInterchainToken(deployer, its);
 
   // Mock token manager already deployed
   await its.setAccount({
@@ -234,7 +234,7 @@ test('Errors', async () => {
       'TokenName',
       'SYMBOL',
       18,
-      Buffer.from(user.toTopBytes()),
+      Buffer.from(user.toTopU8A()),
     ],
   ).substring(2);
 

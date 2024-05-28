@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
-import createKeccakHash from 'keccak';
-import { ADDRESS_ZERO, INTERCHAIN_TOKEN_ID, TOKEN_ID, TOKEN_ID2 } from '../helpers';
+import { TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
+  deployTokenManagerInterchainToken,
   deployTokenManagerLockUnlock,
   deployTokenManagerMintBurn,
-  TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
-  TOKEN_MANAGER_TYPE_MINT_BURN,
   tokenManager,
 } from '../itsHelpers';
 
@@ -390,7 +388,7 @@ describe('Deploy interchain token', () => {
       balance: BigInt('500000000000000000'),
     });
 
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, user);
 
     await user.callContract({
       callee: tokenManager,
@@ -423,7 +421,7 @@ describe('Deploy interchain token', () => {
   });
 
   test('Errors', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, user);
 
     // Not sent enough EGLD funds for ESDT issue
     await user.callContract({
@@ -498,8 +496,8 @@ describe('Deploy interchain token', () => {
     }).assertFail({ code: 4, message: 'Token address already exists' });
   });
 
-  test('Error lock unlock', async () => {
-    await deployTokenManagerLockUnlock(deployer, deployer, user);
+  test('Error other', async () => {
+    await deployTokenManagerMintBurn(deployer, deployer, user);
 
     await user.callContract({
       callee: tokenManager,
@@ -511,13 +509,13 @@ describe('Deploy interchain token', () => {
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
       ],
-    }).assertFail({ code: 4, message: 'Not mint burn token manager' });
+    }).assertFail({ code: 4, message: 'Not native interchain token manager' });
   });
 });
 
 describe('Mint burn', () => {
   test('Mint', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, TOKEN_ID, true, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, TOKEN_ID, true, user);
 
     // Only minter can call this
     await otherUser.callContract({
@@ -561,7 +559,7 @@ describe('Mint burn', () => {
   });
 
   test('Burn', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, TOKEN_ID, true, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, TOKEN_ID, true, user);
 
     // Only minter can call this
     await otherUser.callContract({
@@ -613,7 +611,7 @@ describe('Mint burn', () => {
   });
 
   test('Errors', async () => {
-    await deployTokenManagerMintBurn(deployer, deployer, otherUser, null, false, user);
+    await deployTokenManagerInterchainToken(deployer, deployer, otherUser, null, false, user);
 
     await user.callContract({
       callee: tokenManager,
@@ -633,8 +631,8 @@ describe('Mint burn', () => {
     }).assertFail({ code: 4, message: 'Token address not yet set' });
   });
 
-  test('Error lock unlock', async () => {
-    await deployTokenManagerLockUnlock(deployer, deployer, user);
+  test('Error other', async () => {
+    await deployTokenManagerMintBurn(deployer, deployer, user);
 
     await user.callContract({
       callee: tokenManager,
@@ -644,20 +642,20 @@ describe('Mint burn', () => {
         otherUser,
         e.U(1_000),
       ],
-    }).assertFail({ code: 4, message: 'Not mint burn token manager' });
+    }).assertFail({ code: 4, message: 'Not native interchain token manager' });
 
     await user.callContract({
       callee: tokenManager,
       funcName: 'burn',
       gasLimit: 20_000_000,
       funcArgs: [],
-    }).assertFail({ code: 4, message: 'Not mint burn token manager' });
+    }).assertFail({ code: 4, message: 'Not native interchain token manager' });
   });
 });
 
 describe('Mintership', () => {
   test('Transfer', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, null, false, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, null, false, user);
 
     await deployer.callContract({
       callee: tokenManager,
@@ -700,7 +698,7 @@ describe('Mintership', () => {
   });
 
   test('Propose', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, null, false, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, null, false, user);
 
     await deployer.callContract({
       callee: tokenManager,
@@ -763,7 +761,7 @@ describe('Mintership', () => {
   });
 
   test('Accept', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, otherUser, null, false, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, null, false, user);
 
     await deployer.callContract({
       callee: tokenManager,

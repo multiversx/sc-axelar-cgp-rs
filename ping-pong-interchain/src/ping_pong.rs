@@ -58,7 +58,6 @@ pub trait PingPong {
         self.max_funds().set(max_funds.into_option());
     }
 
-    // TODO: Add execute endpoint and check that it works with Gateway V2
     #[endpoint(execute)]
     fn execute(
         &self,

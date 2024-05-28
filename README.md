@@ -27,8 +27,8 @@ This contract will be used instead of a multisig to manage the other contracts, 
 
 ITS is a comprised of a set of contracts which enable token transfers on top of the CGP protocol.
 
-It is based on the Axelar ITS Solidity implementation available at the time of writing: (v1.2.1)
-- https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.1/DESIGN.md
+It is based on the Axelar ITS Solidity implementation available at the time of writing: (v1.2.4)
+- https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.4/DESIGN.md
 
 It consists of the following contracts:
 - [Interchain Token Service](/interchain-token-service) - main contract which handles transferring of tokens, registering & deploying of token managers

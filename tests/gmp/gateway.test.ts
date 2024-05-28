@@ -1540,7 +1540,7 @@ test.skip('Execute approve contract call with multisig prover encoded data', asy
     gasLimit: 25_000_000,
     funcName: 'execute',
     funcArgs: [
-      e.Tuple(e.Buffer(data), e.Buffer(proof.toTopBytes())),
+      e.Tuple(e.Buffer(data), e.Buffer(proof.toTopU8A())),
     ],
   });
 
@@ -1552,7 +1552,7 @@ test.skip('Execute approve contract call with multisig prover encoded data', asy
     Buffer.from(commandId, 'hex'),
     Buffer.from('Ethereum'),
     Buffer.from('00'),
-    e.Addr('erd1qqqqqqqqqqqqqpgqhe8t5jewej70zupmh44jurgn29psua5l2jps3ntjj3').toTopBytes(),
+    e.Addr('erd1qqqqqqqqqqqqqpgqhe8t5jewej70zupmh44jurgn29psua5l2jps3ntjj3').toTopU8A(),
     Buffer.from(payloadHash, 'hex'),
   ]);
 
@@ -1605,7 +1605,7 @@ test.skip('Execute transfer operatorship with multisig prover encoded data', asy
     gasLimit: 25_000_000,
     funcName: 'execute',
     funcArgs: [
-      e.Tuple(e.Buffer(data), e.Buffer(proof.toTopBytes())),
+      e.Tuple(e.Buffer(data), e.Buffer(proof.toTopU8A())),
     ],
   });
 
