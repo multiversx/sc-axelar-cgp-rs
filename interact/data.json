@@ -1,16 +1,15 @@
 {
   "codeGateway": "file:gateway/output/gateway.wasm",
-  "codeAuth": "file:auth/output/auth.wasm",
   "codeGasService": "file:gas-service/output/gas-service.wasm",
   "codeBaseTokenManager": "file:token-manager/output/token-manager.wasm",
   "codeIts": "file:interchain-token-service/output/interchain-token-service.wasm",
   "codeInterchainTokenFactory": "file:interchain-token-factory/output/interchain-token-factory.wasm",
   "codePingPongInterchain": "file:ping-pong-interchain/output/ping-ping-interchain.wasm",
   "codeGovernance": "file:governance/output/governance.wasm",
-  "chainId": {
-    "devnet": "D",
-    "testnet": "T",
-    "mainnet": "1"
+  "domainSeparator": {
+    "devnet": "209d8e45d084f6d3171d9e862bce4c3b17bf03ab71a687406c111f55b8dceb76",
+    "testnet": "",
+    "mainnet": ""
   },
   "governance": {
     "chain": {
@@ -35,42 +34,42 @@
     "mainnet": ""
   },
   "addressGateway": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqhxy6dv9k5p3u4d6rawnwjyp0j3sunu9dkklspga3t9",
-    "testnet": "",
-    "mainnet": ""
-  },
-  "addressAuth": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqehceexve3lsu7few7fayld6gkw984fyrkklsyp8lr9",
+    "devnet": "erd1qqqqqqqqqqqqqpgqvkhh6ex5m0sl0rgxn5790ljsscye0r48kkls7hrlaw",
     "testnet": "",
     "mainnet": ""
   },
   "addressGasService": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqsrhknrwuvy606ar5l2kuaz4glgyyye9vkkls5ng86g",
+    "devnet": "erd1qqqqqqqqqqqqqpgq8fmglw6pngxsczmpa0kr3904shnclzsukklsjeykne",
     "testnet": "",
     "mainnet": ""
   },
   "addressBaseTokenManager": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqqqsm476xr8rhx4fj7favff0ux9t0rc4tkklsc6axy3",
+    "devnet": "erd1qqqqqqqqqqqqqpgqqwnfjq9zmyxphd7sql6ud9tk4a0xj33lkklsqnlru6",
     "testnet": "",
     "mainnet": ""
   },
   "addressIts": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqw08zahneragk9rnaujwe8qcyu84ehw2lkklsvca0jx",
+    "devnet": "erd1qqqqqqqqqqqqqpgqcv3rhjjrqpl88es4q25lw03hfhpw6s36kklsn6t9a6",
     "testnet": "",
     "mainnet": ""
   },
   "addressInterchainTokenFactory": {
-    "devnet": "erd1qqqqqqqqqqqqqpgq8eylwsw70uw878r2l0chjf3a7s6zjsrykklsymyndm",
+    "devnet": "erd1qqqqqqqqqqqqqpgq0mhy244pyr9pzdhahvvyze4rw3xl29q4kklszyzq72",
     "testnet": "",
     "mainnet": ""
   },
   "addressGovernance": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqcwpm529augh68lnfxgl8k7rjms47xmsfkklsrwkrgt",
+    "devnet": "erd1qqqqqqqqqqqqqpgqspavr3yujrkq3nge27vmkh2kzxj98zzskkls0gjk47",
     "testnet": "",
     "mainnet": ""
   },
   "addressPingPongInterchain": {
-    "devnet": "",
+    "devnet": "erd1qqqqqqqqqqqqqpgqf66fr098unjekvmn6ezrfe4r82zt50ggkklsgfce63",
+    "testnet": "",
+    "mainnet": ""
+  },
+  "addressPingPong": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqswka88982f9uk2t4qxw2r60fs20nd7uwkklsemapa9",
     "testnet": "",
     "mainnet": ""
   },
@@ -78,11 +77,15 @@
     "devnet": {
       "EGLD": {
         "tokenId": "a5c60f3b87f8bd9ae6d97755143b9842902b228c46beb7abf63f12e0904c19b1",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqvepwc5nahtpmv7gl74unkyex48k473cjkklsh9gp9d"
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqzaxt2e4630kpp6uxg5hl6yfefls72us0kklsxhl8fk"
       },
-      "ITSTT-9a9969": {
+      "ITSTT-56fc4e": {
         "tokenId": "9beb1db4db80c00d179db0f03a8ed4e0a3f868bc7a3a01ba7773cc157812a729",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqym0z6cpgmxr7zqzy94rhdymaxgq0qwn2kklsk2wxyc"
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqyv58myla28ql7ufg5dlanwzed97jhy40kklsyk4666"
+      },
+      "SYMBOL-9c7411": {
+        "tokenId": "bbee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqlnvua4qchnsfj7xrfd9vmlg9mqeky5erkklsmzqcl4"
       }
     },
     "testnet": {},
