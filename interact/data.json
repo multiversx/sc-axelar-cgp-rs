@@ -86,6 +86,10 @@
       "SYMBOL-9c7411": {
         "tokenId": "bbee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb",
         "tokenManager": "erd1qqqqqqqqqqqqqpgqlnvua4qchnsfj7xrfd9vmlg9mqeky5erkklsmzqcl4"
+      },
+      "ITSTT-9a9969": {
+        "tokenId": "aaee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqaeu63py0unche3mwl2u8nmm38ff8kf4hkklsrjkh6q"
       }
     },
     "testnet": {},

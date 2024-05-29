@@ -5,12 +5,19 @@ import { firstSigners, firstSignersHash, loadWallet } from './index';
 import { Command } from 'commander';
 import { Wallet } from 'xsuite';
 import { envChain } from 'xsuite/interact';
-import { generateMessageSignature, generateProof, getKeccak256Hash, INTERCHAIN_TOKEN_ID } from '../tests/helpers';
+import {
+  generateMessageSignature,
+  generateProof,
+  getKeccak256Hash,
+  INTERCHAIN_TOKEN_ID,
+  TOKEN_ID,
+} from '../tests/helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { AbiCoder } from 'ethers';
 import {
-  MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+  its,
+  MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
 } from '../tests/itsHelpers';
@@ -184,8 +191,8 @@ export const setupITSCommands = (program: Command) => {
   program.command('itsInterchainTransfer')
     .argument('tokenIdentifier')
     .argument('amount')
-    .argument('[gasValue]', '', 0)
-    .action(async (tokenIdentifier, amount, gasValue = 0) => {
+    .argument('[gasValue]', '', 1000)
+    .action(async (tokenIdentifier, amount, gasValue = 1000) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
@@ -304,7 +311,7 @@ export const setupITSCommands = (program: Command) => {
     ITS Deploy Interchain Token test flow
   ********************************/
 
-    // Update this if wanting to test again
+  // Update this if wanting to test again
   const executeDeployInterchainTokenMessageId = 'executeDeployInterchainTokenMessageId';
   const executeDeployInterchainTokenPayload = (wallet: Wallet) => {
     const tokenId = 'bbee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb';
@@ -353,7 +360,7 @@ export const setupITSCommands = (program: Command) => {
     console.log('Result:', result);
   });
 
-  // Needs to be called 3 times to fully finish the token deployment!
+  // Needs to be called 2 times to fully finish the token deployment!
   program.command('itsExecuteDeployInterchainToken').action(async () => {
     const wallet = await loadWallet();
 
@@ -379,6 +386,79 @@ export const setupITSCommands = (program: Command) => {
   /*******************************
    ITS Deploy Token Manager test flow
    ********************************/
+
+    // Update this if wanting to test again
+  const executeDeployTokenManagerMessageId = 'executeDeployTokenManagerMessageId';
+  const executeDeployTokenManagerPayload = (wallet: Wallet) => {
+    const tokenId = 'aaee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb';
+    const tokenIdentifier = 'ITSTT-9a9969';
+
+    return AbiCoder.defaultAbiCoder().encode(
+      ['uint256', 'bytes32', 'uint8', 'bytes'],
+      [
+        MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+        Buffer.from(tokenId, 'hex'),
+        TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
+        Buffer.from(
+          e.Tuple(
+            e.Option(wallet), // operator
+            e.Option(e.Str(tokenIdentifier)),
+          ).toTopU8A(),
+        ),
+      ],
+    ).substring(2);
+  };
+
+  program.command('itsApproveExecuteDeployTokenManager').action(async () => {
+    const wallet = await loadWallet();
+
+    const payload = executeDeployTokenManagerPayload(wallet);
+
+    const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
+
+    const message = e.Tuple(
+      e.Str(otherChainName),
+      e.Str(executeDeployTokenManagerMessageId),
+      e.Str(otherChainAddress),
+      e.Addr(envChain.select(data.addressIts)),
+      e.TopBuffer(payloadHash),
+    );
+
+    const result = await wallet.callContract({
+      callee: envChain.select(data.addressGateway),
+      gasLimit: 15_000_000,
+      funcName: 'approveMessages',
+      funcArgs: [
+        e.List(message),
+        generateProof(
+          firstSigners, [
+            generateMessageSignature(firstSignersHash, e.List(message)),
+          ],
+        ),
+      ],
+    });
+    console.log('Result:', result);
+  });
+
+  program.command('itsExecuteDeployTokenManager').action(async () => {
+    const wallet = await loadWallet();
+
+    const payload = executeDeployTokenManagerPayload(wallet);
+
+    const result = await wallet.callContract({
+      callee: envChain.select(data.addressIts),
+      funcName: 'execute',
+      gasLimit: 100_000_000,
+      funcArgs: [
+        e.Str(otherChainName),
+        e.Str(executeDeployTokenManagerMessageId),
+        e.Str(otherChainAddress),
+        payload,
+      ],
+    });
+
+    console.log(`Result`, result);
+  });
 };
 
 const setupInterchainTokenFactoryCommands = (program: Command) => {
