@@ -191,7 +191,13 @@ program.command('rotateSigners')
     const wallet = await loadWallet();
 
     // This should be changed to a new value if we want the transaction to actually succeed
-    const newSigners = firstSigners;
+    const [newSigners, firstSignersHash] = getSignersHashAndEncodable(
+      [
+        { signer: ALICE_PUB_KEY, weight: 10 },
+      ],
+      10,
+      getKeccak256Hash('nonce1'),
+    );
 
     let proof;
     if (latest) {

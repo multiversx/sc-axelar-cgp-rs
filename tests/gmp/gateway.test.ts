@@ -1511,174 +1511,171 @@ test('Approve validate execute external contract', async () => {
   });
 });
 
-// TODO: Re-enable below tests after updating Amplifier Multisig Prover
-test.skip('Execute approve contract call with multisig prover encoded data', async () => {
+const multisigSignersHash = getSignersHash(
+  [
+    { signer: ALICE_PUB_KEY, weight: 1 },
+    { signer: BOB_PUB_KEY, weight: 1 },
+    { signer: CAROL_PUB_KEY, weight: 1 },
+    { signer: 'ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6', weight: 1 },
+    { signer: 'ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449', weight: 1 },
+  ],
+  3,
+  '290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563',
+);
+
+test('Approve messages with multisig prover encoded data', async () => {
   await deployContract();
 
-  // 00000001 - length of text
-  // 44 - 'D' as hex
-  // 00000001 - length of command ids
-  // ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff - command id
-  // 00000001 - length of commands
-  // 00000013 - length of text
-  // 617070726f7665436f6e747261637443616c6c - 'approveContractCall' as hex
-  // 00000001 - length of params
-  // 00000052 - length of param
-  // 00000008457468657265756d00000002303000000000000000000500be4eba4b2eccbcf1703bbd6b2e0d1351430e769f54830202020202020202020202020202020202020202020202020202020202020202 - params
-  const data = Buffer.from(
-    '000000014400000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000100000013617070726f7665436f6e747261637443616c6c000000010000005200000008457468657265756d00000002303000000000000000000500be4eba4b2eccbcf1703bbd6b2e0d1351430e769f54830202020202020202020202020202020202020202020202020202020202020202',
-    'hex',
-  );
-
-  const proof = generateProofOld(data);
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 25_000_000,
-    funcName: 'execute',
-    funcArgs: [
-      e.Tuple(e.Buffer(data), e.Buffer(proof.toTopU8A())),
-    ],
-  });
-
-  const commandId = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-  const payloadHash = '0202020202020202020202020202020202020202020202020202020202020202';
-
-  // get_is_contract_call_approved_key hash
-  let approvedData = Buffer.concat([
-    Buffer.from(commandId, 'hex'),
-    Buffer.from('Ethereum'),
-    Buffer.from('00'),
-    e.Addr('erd1qqqqqqqqqqqqqpgqhe8t5jewej70zupmh44jurgn29psua5l2jps3ntjj3').toTopU8A(),
-    Buffer.from(payloadHash, 'hex'),
-  ]);
-
-  const approvedDataHash = createKeccakHash('keccak256').update(approvedData).digest('hex');
-
-  let kvs = await contract.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    hasKvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
-
-      e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(1)),
-
-      e.kvs.Mapper('contract_call_approved', e.TopBuffer(approvedDataHash)).Value(e.U8(1)),
-    ],
-  });
-});
-
-test.skip('Execute transfer operatorship with multisig prover encoded data', async () => {
-  await deployContract();
-
-  // 00000001 - length of text
-  // 44 - 'D' as hex
-  // 00000001 - length of command ids
-  // ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff - command id
-  // 00000001 - length of commands
-  // 00000014 - length of text
-  // 7472616e736665724f70657261746f7273686970 - 'approveContractCall' as hex
-  // 00000001 - length of params
-  // 00000057 - length of param
-  // 00000002ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000002000000010a000000010a0000000114 - params
-  const data = Buffer.from(
-    '000000014400000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000001000000147472616e736665724f70657261746f7273686970000000010000005700000002ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000002000000010a000000010a0000000114',
-    'hex',
-  );
-
-  const signature = generateSignature(data);
-  const signatureBob = generateSignature(data, './bob.pem');
-
-  const proof = e.Tuple(
-    e.List(e.TopBuffer(ALICE_PUB_KEY), e.TopBuffer(BOB_PUB_KEY)),
-    e.List(e.U(10), e.U(2)),
-    e.U(12),
-    e.List(e.TopBuffer(signature), e.TopBuffer(signatureBob)),
-  );
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 25_000_000,
-    funcName: 'execute',
-    funcArgs: [
-      e.Tuple(e.Buffer(data), e.Buffer(proof.toTopU8A())),
-    ],
-  });
-
-  const commandId = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-
-  let kvs = await contract.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(addressAuth)),
-      e.kvs.Mapper('chain_id').Value(e.Str(DOMAIN_SEPARATOR)),
-
-      e.kvs.Mapper('command_executed', e.TopBuffer(commandId)).Value(e.U8(1)),
-    ],
-  });
-
-  const operatorsHash = getSignersHash([ALICE_PUB_KEY], [10], 10);
-  const operatorsHash2 = getSignersHash([ALICE_PUB_KEY, BOB_PUB_KEY], [10, 2], 12);
-  const operatorsHash3 = getSignersHash([MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2], [10, 10], 20);
-
-  // Check that Auth contract was updated
-  kvs = await contractAuth.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0,
-    kvs: [
-      // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
-      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash2)).Value(e.U64(16)),
-      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash3)).Value(e.U64(17)),
-
-      e.kvs.Mapper('hash_for_epoch', e.U64(17)).Value(e.TopBuffer(operatorsHash3)),
-
-      e.kvs.Mapper('current_epoch').Value(e.U64(17)),
-    ],
-  });
-});
-
-test.skip('Validate proof with multisig prover encoded proof', async () => {
-  await deployContract();
-
-  const operatorsHash = getSignersHash([MULTISIG_PROVER_PUB_KEY_1, MULTISIG_PROVER_PUB_KEY_2], [10, 10], 10);
+  // Mock multisig signers in contract
   await contract.setAccount({
     ...await contract.getAccount(),
     kvs: [
-      // Manually add epoch for hash & current epoch
-      e.kvs.Mapper('epoch_for_hash', e.TopBuffer(operatorsHash)).Value(e.U64(1)),
+      ...baseKvs(),
 
-      e.kvs.Mapper('current_epoch').Value(e.U64(16)),
-    ],
+      e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
+      e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
+    ]
   });
 
-  // 00000002 - length of operators
-  // ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6 - first operator public key
-  // ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449 - second operator public key
-  // 00000002 - length of weigths
-  // 00000001 0a - length of biguint weight followed by 10 as hex
-  // 00000001 0a
-  // 00000001 0a - length of biguint threshold followed by 10 as hex
-  // 00000002 - length of signatures
-  // fdae22df86f53a39985674072ed1442d08a66683e464134b8d17e373a07e8b82137b96087fa7bbbd2764c4e7658564c32480b2bb31ba70c1225350724494e507 - first signature
-  // b054d00827810f8384b85c88352dabf81dcc9be76a77617df942e8bd65ca15fadaef5941a0022f29d86fa5bd33c7fc593580930e521e337544716b5901f8810f - second signature
+  // 00000009 67616e616368652d31 - length of `ganache-1` source chain string followed by it as hex
+  // 00000044 3078666638323263383838303738353966663232366235386532346632343937346137306630346239343432353031616533386664363635623363363866333833342d30 - length of message id followed by `0xff822c88807859ff226b58e24f24974a70f04b9442501ae38fd665b3c68f3834-0` string encoded as hex
+  // 0000002a 307835323434346631383335416463303230383663333743623232363536313630356532453136393962 - length of source address followed by `0x52444f1835Adc02086c37Cb226561605e2E1699b` string as hex
+  // 000000000000000005006fbc99e58a82ef3c082afcd2679292693049c9371090 - destination address `erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax` from bech32 to hex
+  // 8c3685dc41c2eca11426f8035742fb97ea9f14931152670a5703f18fe8b392f0 - payload hash as hex
   const data = Buffer.from(
-    '00000002ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000002000000010a000000010a000000010a00000002fdae22df86f53a39985674072ed1442d08a66683e464134b8d17e373a07e8b82137b96087fa7bbbd2764c4e7658564c32480b2bb31ba70c1225350724494e507b054d00827810f8384b85c88352dabf81dcc9be76a77617df942e8bd65ca15fadaef5941a0022f29d86fa5bd33c7fc593580930e521e337544716b5901f8810f',
+    '0000000967616e616368652d31000000443078666638323263383838303738353966663232366235386532346632343937346137306630346239343432353031616533386664363635623363363866333833342d300000002a307835323434346631383335416463303230383663333743623232363536313630356532453136393962000000000000000005006fbc99e58a82ef3c082afcd2679292693049c93710908c3685dc41c2eca11426f8035742fb97ea9f14931152670a5703f18fe8b392f0',
     'hex',
   );
 
-  const messageHash = Buffer.from('84219fac907aad564fe5f1af58993d1c3f8f288af30b8bff5b50ffb5bba96bc0', 'hex');
+  // 00000005 - length of signers
+  // 0139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e1 00000001 01 - first signer with weight
+  // 8049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f8 00000001 01 - second signer with weight
+  // b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba 00000001 01 - third signer with weight
+  // ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6 00000001 01 - fourth signer with weight
+  // ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449 00000001 01 - fifth signer with weight
+  // 00000001 03 - length of biguint threshold followed by 3 as hex
+  // 290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563 - the nonce (keccak256 hash of Uin256 number 0, created_at date)
+  // 00000005 - length of signatures
+  // 01 9543286a58ded1c031fcf8e5fcdc7c5b48b6304c539bdf7a30a0b780451a64318420fe654a13be7a33cae4f221cd26e1e033d01da144901453474c73b520450d - first signature encoded as a Some option
+  // 01 199b7e0f25ff4c24637bbdfdc18d338f422793f492a81140afd080019061088ddf667f018d88928a28dcb77a2c253c66ee5a83be2d4134ff3ab3141f0fdb170d - second signature encoded as a Some option
+  // 01 4f883c316682c6e000bf4c92536a138f78c6af265f4f13d7210110e40350bb4d99e049677db13e7c12f8a4e617a5cb9bf32f5142cd58f7146505078e2d675703 - third signature encoded as a Some option
+  // 00 - fourth signature encoded as a None option (the fourth signer didn't specify any signature)
+  // 00 - fifth signature encoded as a None option (the fifth signer didn't specify any signature)
+  const proof = Buffer.from(
+    '000000050139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba0000000101ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b60000000101ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56300000005019543286a58ded1c031fcf8e5fcdc7c5b48b6304c539bdf7a30a0b780451a64318420fe654a13be7a33cae4f221cd26e1e033d01da144901453474c73b520450d01199b7e0f25ff4c24637bbdfdc18d338f422793f492a81140afd080019061088ddf667f018d88928a28dcb77a2c253c66ee5a83be2d4134ff3ab3141f0fdb170d014f883c316682c6e000bf4c92536a138f78c6af265f4f13d7210110e40350bb4d99e049677db13e7c12f8a4e617a5cb9bf32f5142cd58f7146505078e2d6757030000',
+    'hex'
+  )
 
-  // Signature is invalid because we use mock public keys, but we test if decoding of the raw data works properly
   await deployer.callContract({
     callee: contract,
-    gasLimit: 10_000_000,
-    funcName: 'validateProof',
+    gasLimit: 25_000_000,
+    funcName: 'approveMessages',
     funcArgs: [
-      e.TopBuffer(messageHash),
-      e.TopBuffer(data),
+      e.Buffer(data),
+      e.Buffer(proof),
     ],
-  }).assertFail({ code: 10, message: 'invalid signature' });
+  });
+
+  const commandId = getKeccak256Hash('ganache-1_0xff822c88807859ff226b58e24f24974a70f04b9442501ae38fd665b3c68f3834-0');
+
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0,
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
+      e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
+
+      // Message was executed
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer('b8fe5d23fe5954fa900ec37278b8661a98d061dfa34e7ebdd2e3ae98fbee5d8d')),
+    ],
+  });
+});
+
+test('Rotate signers with multisig prover encoded data', async () => {
+  await deployContract();
+
+  // Mock multisig signers in contract
+  await contract.setAccount({
+    ...await contract.getAccount(),
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
+      e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
+    ]
+  });
+
+  // 00000003 - length of new signers
+  // 0139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e1 - first new signer
+  // 00000001 01 - length of biguint weight followed by 1 as hex
+  // 8049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f8 - second new signer
+  // 00000001 01 - length of biguint weight followed by 1 as hex
+  // b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba - third new signer
+  // 00000001 01 - length of biguint weight followed by 1 as hex
+  // 00000001 03 - length of biguint threshold followed by 3 as hex
+  // 290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563 - the nonce (keccak256 hash of Uin256 number 0, created_at date)
+  const newSigners = Buffer.from(
+    '000000030139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba00000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563',
+    'hex',
+  );
+
+  // 00000005 - length of signers
+  // 0139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e1 00000001 01 - first signer with weight
+  // 8049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f8 00000001 01 - second signer with weight
+  // b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba 00000001 01 - third signer with weight
+  // ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6 00000001 01 - fourth signer with weight
+  // ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449 00000001 01 - fifth signer with weight
+  // 00000001 03 - length of biguint threshold followed by 3 as hex
+  // 290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563 - the nonce (keccak256 hash of Uin256 number 0, created_at date)
+  // 00000005 - length of signatures
+  // 01 5c98a98d1e47adecf83a10d4fdc542aae1cb13ab8e6d3f5e237ad75ccb6608631c0d3f8735e3f5f481e82f088fe5215d431ae8c6abf68b96797df4bbe610cd05 - first signature encoded as a Some option
+  // 01 ca0999eac93ee855ea88680b8094660635a06743e9acdb8d1987a9c48a60e9f794bd22a10748bb9c3c961ddc3068a96abfae00a9c38252a4b3ad99caeb060805 - second signature encoded as a Some option
+  // 01 deca8b224a38ad99ec4cb4f3d8e86778544c55ab0c4513ce8af834b81b3e934eef29727cc76c364f316a44c2eea82fa655f209f0c5205a209461d8a7fbbacf03 - third signature encoded as a Some option
+  // 00 - fourth signature encoded as a None option (the fourth signer didn't specify any signature)
+  // 00 - fifth signature encoded as a None option (the fifth signer didn't specify any signature)
+  const proof = Buffer.from(
+    '000000050139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba0000000101ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b60000000101ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56300000005015c98a98d1e47adecf83a10d4fdc542aae1cb13ab8e6d3f5e237ad75ccb6608631c0d3f8735e3f5f481e82f088fe5215d431ae8c6abf68b96797df4bbe610cd0501ca0999eac93ee855ea88680b8094660635a06743e9acdb8d1987a9c48a60e9f794bd22a10748bb9c3c961ddc3068a96abfae00a9c38252a4b3ad99caeb06080501deca8b224a38ad99ec4cb4f3d8e86778544c55ab0c4513ce8af834b81b3e934eef29727cc76c364f316a44c2eea82fa655f209f0c5205a209461d8a7fbbacf030000',
+    'hex'
+  );
+
+  await world.setCurrentBlockInfo({
+    timestamp: 3600,
+  });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 25_000_000,
+    funcName: 'rotateSigners',
+    funcArgs: [
+      e.Buffer(newSigners),
+      e.Buffer(proof),
+    ],
+  });
+
+  const newSignersHash = getSignersHash(
+    [
+      { signer: ALICE_PUB_KEY, weight: 1 },
+      { signer: BOB_PUB_KEY, weight: 1 },
+      { signer: CAROL_PUB_KEY, weight: 1 },
+    ],
+    3,
+    '290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563',
+  );
+
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('operator').Value(firstUser),
+      e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
+      e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
+      e.kvs.Mapper('epoch').Value(e.U(2)),
+      e.kvs.Mapper('last_rotation_timestamp').Value(e.U64(3600)),
+
+      e.kvs.Mapper('signer_hash_by_epoch', e.U(2)).Value(e.TopBuffer(newSignersHash)),
+      e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(newSignersHash)).Value(e.U(2)),
+    ],
+  });
 });

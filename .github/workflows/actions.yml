@@ -47,11 +47,10 @@ jobs:
 
           sudo apt install -y wabt=1.0.27-1
 
-          cargo install wasm-opt
           cargo install twiggy
           
           cargo install multiversx-sc-meta --locked
-          
+
           which mxpy
           which wasm-opt
 
