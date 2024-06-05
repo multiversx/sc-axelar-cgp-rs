@@ -33,10 +33,6 @@ jobs:
           toolchain: 1.78.0
           target: wasm32-unknown-unknown
 
-      - name: Setup the PATH variable
-        run: |
-          echo "PATH=$HOME/.local/bin:$HOME/multiversx-sdk/vmtools:$PATH" >> $GITHUB_ENV
-
       - name: Install prerequisites
         run: |
           pipx install multiversx-sdk-cli==v9.5.5

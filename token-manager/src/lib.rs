@@ -219,9 +219,8 @@ pub trait TokenManagerLockUnlockContract:
                 EsdtTokenType::Fungible,
                 decimals as usize,
             )
-            .async_call()
             .with_callback(self.callbacks().deploy_token_callback())
-            .call_and_exit();
+            .async_call_and_exit();
     }
 
     #[endpoint]

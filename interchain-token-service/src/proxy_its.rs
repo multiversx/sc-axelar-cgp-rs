@@ -113,7 +113,6 @@ pub trait ProxyItsModule:
                 token_id.clone(),
             )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
-            .async_call()
             .with_callback(self.callbacks().execute_with_token_callback(
                 source_chain,
                 message_id,
@@ -121,7 +120,7 @@ pub trait ProxyItsModule:
                 token_identifier,
                 amount,
             ))
-            .call_and_exit();
+            .async_call_and_exit();
     }
 
     fn executable_contract_express_execute_with_interchain_token(
@@ -146,7 +145,6 @@ pub trait ProxyItsModule:
                 token_id,
             )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
-            .async_call()
             .with_callback(self.callbacks().exp_execute_with_token_callback(
                 express_executor,
                 source_chain,
@@ -155,7 +153,7 @@ pub trait ProxyItsModule:
                 amount,
                 express_hash,
             ))
-            .call_and_exit();
+            .async_call_and_exit();
     }
 
     #[view(flowLimit)]
