@@ -37,7 +37,7 @@ impl TypeAbi for Roles {
     type Unmanaged = Self;
 
     fn type_name() -> TypeName {
-        TypeName::from("Roles")
+        TypeName::from("u8")
     }
 
     fn type_name_rust() -> TypeName {
