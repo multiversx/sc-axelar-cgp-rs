@@ -38,3 +38,20 @@ There is also a module used by the Token Manager & Interchain Token Service cont
 - [Operatable module](/modules/operatable) - holds details regarding the operator (pseudo owner) of a contract as well as roles management
 
 For testing there is also the [Ping Pong Interchain](/ping-pong-interchain) contract, which is an implementation of the Ping Pong contract compatible with ITS.
+
+# Axelar Amplifier
+
+These contracts work together with the [Axelar Amplifier](https://docs.axelar.dev/dev/amplifier/introduction) in order to facilitate
+GMP (General Message Passing) calls between MultiversX and other chains.
+
+The Axelar Amplifier require multiple CosmWASM contracts to be deployed on Axelar network:
+- **Voting Verifier contract**
+- **Gateway contract**
+- **Multisig Prover contract**
+
+## Axelar Devnet
+
+- source chain - `multiversx`
+- **Voting Verifier contract** - `axelar1sejw0v7gmw3fv56wqr2gy00v3t23l0hwa4p084ft66e8leap9cqq9qlw4t`
+- **Gateway contract** - `axelar1gzlxntvtkatgnf3shfcgc8alqqljjtmx75vezqrt97cpw5mpeasqlc0j84`
+- **Multisig Prover contract** - `axelar1x3wz8zzretn0dp5qxf0p8qynkpczv6hc2x0r8v2guray3t3573hqflslxd`
