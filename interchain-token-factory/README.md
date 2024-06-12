@@ -3,7 +3,7 @@
 This is a wrapper over the [Interchain Token Service](../interchain-token-service) contract that allows easier registering and deployment
 of canonical tokens, both on MultiversX and cross-chain.
 
-This contract is based on the [Interchain Token Factory implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.1/contracts/InterchainTokenFactory.sol).
+This contract is based on the [Interchain Token Factory implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.4/contracts/InterchainTokenFactory.sol).
 
 ## User callable endpoints
 - **deployInterchainToken** (salt, name, symbol, decimals, initial_supply, minter) - deploys a new Token Manager, issues an ESDT and optionally mints the initial supply of tokens to the minter; **needs to be called 2 or 3 times**

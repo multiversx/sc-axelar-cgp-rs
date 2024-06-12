@@ -189,9 +189,9 @@ pub trait EventsModule {
     #[event("interchain_transfer_received_event")]
     fn interchain_transfer_received_event(
         &self,
-        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] source_chain: &ManagedBuffer,
+        #[indexed] message_id: &ManagedBuffer,
         #[indexed] source_address: &ManagedBuffer,
         #[indexed] destination_address: &ManagedAddress,
         #[indexed] data_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -201,20 +201,22 @@ pub trait EventsModule {
     #[event("execute_with_interchain_token_success_event")]
     fn execute_with_interchain_token_success_event(
         &self,
-        #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] source_chain: ManagedBuffer,
+        #[indexed] message_id: ManagedBuffer,
     );
 
     #[event("execute_with_interchain_token_failed_event")]
     fn execute_with_interchain_token_failed_event(
         &self,
-        #[indexed] command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] source_chain: ManagedBuffer,
+        #[indexed] message_id: ManagedBuffer,
     );
 
     #[event("express_executed_event")]
     fn express_executed_event(
         &self,
-        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] source_chain: &ManagedBuffer,
+        #[indexed] message_id: &ManagedBuffer,
         #[indexed] source_address: &ManagedBuffer,
         #[indexed] payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         express_executor: &ManagedAddress,
@@ -223,8 +225,8 @@ pub trait EventsModule {
     #[event("express_execution_fulfilled_event")]
     fn express_execution_fulfilled_event(
         &self,
-        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] source_chain: &ManagedBuffer,
+        #[indexed] message_id: &ManagedBuffer,
         #[indexed] source_address: &ManagedBuffer,
         #[indexed] payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         express_executor: &ManagedAddress,
@@ -233,14 +235,16 @@ pub trait EventsModule {
     #[event("express_execute_with_interchain_token_success_event")]
     fn express_execute_with_interchain_token_success_event(
         &self,
-        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[indexed] express_executor: &ManagedAddress,
+        #[indexed] source_chain: ManagedBuffer,
+        #[indexed] source_address: ManagedBuffer,
+        #[indexed] express_executor: ManagedAddress,
     );
 
     #[event("express_execute_with_interchain_token_failed_event")]
     fn express_execute_with_interchain_token_failed_event(
         &self,
-        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[indexed] express_executor: &ManagedAddress,
+        #[indexed] source_chain: ManagedBuffer,
+        #[indexed] source_address: ManagedBuffer,
+        #[indexed] express_executor: ManagedAddress,
     );
 }

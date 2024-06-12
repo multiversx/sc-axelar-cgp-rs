@@ -8,7 +8,7 @@ use crate::constants::{
     MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
     MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
-use crate::{address_tracker, events, express_executor_tracker, proxy_cgp, proxy_its};
+use crate::{address_tracker, events, express_executor_tracker, proxy_gmp, proxy_its};
 
 multiversx_sc::imports!();
 
@@ -17,7 +17,7 @@ pub trait RemoteModule:
     express_executor_tracker::ExpressExecutorTracker
     + multiversx_sc_modules::pause::PauseModule
     + events::EventsModule
-    + proxy_cgp::ProxyCgpModule
+    + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {

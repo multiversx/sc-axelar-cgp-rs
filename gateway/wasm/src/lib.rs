@@ -5,13 +5,12 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                            8
+// Upgrade:                              1
+// Endpoints:                           18
 // Async Callback (empty):               1
-// Total number of exported functions:  10
+// Total number of exported functions:  21
 
 #![no_std]
-#![allow(internal_features)]
-#![feature(lang_items)]
 
 multiversx_sc_wasm_adapter::allocator!();
 multiversx_sc_wasm_adapter::panic_handler!();
@@ -21,13 +20,24 @@ multiversx_sc_wasm_adapter::endpoints! {
     (
         init => init
         upgrade => upgrade
+        approveMessages => approve_messages
+        rotateSigners => rotate_signers
         callContract => call_contract
-        validateContractCall => validate_contract_call
-        execute => execute
-        isCommandExecuted => is_command_executed
-        isContractCallApproved => is_contract_call_approved
-        chain_id => chain_id
-        authModule => auth_module
+        validateMessage => validate_message
+        isMessageApproved => is_message_approved
+        isMessageExecuted => is_message_executed
+        messages => messages
+        validateProof => validate_proof
+        timeSinceRotation => time_since_rotation
+        epoch => epoch
+        lastRotationTimestamp => last_rotation_timestamp
+        signerHashByEpoch => signer_hash_by_epoch
+        epochBySignerHash => epoch_by_signer_hash
+        previousSignersRetention => previous_signers_retention
+        domainSeparator => domain_separator
+        minimumRotationDelay => minimum_rotation_delay
+        transferOperatorship => transfer_operatorship
+        operator => operator
     )
 }
 

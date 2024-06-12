@@ -18,7 +18,7 @@ pub mod constants;
 pub mod events;
 pub mod executable;
 pub mod express_executor_tracker;
-pub mod proxy_cgp;
+pub mod proxy_gmp;
 pub mod proxy_its;
 pub mod remote;
 pub mod user_functions;
@@ -30,7 +30,7 @@ pub trait InterchainTokenServiceContract:
     + operatable::roles::AccountRoles
     + express_executor_tracker::ExpressExecutorTracker
     + address_tracker::AddressTracker
-    + proxy_cgp::ProxyCgpModule
+    + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
     + executable::ExecutableModule
     + events::EventsModule
@@ -120,8 +120,8 @@ pub trait InterchainTokenServiceContract:
     #[endpoint]
     fn execute(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
@@ -144,9 +144,9 @@ pub trait InterchainTokenServiceContract:
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
-                let valid = self.gateway_validate_contract_call(
-                    &command_id,
+                let valid = self.gateway_validate_message(
                     &source_chain,
+                    &message_id,
                     &source_address,
                     &payload_hash,
                 );
@@ -164,16 +164,16 @@ pub trait InterchainTokenServiceContract:
         match message_type {
             MESSAGE_TYPE_INTERCHAIN_TRANSFER => {
                 let express_executor = self.pop_express_executor(
-                    &command_id,
                     &source_chain,
+                    &message_id,
                     &source_address,
                     &payload_hash,
                 );
 
                 if !express_executor.is_zero() {
                     self.express_execution_fulfilled_event(
-                        &command_id,
                         &source_chain,
+                        &message_id,
                         &source_address,
                         &payload_hash,
                         &express_executor,
@@ -181,9 +181,9 @@ pub trait InterchainTokenServiceContract:
                 }
 
                 self.process_interchain_transfer_payload(
-                    command_id,
                     express_executor,
                     source_chain,
+                    message_id,
                     payload,
                 );
             }
@@ -192,8 +192,8 @@ pub trait InterchainTokenServiceContract:
             }
             MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN => {
                 self.process_deploy_interchain_token_payload(
-                    command_id,
                     source_chain,
+                    message_id,
                     source_address,
                     payload_hash,
                     payload,

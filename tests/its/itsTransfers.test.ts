@@ -88,7 +88,7 @@ describe('Interchain transfer', () => {
     let kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -96,7 +96,7 @@ describe('Interchain transfer', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
@@ -131,7 +131,7 @@ describe('Interchain transfer', () => {
     const kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -139,7 +139,7 @@ describe('Interchain transfer', () => {
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -171,7 +171,7 @@ describe('Interchain transfer', () => {
     const kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -179,7 +179,7 @@ describe('Interchain transfer', () => {
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -420,7 +420,7 @@ describe('Interchain transfer', () => {
     let kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 20,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -428,7 +428,7 @@ describe('Interchain transfer', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 980,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
       ],
     });
@@ -457,7 +457,7 @@ describe('Interchain transfer', () => {
     let kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
         e.kvs.Esdts([
@@ -469,7 +469,7 @@ describe('Interchain transfer', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 980 }]),
@@ -501,7 +501,7 @@ describe('Interchain transfer', () => {
     let kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
         e.kvs.Esdts([
@@ -513,7 +513,7 @@ describe('Interchain transfer', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -544,7 +544,7 @@ describe('Call contract with interchain token', () => {
     let kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -552,7 +552,7 @@ describe('Call contract with interchain token', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
@@ -777,7 +777,7 @@ describe('Call contract with interchain token', () => {
     let kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 20,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -785,7 +785,7 @@ describe('Call contract with interchain token', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 980,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
       ],
     });
@@ -814,7 +814,7 @@ describe('Call contract with interchain token', () => {
     let kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
         e.kvs.Esdts([
@@ -826,7 +826,7 @@ describe('Call contract with interchain token', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 980 }]),
@@ -858,7 +858,7 @@ describe('Call contract with interchain token', () => {
     let kvs = await gasService.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
         e.kvs.Esdts([
@@ -870,7 +870,7 @@ describe('Call contract with interchain token', () => {
     let tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),

@@ -10,8 +10,7 @@ The MultiversX CGP contracts are based on the Axelar CGP (Cross-Chain Gateway Pr
 - https://github.com/axelarnetwork/cgp-spec
 
 The following contracts were written starting from the referance Solidity implementation:
-- [Auth Contract](/auth) - handles validation of messages signed by Axelar Network Validators using ed25519 signatures
-- [Gateway Contract](/gateway) - main CGP contract which handles inbound execution of cross-chain commands from Axelar Network Validators and outbound cross-chain transactions
+- [Gateway Contract](/gateway) - main GMP contract which handles inbound execution of cross-chain commands from Axelar Network Validators and outbound cross-chain transactions
 - [Gas Service Contract](/gas-service) - handles cross-chain gas payments
 
 Also take a look at the full [Axelar Cross-Chain Gateway Protocol Specification MultiversX](https://docs.google.com/document/d/1hrMicw1I4tFHHAITNtmuxlyfqTkC--Pq7XmXBCRPAxU/edit?usp=sharing) if interested,
@@ -27,8 +26,8 @@ This contract will be used instead of a multisig to manage the other contracts, 
 
 ITS is a comprised of a set of contracts which enable token transfers on top of the CGP protocol.
 
-It is based on the Axelar ITS Solidity implementation available at the time of writing: (v1.2.1)
-- https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.1/DESIGN.md
+It is based on the Axelar ITS Solidity implementation available at the time of writing: (v1.2.4)
+- https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.4/DESIGN.md
 
 It consists of the following contracts:
 - [Interchain Token Service](/interchain-token-service) - main contract which handles transferring of tokens, registering & deploying of token managers

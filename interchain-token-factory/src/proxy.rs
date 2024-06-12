@@ -4,9 +4,9 @@ use crate::constants::{Hash, ManagedBufferAscii, TokenId};
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use interchain_token_service::ProxyTrait as _;
 use interchain_token_service::proxy_its::ProxyTrait as _;
 use interchain_token_service::user_functions::ProxyTrait as _;
+use interchain_token_service::ProxyTrait as _;
 use operatable::ProxyTrait as _;
 use token_manager::constants::TokenManagerType;
 use token_manager::mintership::ProxyTrait as _;
@@ -152,11 +152,8 @@ pub trait ProxyModule {
         token_identifier: EgldOrEsdtTokenIdentifier,
         callback: CallbackClosure<Self::Api>,
     ) {
-        let esdt_system_sc_address =
-            ESDTSystemSmartContractProxy::<Self::Api>::new_proxy_obj().esdt_system_sc_address();
-
         let mut contract_call = self.send().contract_call::<()>(
-            esdt_system_sc_address,
+            ESDTSystemSCAddress.to_managed_address(),
             ManagedBuffer::from("getTokenProperties"),
         );
         contract_call.push_raw_argument(token_identifier.into_name());
@@ -178,10 +175,7 @@ pub trait ProxyModule {
     ) -> interchain_token_service::Proxy<Self::Api>;
 
     #[proxy]
-    fn token_manager_proxy(
-        &self,
-        sc_address: ManagedAddress,
-    ) -> token_manager::Proxy<Self::Api>;
+    fn token_manager_proxy(&self, sc_address: ManagedAddress) -> token_manager::Proxy<Self::Api>;
 
     // This was tested on devnet and worked fine
     #[callback]
