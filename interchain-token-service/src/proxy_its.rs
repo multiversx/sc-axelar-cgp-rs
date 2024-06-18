@@ -20,8 +20,8 @@ pub mod executable_contract_proxy {
         #[endpoint(executeWithInterchainToken)]
         fn execute_with_interchain_token(
             &self,
-            command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-            source_chain: ManagedBuffer,
+            source_chain: &ManagedBuffer,
+            message_id: &ManagedBuffer,
             source_address: ManagedBuffer,
             data: ManagedBuffer,
             token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -31,8 +31,8 @@ pub mod executable_contract_proxy {
         #[endpoint(expressExecuteWithInterchainToken)]
         fn express_execute_with_interchain_token(
             &self,
-            command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-            source_chain: ManagedBuffer,
+            source_chain: &ManagedBuffer,
+            message_id: &ManagedBuffer,
             source_address: ManagedBuffer,
             data: ManagedBuffer,
             token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -97,63 +97,63 @@ pub trait ProxyItsModule:
         &self,
         destination_address: ManagedAddress,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         data: ManagedBuffer,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.executable_contract_proxy(destination_address)
             .execute_with_interchain_token(
-                &command_id,
-                source_chain,
+                &source_chain,
+                &message_id,
                 source_address,
                 data,
                 token_id.clone(),
             )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
-            .async_call()
             .with_callback(self.callbacks().execute_with_token_callback(
-                command_id,
+                source_chain,
+                message_id,
                 token_id,
                 token_identifier,
                 amount,
             ))
-            .call_and_exit();
+            .async_call_and_exit();
     }
 
     fn executable_contract_express_execute_with_interchain_token(
         &self,
         destination_address: ManagedAddress,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         data: ManagedBuffer,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
         express_executor: ManagedAddress,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.executable_contract_proxy(destination_address)
             .express_execute_with_interchain_token(
-                &command_id,
-                source_chain,
+                &source_chain,
+                &message_id,
                 source_address,
                 data,
                 token_id,
             )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
-            .async_call()
             .with_callback(self.callbacks().exp_execute_with_token_callback(
                 express_executor,
-                command_id,
+                source_chain,
+                message_id,
                 token_identifier,
                 amount,
                 express_hash,
             ))
-            .call_and_exit();
+            .async_call_and_exit();
     }
 
     #[view(flowLimit)]
@@ -227,7 +227,8 @@ pub trait ProxyItsModule:
     #[callback]
     fn execute_with_token_callback(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
@@ -235,12 +236,12 @@ pub trait ProxyItsModule:
     ) {
         match result {
             ManagedAsyncCallResult::Ok(_) => {
-                self.execute_with_interchain_token_success_event(command_id);
+                self.execute_with_interchain_token_success_event(source_chain, message_id);
             }
             ManagedAsyncCallResult::Err(_) => {
                 self.token_manager_take_token(&token_id, token_identifier, amount);
 
-                self.execute_with_interchain_token_failed_event(command_id);
+                self.execute_with_interchain_token_failed_event(source_chain, message_id);
             }
         }
     }
@@ -250,7 +251,8 @@ pub trait ProxyItsModule:
     fn exp_execute_with_token_callback(
         &self,
         express_executor: ManagedAddress,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -259,8 +261,9 @@ pub trait ProxyItsModule:
         match result {
             ManagedAsyncCallResult::Ok(_) => {
                 self.express_execute_with_interchain_token_success_event(
-                    &command_id,
-                    &express_executor,
+                    source_chain,
+                    message_id,
+                    express_executor,
                 );
             }
             ManagedAsyncCallResult::Err(_) => {
@@ -270,8 +273,9 @@ pub trait ProxyItsModule:
                 self.express_execute(&express_hash).clear();
 
                 self.express_execute_with_interchain_token_failed_event(
-                    &command_id,
-                    &express_executor,
+                    source_chain,
+                    message_id,
+                    express_executor,
                 );
             }
         }

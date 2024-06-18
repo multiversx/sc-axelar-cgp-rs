@@ -9,7 +9,7 @@ use crate::constants::MetadataVersion;
 multiversx_sc::imports!();
 
 #[multiversx_sc::module]
-pub trait ProxyCgpModule: address_tracker::AddressTracker {
+pub trait ProxyGmpModule: address_tracker::AddressTracker {
     fn gas_service_pay_gas_for_contract_call(
         &self,
         destination_chain: &ManagedBuffer,
@@ -129,42 +129,43 @@ pub trait ProxyCgpModule: address_tracker::AddressTracker {
             .execute_on_dest_context::<()>();
     }
 
-    fn gateway_is_command_executed(
+    fn gateway_validate_message(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> bool {
-        self.gateway_proxy(self.gateway().get())
-            .is_command_executed(command_id)
-            .execute_on_dest_context::<bool>()
-    }
-
-    fn gateway_validate_contract_call(
-        &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
         self.gateway_proxy(self.gateway().get())
-            .validate_contract_call(command_id, source_chain, source_address, payload_hash)
+            .validate_message(source_chain, message_id, source_address, payload_hash)
             .execute_on_dest_context::<bool>()
     }
 
-    fn gateway_is_contract_call_approved(
+    fn gateway_is_message_approved(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
         self.gateway_proxy(self.gateway().get())
-            .is_contract_call_approved(
-                command_id,
+            .is_message_approved(
                 source_chain,
+                message_id,
                 source_address,
                 &self.blockchain().get_sc_address(),
                 payload_hash,
             )
+            .execute_on_dest_context::<bool>()
+    }
+
+    fn gateway_is_message_executed(
+        &self,
+        source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
+    ) -> bool {
+        self.gateway_proxy(self.gateway().get())
+            .is_message_executed(source_chain, message_id)
             .execute_on_dest_context::<bool>()
     }
 

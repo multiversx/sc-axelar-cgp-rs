@@ -19,13 +19,13 @@ import {
   computeInterchainTokenSalt,
   deployContracts,
   deployInterchainTokenFactory,
-  deployIts,
+  deployIts, deployTokenManagerInterchainToken,
   deployTokenManagerLockUnlock,
   deployTokenManagerMintBurn,
   gasService,
   interchainTokenFactory,
-  its,
-  TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
+  its, TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
+  TOKEN_MANAGER_TYPE_LOCK_UNLOCK, TOKEN_MANAGER_TYPE_MINT_BURN,
   tokenManager,
 } from '../itsHelpers';
 
@@ -82,14 +82,14 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const deployAndMockTokenManagerMintBurn = async (burnRole: boolean = false) => {
+const deployAndMockTokenManagerInterchainToken = async (burnRole: boolean = false) => {
   await deployContracts(deployer, collector);
 
   let baseTokenManagerKvs;
   if (!burnRole) {
-    baseTokenManagerKvs = await deployTokenManagerMintBurn(deployer, its);
+    baseTokenManagerKvs = await deployTokenManagerInterchainToken(deployer, its);
   } else {
-    baseTokenManagerKvs = await deployTokenManagerMintBurn(
+    baseTokenManagerKvs = await deployTokenManagerInterchainToken(
       deployer,
       interchainTokenFactory,
       its,
@@ -111,6 +111,7 @@ const deployAndMockTokenManagerMintBurn = async (burnRole: boolean = false) => {
       e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(tokenManager),
     ],
   });
+
   return { baseTokenManagerKvs, computedTokenId };
 };
 
@@ -190,7 +191,7 @@ test('Init & upgrade', async () => {
   const kvs = await interchainTokenFactory.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
@@ -237,7 +238,7 @@ describe('Deploy interchain token', () => {
     const kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
       ],
     });
@@ -247,8 +248,9 @@ describe('Deploy interchain token', () => {
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(its),
+        e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
         e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000110)), // flow limit and operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
@@ -280,7 +282,7 @@ describe('Deploy interchain token', () => {
     const kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
       ],
     });
@@ -290,8 +292,9 @@ describe('Deploy interchain token', () => {
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(its),
+        e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit role
@@ -323,7 +326,7 @@ describe('Deploy interchain token', () => {
     const kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
       ],
     });
@@ -333,8 +336,9 @@ describe('Deploy interchain token', () => {
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(its),
+        e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit and operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit role
@@ -343,7 +347,7 @@ describe('Deploy interchain token', () => {
   });
 
   test('Only issue esdt minter mint', async () => {
-    const { baseTokenManagerKvs, computedTokenId } = await deployAndMockTokenManagerMintBurn();
+    const { baseTokenManagerKvs, computedTokenId } = await deployAndMockTokenManagerInterchainToken();
 
     // Insufficient funds for issuing ESDT
     await user.callContract({
@@ -406,7 +410,7 @@ describe('Deploy interchain token', () => {
   });
 
   test('Only issue esdt minter no mint', async () => {
-    const { baseTokenManagerKvs, computedTokenId } = await deployAndMockTokenManagerMintBurn();
+    const { baseTokenManagerKvs, computedTokenId } = await deployAndMockTokenManagerInterchainToken();
 
     await user.callContract({
       callee: interchainTokenFactory,
@@ -453,7 +457,7 @@ describe('Deploy interchain token', () => {
   });
 
   test('Only mint minter', async () => {
-    const { baseTokenManagerKvs } = await deployAndMockTokenManagerMintBurn(true);
+    const { baseTokenManagerKvs } = await deployAndMockTokenManagerInterchainToken(true);
 
     await user.callContract({
       callee: interchainTokenFactory,
@@ -488,7 +492,7 @@ describe('Deploy interchain token', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000000)), // roles removed
@@ -516,7 +520,7 @@ describe('Deploy interchain token', () => {
   });
 
   test('Only mint no minter', async () => {
-    const { baseTokenManagerKvs } = await deployAndMockTokenManagerMintBurn(true);
+    const { baseTokenManagerKvs } = await deployAndMockTokenManagerInterchainToken(true);
 
     await user.callContract({
       callee: interchainTokenFactory,
@@ -536,7 +540,7 @@ describe('Deploy interchain token', () => {
     let kvs = await tokenManager.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseTokenManagerKvs,
 
         e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000000)), // roles removed
@@ -566,7 +570,7 @@ describe('Deploy interchain token', () => {
 
 describe('Deploy remote interchain token', () => {
   test('No original chain name no minter', async () => {
-    await deployAndMockTokenManagerMintBurn(true);
+    await deployAndMockTokenManagerInterchainToken(true);
 
     await user.callContract({
       callee: interchainTokenFactory,
@@ -596,7 +600,7 @@ describe('Deploy remote interchain token', () => {
           e.Str(TOKEN_ID.split('-')[0]),
           e.Buffer(''), // minter
           e.U(100_000_000n),
-          e.Buffer(user.toTopBytes()),
+          e.Buffer(user.toTopU8A()),
         )),
       ],
     });
@@ -630,7 +634,7 @@ describe('Deploy remote interchain token', () => {
     const gasServiceKvs = await gasService.getAccountWithKvs();
     assertAccount(gasServiceKvs, {
       balance: 100_000_000n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -639,7 +643,7 @@ describe('Deploy remote interchain token', () => {
   });
 
   test('No original chain name with minter', async () => {
-    await deployAndMockTokenManagerMintBurn(true);
+    await deployAndMockTokenManagerInterchainToken(true);
 
     await user.callContract({
       callee: interchainTokenFactory,
@@ -667,9 +671,9 @@ describe('Deploy remote interchain token', () => {
           e.Buffer(computeInterchainTokenSalt(CHAIN_NAME, user)),
           e.Str(OTHER_CHAIN_NAME),
           e.Str(TOKEN_ID.split('-')[0]),
-          e.Buffer(interchainTokenFactory.toTopBytes()), // minter
+          e.Buffer(interchainTokenFactory.toTopU8A()), // minter
           e.U(100_000_000n),
-          e.Buffer(user.toTopBytes()),
+          e.Buffer(user.toTopU8A()),
         )),
       ],
     });
@@ -701,7 +705,7 @@ describe('Deploy remote interchain token', () => {
     // Assert gas was paid for cross chain call
     assertAccount(await gasService.getAccountWithKvs(), {
       balance: 100_000_000n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -742,7 +746,7 @@ describe('Deploy remote interchain token', () => {
       ],
     }).assertFail({ code: 4, message: 'Not minter' });
 
-    const { baseTokenManagerKvs } = await deployAndMockTokenManagerMintBurn(true);
+    const { baseTokenManagerKvs } = await deployAndMockTokenManagerInterchainToken(true);
 
     // Wrong minter
     await user.callContract({
@@ -804,7 +808,7 @@ describe('Register canonical interchain token', () => {
     const kvs = await its.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
       ],
     });
@@ -813,7 +817,7 @@ describe('Register canonical interchain token', () => {
     const tokenManagerKvs = await tokenManager.getAccountWithKvs();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('interchain_token_service').Value(its),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
@@ -897,7 +901,7 @@ describe('Deploy remote canonical interchain token', () => {
           e.Str(TOKEN_ID.split('-')[0]),
           e.Buffer(''), // minter
           e.U(100_000_000n),
-          e.Buffer(user.toTopBytes()),
+          e.Buffer(user.toTopU8A()),
         )),
       ],
     });
@@ -928,7 +932,7 @@ describe('Deploy remote canonical interchain token', () => {
     // Assert gas was paid for cross chain call
     assertAccount(await gasService.getAccountWithKvs(), {
       balance: 100_000_000n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
@@ -964,7 +968,7 @@ describe('Deploy remote canonical interchain token', () => {
     const gasServiceKvs = await gasService.getAccountWithKvs();
     assertAccount(gasServiceKvs, {
       balance: 100_000_000n,
-      allKvs: [
+      kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });

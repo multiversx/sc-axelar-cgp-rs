@@ -125,8 +125,8 @@ pub trait Governance: events::Events {
     #[endpoint]
     fn execute(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
@@ -136,7 +136,7 @@ pub trait Governance: events::Events {
 
         require!(
             self.gateway_proxy(self.gateway().get())
-                .validate_contract_call(&command_id, &source_chain, &source_address, &payload_hash)
+                .validate_message(&source_chain, &message_id, &source_address, &payload_hash)
                 .execute_on_dest_context::<bool>(),
             "Not approved by gateway"
         );

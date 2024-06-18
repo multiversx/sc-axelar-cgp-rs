@@ -14,11 +14,10 @@ permissions:
 jobs:
   contracts:
     name: Contracts
-    uses: multiversx/mx-sc-actions/.github/workflows/contracts.yml@v2.3.5
+    uses: multiversx/mx-sc-actions/.github/workflows/contracts.yml@v3.2.0
     with:
-      rust-toolchain: nightly-2023-12-11
-      vmtools-version: v1.5.24
-      pip-mxpy-args: "multiversx-sdk-cli==v9.3.1"
+      rust-toolchain: 1.78.0
+      pip-mxpy-args: "multiversx-sdk-cli==v9.5.5"
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -31,20 +30,12 @@ jobs:
       - name: Install rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-11
+          toolchain: 1.78.0
           target: wasm32-unknown-unknown
-
-      - name: Setup the PATH variable
-        run: |
-          echo "PATH=$HOME/.local/bin:$HOME/multiversx-sdk/vmtools:$PATH" >> $GITHUB_ENV
 
       - name: Install prerequisites
         run: |
-          pip3 install multiversx-sdk-cli==v9.3.1
-          mkdir $HOME/multiversx-sdk
-          python3 -m multiversx_sdk_cli.cli config set "dependencies.vmtools.urlTemplate.linux" "https://github.com/multiversx/mx-chain-vm-go/archive/{TAG}.tar.gz"
-          python3 -m multiversx_sdk_cli.cli config set "dependencies.vmtools.tag" "v1.5.24"
-          python3 -m multiversx_sdk_cli.cli deps install vmtools --overwrite
+          pipx install multiversx-sdk-cli==v9.5.5
           
           wget -O binaryen.tar.gz https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz
           tar -xf binaryen.tar.gz
@@ -55,10 +46,9 @@ jobs:
           cargo install twiggy
           
           cargo install multiversx-sc-meta --locked
-          
+
+          which mxpy
           which wasm-opt
-          which wasm2wat
-          which run-scenarios
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -66,5 +56,5 @@ jobs:
           node-version: '18.x'
 
       - run: npm ci
-      - run: npm run build:ci
+      - run: npm run build
       - run: npm run test

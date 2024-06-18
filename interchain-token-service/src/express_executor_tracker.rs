@@ -6,13 +6,13 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 pub trait ExpressExecutorTracker {
     fn get_express_executor(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> ManagedAddress {
         let hash =
-            self.express_execute_hash(command_id, source_chain, source_address, payload_hash);
+            self.express_execute_hash(source_chain, message_id, source_address, payload_hash);
         let express_execute_mapper = self.express_execute(&hash);
 
         if express_execute_mapper.is_empty() {
@@ -24,14 +24,14 @@ pub trait ExpressExecutorTracker {
 
     fn set_express_executor(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         express_executor: &ManagedAddress,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let hash =
-            self.express_execute_hash(command_id, source_chain, source_address, payload_hash);
+            self.express_execute_hash(source_chain, message_id, source_address, payload_hash);
 
         let express_execute_mapper = self.express_execute(&hash);
 
@@ -47,13 +47,13 @@ pub trait ExpressExecutorTracker {
 
     fn pop_express_executor(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> ManagedAddress {
         let hash =
-            self.express_execute_hash(command_id, source_chain, source_address, payload_hash);
+            self.express_execute_hash(source_chain, message_id, source_address, payload_hash);
 
         let express_execute_mapper = self.express_execute(&hash);
 
@@ -66,15 +66,15 @@ pub trait ExpressExecutorTracker {
 
     fn express_execute_hash(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut hash_data = ManagedBuffer::new();
 
-        hash_data.append(command_id.as_managed_buffer());
         hash_data.append(source_chain);
+        hash_data.append(message_id);
         hash_data.append(source_address);
         hash_data.append(payload_hash.as_managed_buffer());
 

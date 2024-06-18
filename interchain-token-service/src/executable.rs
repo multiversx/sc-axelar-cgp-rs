@@ -9,7 +9,7 @@ use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, TokenId,
 };
-use crate::{address_tracker, events, express_executor_tracker, proxy_cgp, proxy_its};
+use crate::{address_tracker, events, express_executor_tracker, proxy_gmp, proxy_its};
 
 multiversx_sc::imports!();
 
@@ -18,15 +18,15 @@ pub trait ExecutableModule:
     express_executor_tracker::ExpressExecutorTracker
     + multiversx_sc_modules::pause::PauseModule
     + events::EventsModule
-    + proxy_cgp::ProxyCgpModule
+    + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
     fn process_interchain_transfer_payload(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         express_executor: ManagedAddress,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
         let send_token_payload = InterchainTransferPayload::<Self::Api>::abi_decode(payload);
@@ -45,9 +45,9 @@ pub trait ExecutableModule:
             ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
 
         self.interchain_transfer_received_event(
-            &command_id,
             &send_token_payload.token_id,
             &source_chain,
+            &message_id,
             &send_token_payload.source_address,
             &destination_address,
             if send_token_payload.data.is_empty() {
@@ -79,18 +79,24 @@ pub trait ExecutableModule:
         self.executable_contract_execute_with_interchain_token(
             destination_address,
             source_chain,
+            message_id,
             send_token_payload.source_address,
             send_token_payload.data,
             send_token_payload.token_id,
             token_identifier,
             amount,
-            command_id,
         );
     }
 
     fn process_deploy_token_manager_payload(&self, payload: ManagedBuffer) {
         let deploy_token_manager_payload =
             DeployTokenManagerPayload::<Self::Api>::abi_decode(payload);
+
+        require!(
+            deploy_token_manager_payload.token_manager_type
+                != TokenManagerType::NativeInterchainToken,
+            "Can not deploy"
+        );
 
         self.deploy_token_manager_raw(
             &deploy_token_manager_payload.token_id,
@@ -101,8 +107,8 @@ pub trait ExecutableModule:
 
     fn process_deploy_interchain_token_payload(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         payload: ManagedBuffer,
@@ -126,9 +132,9 @@ pub trait ExecutableModule:
             );
 
             // Only check that the call is valid, since this needs to be called twice with the same parameters
-            let valid = self.gateway_is_contract_call_approved(
-                &command_id,
+            let valid = self.gateway_is_message_approved(
                 &source_chain,
+                &message_id,
                 &source_address,
                 &payload_hash,
             );
@@ -144,15 +150,19 @@ pub trait ExecutableModule:
             .top_encode(&mut params)
             .unwrap();
 
-            self.deploy_token_manager_raw(&data.token_id, TokenManagerType::MintBurn, params);
+            self.deploy_token_manager_raw(
+                &data.token_id,
+                TokenManagerType::NativeInterchainToken,
+                params,
+            );
 
             return;
         }
 
         // The second time this is called, the call will be validated
-        let valid = self.gateway_validate_contract_call(
-            &command_id,
+        let valid = self.gateway_validate_message(
             &source_chain,
+            &message_id,
             &source_address,
             &payload_hash,
         );

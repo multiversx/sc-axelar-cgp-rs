@@ -23,7 +23,7 @@ This contract will be used instead of a multisig to manage the Gateway contract.
 
 The most used endpoints are:
 - **executeProposal** (target, call_data, native_value) - can be called by anyone (most likely a Relayer) to execute a proposal after it was approved
-- **execute** (command_id, source_chain, source_address, payload) - can be called only cross-chain from the source chain and source contract configured on deployment
+- **execute** (source_chain, message_id, source_address, payload) - can be called only cross-chain from the source chain and source contract configured on deployment
 
 These endpoints look like this:
 ```rust
@@ -52,8 +52,8 @@ The **execute** endpoint looks like this:
 #[endpoint]
 fn execute(
     &self,
-    command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     source_chain: ManagedBuffer,
+    message_id: ManagedBuffer,
     source_address: ManagedBuffer,
     payload: ManagedBuffer,
 );

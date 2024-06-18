@@ -5,13 +5,11 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           13
+// Endpoints:                           14
 // Async Callback (empty):               1
-// Total number of exported functions:  15
+// Total number of exported functions:  16
 
 #![no_std]
-#![allow(internal_features)]
-#![feature(lang_items)]
 
 multiversx_sc_wasm_adapter::allocator!();
 multiversx_sc_wasm_adapter::panic_handler!();
@@ -20,6 +18,7 @@ multiversx_sc_wasm_adapter::endpoints! {
     ping_ping_interchain
     (
         init => init
+        execute => execute
         executeWithInterchainToken => execute_with_interchain_token
         expressExecuteWithInterchainToken => express_execute_with_interchain_token
         ping => ping

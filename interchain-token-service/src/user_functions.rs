@@ -11,7 +11,7 @@ use crate::constants::{
     MESSAGE_TYPE_INTERCHAIN_TRANSFER, PREFIX_INTERCHAIN_TOKEN_ID,
 };
 use crate::{
-    address_tracker, events, executable, express_executor_tracker, proxy_cgp, proxy_its, remote,
+    address_tracker, events, executable, express_executor_tracker, proxy_gmp, proxy_its, remote,
 };
 
 multiversx_sc::imports!();
@@ -19,7 +19,7 @@ multiversx_sc::imports!();
 #[multiversx_sc::module]
 pub trait UserFunctionsModule:
     express_executor_tracker::ExpressExecutorTracker
-    + proxy_cgp::ProxyCgpModule
+    + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
     + events::EventsModule
@@ -37,6 +37,12 @@ pub trait UserFunctionsModule:
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) -> TokenId<Self::Api> {
+        // Custom token managers can't be deployed with Interchain token mint burn type, which is reserved for interchain tokens
+        require!(
+            token_manager_type != TokenManagerType::NativeInterchainToken,
+            "Can not deploy"
+        );
+
         self.require_not_paused();
 
         let mut deployer = self.blockchain().get_caller();
@@ -122,7 +128,7 @@ pub trait UserFunctionsModule:
                 .top_encode(&mut params)
                 .unwrap();
 
-                self.deploy_token_manager_raw(&token_id, TokenManagerType::MintBurn, params);
+                self.deploy_token_manager_raw(&token_id, TokenManagerType::NativeInterchainToken, params);
 
                 return token_id;
             }
@@ -150,8 +156,8 @@ pub trait UserFunctionsModule:
     #[endpoint(expressExecute)]
     fn express_execute_endpoint(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
@@ -166,7 +172,7 @@ pub trait UserFunctionsModule:
         );
 
         require!(
-            !self.gateway_is_command_executed(&command_id),
+            !self.gateway_is_message_executed(&source_chain, &message_id),
             "Already executed"
         );
 
@@ -174,24 +180,24 @@ pub trait UserFunctionsModule:
         let payload_hash = self.crypto().keccak256(payload);
 
         self.express_executed_event(
-            &command_id,
             &source_chain,
+            &message_id,
             &source_address,
             &payload_hash,
             &express_executor,
         );
 
         let express_hash = self.set_express_executor(
-            &command_id,
             &source_chain,
+            &message_id,
             &source_address,
             &payload_hash,
             &express_executor,
         );
 
         self.express_execute_raw(
-            command_id,
             source_chain,
+            message_id,
             interchain_transfer_payload,
             express_executor,
             express_hash,
@@ -268,8 +274,8 @@ pub trait UserFunctionsModule:
 
     fn express_execute_raw(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         interchain_transfer_payload: InterchainTransferPayload<Self::Api>,
         express_executor: ManagedAddress,
         express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -288,9 +294,9 @@ pub trait UserFunctionsModule:
         );
 
         self.interchain_transfer_received_event(
-            &command_id,
             &interchain_transfer_payload.token_id,
             &source_chain,
+            &message_id,
             &interchain_transfer_payload.source_address,
             &destination_address,
             if interchain_transfer_payload.data.is_empty() {
@@ -305,13 +311,13 @@ pub trait UserFunctionsModule:
             self.executable_contract_express_execute_with_interchain_token(
                 destination_address,
                 source_chain,
+                message_id,
                 interchain_transfer_payload.source_address,
                 interchain_transfer_payload.data,
                 interchain_transfer_payload.token_id,
                 token_identifier,
                 interchain_transfer_payload.amount,
                 express_executor,
-                command_id,
                 express_hash,
             );
 

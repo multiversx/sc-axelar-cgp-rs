@@ -47,7 +47,7 @@ const deployContract = async () => {
   const pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(collector),
     ],
   });
@@ -72,7 +72,7 @@ test('Pay gas for contract call no esdts', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -100,7 +100,7 @@ test('Pay gas for contract call', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
       e.kvs.Esdts([
@@ -132,7 +132,7 @@ test('Pay native gas for contract call no value', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -158,7 +158,7 @@ test('Pay native gas for contract call', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 1_000,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -183,7 +183,7 @@ test('Pay gas for express contract call no esdts', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -211,7 +211,7 @@ test('Pay gas for express contract call', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
       e.kvs.Esdts([
@@ -243,7 +243,7 @@ test('Pay native gas for express contract call no value', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -269,7 +269,7 @@ test('Pay native gas for express contract call', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 1_000,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -292,7 +292,7 @@ test('Add gas no esdts', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -318,7 +318,7 @@ test('Add gas', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
       e.kvs.Esdts([
@@ -348,7 +348,7 @@ test('Add native gas no value', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -372,7 +372,7 @@ test('Add native gas', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 1_000,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -395,7 +395,7 @@ test('Add express gas no esdts', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -421,7 +421,7 @@ test('Add express gas', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
       e.kvs.Esdts([
@@ -451,7 +451,7 @@ test('Add native express gas no value', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -475,7 +475,7 @@ test('Add native express gas', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 1_000,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -596,7 +596,7 @@ test('Collect fees', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -604,7 +604,7 @@ test('Collect fees', async () => {
   let pairsDeployer = await deployer.getAccountWithKvs();
   assertAccount(pairsDeployer, {
     balance: 10_000_002_000n,
-    allKvs: [
+    kvs: [
       e.kvs.Esdts([
         {
           id: TOKEN_ID,
@@ -653,7 +653,7 @@ test('Collect fees too much asked', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 2_000,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
       e.kvs.Esdts([
@@ -727,7 +727,7 @@ test('Refund egld', async () => {
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 1_500,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
     ],
   });
@@ -770,7 +770,7 @@ test('Refund esdt', async () => {
 
   let pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
       e.kvs.Esdts([
@@ -785,7 +785,7 @@ test('Refund esdt', async () => {
   let pairsDeployer = await deployer.getAccountWithKvs();
   assertAccount(pairsDeployer, {
     balance: 10_000_000_000,
-    allKvs: [
+    kvs: [
       e.kvs.Esdts([
         {
           id: TOKEN_ID,
@@ -824,7 +824,7 @@ test('Set gas collector', async () => {
   const pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(deployer),
     ],
   });
@@ -854,7 +854,7 @@ test('Upgrade', async () => {
   const pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       e.kvs.Mapper('gas_collector').Value(collector),
     ],
   });

@@ -1,11 +1,8 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
-import createKeccakHash from 'keccak';
 import {
-  CHAIN_ID,
-  COMMAND_ID,
   INTERCHAIN_TOKEN_ID,
-  MOCK_CONTRACT_ADDRESS_1,
+  MESSAGE_ID,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
@@ -14,6 +11,7 @@ import {
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
+  baseGatewayKvs,
   baseItsKvs,
   deployContracts,
   gateway,
@@ -21,6 +19,8 @@ import {
   its,
   itsDeployTokenManagerLockUnlock,
   MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+  mockGatewayMessageApproved, TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
+  TOKEN_MANAGER_TYPE_MINT_BURN,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -31,7 +31,7 @@ let user: SWallet;
 
 beforeEach(async () => {
   world = await SWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
     timestamp: 0,
@@ -76,59 +76,37 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
+const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID, type = TOKEN_MANAGER_TYPE_MINT_BURN) => {
   const payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256', 'bytes32', 'uint8', 'bytes'],
     [
       MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
       Buffer.from(tokenId, 'hex'),
-      0, // Mint/Burn
+      type,
       Buffer.from(
         e.Tuple(
           e.Option(its),
           e.Option(e.Str(TOKEN_ID)),
-        ).toTopBytes(),
+        ).toTopU8A(),
       ),
     ],
   ).substring(2);
 
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest('hex');
+  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  // Mock contract call approved by gateway
-  let data = Buffer.concat([
-    Buffer.from(COMMAND_ID, 'hex'),
-    Buffer.from(OTHER_CHAIN_NAME),
-    Buffer.from(OTHER_CHAIN_ADDRESS),
-    its.toTopBytes(),
-    Buffer.from(payloadHash, 'hex'),
-  ]);
-
-  const dataHash = createKeccakHash('keccak256').update(data).digest('hex');
-  await gateway.setAccount({
-    ...await gateway.getAccount(),
-    codeMetadata: [],
-    kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
-
-      // Manually approve call
-      e.kvs.Mapper('contract_call_approved', e.TopBuffer(dataHash)).Value(e.U8(1)),
-    ],
-  });
-
-  return payload;
+  return { payload, commandId, messageHash };
 };
 
 test('Execute', async () => {
-  const payload = await mockGatewayCall();
+  const { payload, commandId} = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
     funcName: 'execute',
     gasLimit: 50_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
@@ -137,7 +115,7 @@ test('Execute', async () => {
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
-    allKvs: [
+    kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, INTERCHAIN_TOKEN_ID),
     ],
   });
@@ -148,18 +126,19 @@ test('Execute', async () => {
     balance: 0,
     kvs: [
       e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
+      e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_MINT_BURN)),
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
     ],
   });
 
-  // Gateway contract call approved key was removed
-  const gatewayKvs = await gateway.getAccountWithKvs();
-  assertAccount(gatewayKvs, {
+  // Gateway message was marked as executed
+  assertAccount(await gateway.getAccountWithKvs(), {
     kvs: [
-      e.kvs.Mapper('auth_module').Value(e.Addr(MOCK_CONTRACT_ADDRESS_1)),
-      e.kvs.Mapper('chain_id').Value(e.Str(CHAIN_ID)),
+      ...baseGatewayKvs(deployer),
+
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
     ],
   });
 });
@@ -178,8 +157,8 @@ test('Errors', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str('SomeOtherAddress'),
       payload,
     ],
@@ -190,27 +169,41 @@ test('Errors', async () => {
     funcName: 'execute',
     gasLimit: 20_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, } = await itsDeployTokenManagerLockUnlock(
     world,
     user,
   );
 
-  payload = await mockGatewayCall(computedTokenId);
+  ({ payload } = await mockGatewayCall(computedTokenId, TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN));
 
   await user.callContract({
     callee: its,
     funcName: 'execute',
     gasLimit: 50_000_000,
     funcArgs: [
-      e.TopBuffer(COMMAND_ID),
       e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Can not deploy' });
+
+  ({ payload } = await mockGatewayCall(computedTokenId));
+
+  await user.callContract({
+    callee: its,
+    funcName: 'execute',
+    gasLimit: 50_000_000,
+    funcArgs: [
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],

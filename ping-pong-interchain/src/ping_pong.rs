@@ -7,6 +7,7 @@ mod user_status;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use user_status::UserStatus;
+use gateway::ProxyTrait as _;
 
 #[derive(TypeAbi, TopDecode)]
 pub struct Data<M: ManagedTypeApi> {
@@ -57,12 +58,33 @@ pub trait PingPong {
         self.max_funds().set(max_funds.into_option());
     }
 
+    #[endpoint(execute)]
+    fn execute(
+        &self,
+        source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
+        source_address: ManagedBuffer,
+        payload: ManagedBuffer,
+    ) {
+        let payload_hash = self.crypto().keccak256(&payload);
+
+        let valid = self.gateway_proxy(self.interchain_token_service().get())
+            .validate_message(source_chain, message_id, source_address, payload_hash)
+            .execute_on_dest_context::<bool>();
+
+        require!(valid, "Not validated by gateway");
+
+        let data = Data::<Self::Api>::top_decode(payload).unwrap();
+
+        self.pong(OptionalValue::Some(data.address));
+    }
+
     #[payable("*")]
     #[endpoint(executeWithInterchainToken)]
     fn execute_with_interchain_token(
         &self,
-        _command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         _source_chain: ManagedBuffer,
+        _message_id: ManagedBuffer,
         _source_address: ManagedBuffer,
         data: Data<Self::Api>, // this will be automatically decoded from a ManagedBuffer
         _token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
@@ -85,15 +107,15 @@ pub trait PingPong {
     #[endpoint(expressExecuteWithInterchainToken)]
     fn express_execute_with_interchain_token(
         &self,
-        command_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: ManagedBuffer,
         data: Data<Self::Api>,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.execute_with_interchain_token(
-            command_id,
             source_chain,
+            message_id,
             source_address,
             data,
             token_id,
@@ -276,4 +298,7 @@ pub trait PingPong {
     #[view(pongAllLastUser)]
     #[storage_mapper("pongAllLastUser")]
     fn pong_all_last_user(&self) -> SingleValueMapper<usize>;
+
+    #[proxy]
+    fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway::Proxy<Self::Api>;
 }

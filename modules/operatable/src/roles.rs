@@ -1,6 +1,7 @@
 multiversx_sc::imports!();
-
 use bitflags::bitflags;
+use multiversx_sc::abi::{TypeAbiFrom, TypeName};
+
 bitflags! {
     #[derive(PartialEq, Copy, Clone)]
     pub struct Roles: u8 {
@@ -20,7 +21,7 @@ impl TopEncode for Roles {
 }
 
 impl TopDecode for Roles {
-    fn top_decode<I>(input: I) -> Result<Self, multiversx_sc::codec::DecodeError>
+    fn top_decode<I>(input: I) -> Result<Self, DecodeError>
     where
         I: multiversx_sc::codec::TopDecodeInput,
     {
@@ -29,8 +30,17 @@ impl TopDecode for Roles {
     }
 }
 
+impl TypeAbiFrom<Self> for Roles {}
+impl TypeAbiFrom<&Self> for Roles {}
+
 impl TypeAbi for Roles {
-    fn type_name() -> multiversx_sc::abi::TypeName {
+    type Unmanaged = Self;
+
+    fn type_name() -> TypeName {
+        TypeName::from("u8")
+    }
+
+    fn type_name_rust() -> TypeName {
         core::any::type_name::<u8>().into()
     }
 }
