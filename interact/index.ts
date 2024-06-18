@@ -15,8 +15,9 @@ import {
 } from '../tests/helpers';
 import { setupITSCommands } from './its';
 import { Buffer } from 'buffer';
+import { setupTestCommands } from './test';
 
-const world = World.new({
+export const world = World.new({
   proxyUrl: envChain.publicProxyUrl(),
   chainId: envChain.id(),
   gasPrice: 1000000000,
@@ -27,6 +28,7 @@ export const loadWallet = () => world.newWalletFromFile('wallet.json');
 export const program = new Command();
 
 setupITSCommands(program);
+setupTestCommands(program);
 
 export const [firstSigners, firstSignersHash] = getSignersHashAndEncodable(
   [

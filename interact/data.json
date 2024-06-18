@@ -6,6 +6,7 @@
   "codeInterchainTokenFactory": "file:interchain-token-factory/output/interchain-token-factory.wasm",
   "codePingPongInterchain": "file:ping-pong-interchain/output/ping-ping-interchain.wasm",
   "codeGovernance": "file:governance/output/governance.wasm",
+  "codeHelloWorld": "file:interact/hello-world.wasm",
   "domainSeparator": {
     "devnet": "209d8e45d084f6d3171d9e862bce4c3b17bf03ab71a687406c111f55b8dceb76",
     "testnet": "",
@@ -72,6 +73,9 @@
     "devnet": "erd1qqqqqqqqqqqqqpgqswka88982f9uk2t4qxw2r60fs20nd7uwkklsemapa9",
     "testnet": "",
     "mainnet": ""
+  },
+  "addressHelloWorld": {
+    "devnet": "erd1qqqqqqqqqqqqqpgqe5p3cgezy9wdvxa2u8wej9dakq5fjr0qkklsrzk3er"
   },
   "knownTokens": {
     "devnet": {
