@@ -59,3 +59,4 @@ The Axelar Amplifier require multiple CosmWASM contracts to be deployed on Axela
 ### Testing
 
 **Ethereum Sepolia HelloWorld contract:** - `0x8b77c570ba9edf17d2d24a99602f645adaeb3ff8` ([code](https://github.com/axelarnetwork/axelar-examples/blob/main/examples/multiversx/call-contract/contracts/HelloWorld.sol))
+**Fantom Testnet HelloWorld contract:** - `0xf5f75b97ac847c4e7632ee6ee4a65a63408dfde2` ([code](https://github.com/axelarnetwork/axelar-examples/blob/main/examples/multiversx/call-contract/contracts/HelloWorld.sol))
