@@ -9,14 +9,14 @@ import {
   BOB_PUB_KEY,
   CAROL_PUB_KEY,
   generateMessageSignature,
-  generateProof, generateRotateSignersSignature, getKeccak256Hash,
+  generateProof, generateRotateSignersSignature,
+  getKeccak256Hash,
   getSignersHashAndEncodable,
   MOCK_CONTRACT_ADDRESS_2,
 } from '../tests/helpers';
 import { setupITSCommands } from './its';
 import { Buffer } from 'buffer';
 import { setupTestCommands } from './test';
-import { AbiCoder, MaxUint256 } from 'ethers';
 
 export const world = World.new({
   proxyUrl: envChain.publicProxyUrl(),
@@ -36,7 +36,7 @@ export const [firstSigners, firstSignersHash] = getSignersHashAndEncodable(
     { signer: ALICE_PUB_KEY, weight: 10 },
   ],
   10,
-  getKeccak256Hash('nonce1'),
+  0,
 );
 
 const [latestSigners, latestSignersHash] = getSignersHashAndEncodable(
@@ -46,7 +46,7 @@ const [latestSigners, latestSignersHash] = getSignersHashAndEncodable(
     { signer: CAROL_PUB_KEY, weight: 7 },
   ],
   10,
-  getKeccak256Hash('nonce2'),
+  1,
 );
 
 program.command('deploy').action(async () => {
@@ -194,7 +194,6 @@ program.command('rotateSigners')
     const wallet = await loadWallet();
 
     const createdAt = 2055833;
-    const nonce = AbiCoder.defaultAbiCoder().encode(['uint256'], [createdAt]).substring(2);
 
     // This should be changed to a new value if we want the transaction to actually succeed
     const [newSigners, newSignersHash] = getSignersHashAndEncodable(
@@ -204,7 +203,7 @@ program.command('rotateSigners')
         { signer: '2ea16de592f6c6ca0593c9f0e4f3bb754ccc0d35fe40b56b4edd43bb29abe61d', weight: 1 },
       ],
       2,
-      getKeccak256Hash(Buffer.from(nonce, 'hex')),
+      createdAt,
     );
 
     let proof;

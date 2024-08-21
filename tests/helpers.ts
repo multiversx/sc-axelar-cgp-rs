@@ -2,6 +2,7 @@ import fs from 'fs';
 import { UserSecretKey } from '@multiversx/sdk-wallet/out';
 import createKeccakHash from 'keccak';
 import { e, Encodable } from 'xsuite';
+import { AbiCoder } from 'ethers';
 
 export const MOCK_CONTRACT_ADDRESS_1: string = 'erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax';
 export const MOCK_CONTRACT_ADDRESS_2: string = 'erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh';
@@ -107,7 +108,9 @@ export const getSignersHash = (signers: { signer: string, weight: number } [], t
 export const getSignersHashAndEncodable = (signers: {
   signer: string,
   weight: number
-} [], threshold: number, nonce: string) => {
+} [], threshold: number, createdAt: number) => {
+  const nonce = AbiCoder.defaultAbiCoder().encode(['uint256'], [createdAt]).substring(2);
+
   const signerHash = getSignersHash(signers, threshold, nonce);
 
   const encodable = e.Tuple(
