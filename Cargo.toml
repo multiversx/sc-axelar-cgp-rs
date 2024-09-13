@@ -15,5 +15,7 @@ members = [
     "interchain-token-factory",
     "interchain-token-factory/meta",
     "governance",
-    "governance/meta"
+    "governance/meta",
+    "multicall",
+    "multicall/meta"
 ]

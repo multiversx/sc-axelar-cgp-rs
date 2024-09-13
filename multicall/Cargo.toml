@@ -1,0 +1,15 @@
+[package]
+name = "multicall"
+version = "0.0.0"
+authors = ["you"]
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/multicall.rs"
+
+[dependencies.multiversx-sc]
+version = "0.50.3"
+
+[dependencies.gateway]
+path = "../gateway"
