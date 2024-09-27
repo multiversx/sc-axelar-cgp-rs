@@ -35,7 +35,7 @@ pub trait ExecutableModule:
         if message_type != MESSAGE_TYPE_RECEIVE_FROM_HUB {
             // Prevent receiving a direct message from the ITS Hub. This is not supported yet.
             require!(
-                source_chain != ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+                source_chain != *ITS_HUB_CHAIN_NAME,
                 "Untrusted chain"
             );
 
@@ -43,7 +43,7 @@ pub trait ExecutableModule:
         }
 
         require!(
-            source_chain == ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+            source_chain == *ITS_HUB_CHAIN_NAME,
             "Untrusted chain"
         );
 
@@ -67,14 +67,12 @@ pub trait ExecutableModule:
     }
 
     fn get_message_type(&self, payload: &ManagedBuffer) -> u64 {
-        let message_type = ParamType::Uint256
+        ParamType::Uint256
             .abi_decode(payload, 0)
             .token
             .into_biguint()
             .to_u64()
-            .unwrap();
-
-        message_type
+            .unwrap()
     }
 
     fn process_interchain_transfer_payload(

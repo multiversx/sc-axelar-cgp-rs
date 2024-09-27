@@ -138,7 +138,7 @@ test('Transfer mint burn', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
     ],
   });
 });
@@ -189,7 +189,7 @@ test('Transfer lock unlock', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
     ],
   });
 });
@@ -330,7 +330,7 @@ test('Express executor', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
     ],
   });
 

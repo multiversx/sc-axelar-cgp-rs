@@ -33,6 +33,13 @@ export const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER = 2;
 export const MESSAGE_TYPE_SEND_TO_HUB = 3;
 export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
 
+export const ITS_HUB_CHAIN_NAME = 'axelarnet';
+export const ITS_HUB_ROUTING_IDENTIFIER = 'hub';
+export const ITS_HUB_ROUTING_IDENTIFIER_HASH: string = createKeccakHash('keccak256').update(ITS_HUB_ROUTING_IDENTIFIER).digest('hex');
+
+export const ITS_CHAIN_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
+export const ITS_CHAIN_ADDRESS_HASH: string = createKeccakHash('keccak256').update(ITS_CHAIN_ADDRESS).digest('hex');
+
 export const LATEST_METADATA_VERSION = 1;
 
 export const TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN = 0;
@@ -529,19 +536,24 @@ export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory
   ];
 };
 
-export async function mockGatewayMessageApproved(payload: string, operator: SWallet) {
+export async function mockGatewayMessageApproved(
+  payload: string,
+  operator: SWallet,
+  sourceChain: string = OTHER_CHAIN_NAME,
+  sourceAddress: string = OTHER_CHAIN_ADDRESS
+) {
   const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
 
   const messageData = Buffer.concat([
-    Buffer.from(OTHER_CHAIN_NAME),
+    Buffer.from(sourceChain),
     Buffer.from(MESSAGE_ID),
-    Buffer.from(OTHER_CHAIN_ADDRESS),
+    Buffer.from(sourceAddress),
     its.toTopU8A(),
     Buffer.from(payloadHash, 'hex'),
   ]);
   const messageHash = getKeccak256Hash(messageData);
 
-  const commandId = getKeccak256Hash(OTHER_CHAIN_NAME + '_' + MESSAGE_ID);
+  const commandId = getKeccak256Hash(sourceChain + '_' + MESSAGE_ID);
 
   // Mock call approved by gateway
   await gateway.setAccount({

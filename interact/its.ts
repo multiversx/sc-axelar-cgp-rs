@@ -22,9 +22,14 @@ import {
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
 } from '../tests/itsHelpers';
 
-const chainName = 'MultiversX-D';
-const otherChainName = 'ethereum-2';
-const otherChainAddress = '0xf786e21509a9d50a9afd033b5940a2b7d872c208';
+// TODO: Update these when needed
+const chainName = 'multiversx';
+
+const itsHubChainName = 'axelarnet';
+const itsHubChainAddress = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
+
+const otherChainName = 'avalanche-fuji';
+const otherChainAddress = 'hub';
 
 const deployBaseTokenManager = async (deployer: Wallet) => {
   // Deploy parameters don't matter since they will be overwritten
@@ -60,10 +65,12 @@ const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
       deployer,
       e.Str(chainName),
 
-      e.U32(1),
+      e.U32(2),
+      e.Str(itsHubChainName),
       e.Str(otherChainName),
 
-      e.U32(1),
+      e.U32(2),
+      e.Str(itsHubChainAddress),
       e.Str(otherChainAddress),
     ],
   });
@@ -191,8 +198,9 @@ export const setupITSCommands = (program: Command) => {
   program.command('itsInterchainTransfer')
     .argument('tokenIdentifier')
     .argument('amount')
+    .argument('destinationAddress')
     .argument('[gasValue]', '', 1000)
-    .action(async (tokenIdentifier, amount, gasValue = 1000) => {
+    .action(async (tokenIdentifier, amount, destinationAddress, gasValue = 1000) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
@@ -203,7 +211,7 @@ export const setupITSCommands = (program: Command) => {
         funcArgs: [
           e.TopBuffer(envChain.select(data.knownTokens)[tokenIdentifier].tokenId),
           e.Str(otherChainName),
-          e.Str(otherChainAddress),
+          e.TopBuffer(destinationAddress),
           e.TopBuffer(''), // No metadata, uses default
           e.U(BigInt(gasValue)),
         ],

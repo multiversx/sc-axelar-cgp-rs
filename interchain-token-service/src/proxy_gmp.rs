@@ -156,7 +156,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
                 source_chain,
                 message_id,
                 source_address,
-                &self.blockchain().get_sc_address(),
+                self.blockchain().get_sc_address(),
                 payload_hash,
             )
             .execute_on_dest_context::<bool>()
@@ -212,7 +212,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
     ) -> (ManagedBuffer, ManagedBuffer, ManagedBuffer) {
         // Prevent sending directly to the ITS Hub chain. This is not supported yet, so fail early to prevent the user from having their funds stuck.
         require!(
-            destination_chain != ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+            destination_chain != *ITS_HUB_CHAIN_NAME,
             "Untrusted chain"
         );
 
@@ -221,7 +221,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         let destination_address = destination_address.get();
 
         // Check whether the ITS call should be routed via ITS hub for this destination chain
-        if destination_address != ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER) {
+        if destination_address != *ITS_HUB_ROUTING_IDENTIFIER {
             return (destination_chain, destination_address, payload);
         }
 
