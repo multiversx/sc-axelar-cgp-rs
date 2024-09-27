@@ -30,6 +30,8 @@ export const PREFIX_INTERCHAIN_TOKEN_SALT = 'interchain-token-salt';
 export const MESSAGE_TYPE_INTERCHAIN_TRANSFER = 0;
 export const MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN = 1;
 export const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER = 2;
+export const MESSAGE_TYPE_SEND_TO_HUB = 3;
+export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
 
 export const LATEST_METADATA_VERSION = 1;
 

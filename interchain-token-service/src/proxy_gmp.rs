@@ -1,10 +1,13 @@
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
+use crate::abi::AbiEncodeDecode;
+use crate::address_tracker;
+use crate::constants::{
+    MetadataVersion, SendToHubPayload, ITS_HUB_CHAIN_NAME,
+    ITS_HUB_ROUTING_IDENTIFIER, MESSAGE_TYPE_SEND_TO_HUB,
+};
 use gas_service::ProxyTrait as _;
 use gateway::ProxyTrait as _;
-
-use crate::address_tracker;
-use crate::constants::MetadataVersion;
 
 multiversx_sc::imports!();
 
@@ -171,38 +174,73 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
 
     fn call_contract(
         &self,
-        destination_chain: &ManagedBuffer,
-        payload: &ManagedBuffer,
+        destination_chain: ManagedBuffer,
+        payload: ManagedBuffer,
         metadata_version: MetadataVersion,
         gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
-        let destination_address = self.trusted_address(destination_chain);
-
-        require!(!destination_address.is_empty(), "Untrusted chain");
-
-        let destination_address = destination_address.get();
+        let (destination_chain, destination_address, payload) =
+            self.get_call_params(destination_chain, payload);
 
         if gas_value > 0 {
             match metadata_version {
                 MetadataVersion::ContractCall => self.gas_service_pay_gas_for_contract_call(
-                    destination_chain,
+                    &destination_chain,
                     &destination_address,
-                    payload,
+                    &payload,
                     gas_token,
                     gas_value,
                 ),
                 MetadataVersion::ExpressCall => self.gas_service_pay_gas_for_express_call(
-                    destination_chain,
+                    &destination_chain,
                     &destination_address,
-                    payload,
+                    &payload,
                     gas_token,
                     gas_value,
                 ),
             }
         }
 
-        self.gateway_call_contract(destination_chain, &destination_address, payload);
+        self.gateway_call_contract(&destination_chain, &destination_address, &payload);
+    }
+
+    fn get_call_params(
+        &self,
+        destination_chain: ManagedBuffer,
+        payload: ManagedBuffer,
+    ) -> (ManagedBuffer, ManagedBuffer, ManagedBuffer) {
+        // Prevent sending directly to the ITS Hub chain. This is not supported yet, so fail early to prevent the user from having their funds stuck.
+        require!(
+            destination_chain != ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+            "Untrusted chain"
+        );
+
+        let destination_address = self.trusted_address(&destination_chain);
+        require!(!destination_address.is_empty(), "Untrusted chain");
+        let destination_address = destination_address.get();
+
+        // Check whether the ITS call should be routed via ITS hub for this destination chain
+        if destination_address != ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER) {
+            return (destination_chain, destination_address, payload);
+        }
+
+        let destination_address = self.trusted_address(&ManagedBuffer::from(ITS_HUB_CHAIN_NAME));
+        require!(!destination_address.is_empty(), "Untrusted chain");
+        let destination_address = destination_address.get();
+
+        let data = SendToHubPayload::<Self::Api> {
+            message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
+            destination_chain,
+            payload,
+        };
+
+        // Send wrapped message to ITS Hub chain and to ITS Hub true address
+        return (
+            ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+            destination_address,
+            data.abi_encode(),
+        );
     }
 
     #[view]

@@ -19,7 +19,7 @@ import {
   its,
   itsDeployTokenManagerLockUnlock,
   itsDeployTokenManagerMintBurn,
-  MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+  MESSAGE_TYPE_INTERCHAIN_TRANSFER, MESSAGE_TYPE_RECEIVE_FROM_HUB,
   mockGatewayMessageApproved,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
@@ -389,7 +389,7 @@ test('Errors', async () => {
   payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256'],
     [
-      4, // message type unknown
+      MESSAGE_TYPE_RECEIVE_FROM_HUB + 1, // message type unknown
     ],
   ).substring(2);
 

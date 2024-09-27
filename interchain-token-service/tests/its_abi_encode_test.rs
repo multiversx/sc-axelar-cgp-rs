@@ -265,3 +265,5 @@ fn encode_deploy_interchain_token_payload() {
     );
     assert_eq!(encoded, ManagedBuffer::from(&expected));
 }
+
+// TODO: Add test for encode SendToHubPayload

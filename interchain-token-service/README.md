@@ -7,7 +7,7 @@ The contract is made to be permissionless, to allow anyone to register an existi
 a new token, as well as register a token remotely for another chain. The [Interchain Token Factory](../interchain-token-factory) contract exists
 to abstract some functionality regarding deployment of tokens.  
 
-This contract is based on the v1.2.4 reference [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.4/contracts/InterchainTokenService.sol).
+This contract is based on the 9876ff5f47997053e1bc5e05bdee1a345ac89272 commit of the [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/9876ff5f47997053e1bc5e05bdee1a345ac89272/contracts/InterchainTokenService.sol).
 
 ## User callable endpoints
 - **deployTokenManager** (salt, destination_chain, token_manager_type, params) - deploys a custom token manager on MultiversX or another chain
@@ -40,7 +40,7 @@ The **execute** endpoint will be cross-chain called by other ITS contracts from 
 
 The source address needs to correspond to the ITS contract of the source chain, which will be checked against an internal stored mapping of ITS addresses from other supported chains. 
 
-The Gateway contract is called to validate that this cross-chain contract call was authorized by Axelar Validators and then execute one of 3 commands:
+The Gateway contract is called to validate that this cross-chain contract call was authorized by Axelar Validators and then execute one of 5 commands:
 - **MESSAGE_TYPE_INTERCHAIN_TRANSFER (0)** - received an already registered token from another chain
   - it will get the appropriate Token Manager for the respective id and give the token to the appropriate address
   - the Token Manager will either unlock already locked tokens or mint new tokens
@@ -53,3 +53,6 @@ The Gateway contract is called to validate that this cross-chain contract call w
   - **needs to be called twice**, first time it will deploy the Token Manager and NOT mark the Gateway cross-chain call as executed
   - the second time it will issue the ESDT through the Token Manager and mark the Gateway cross-chain call as executed
 - **MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER (2)** - it will deploy a custom Token Manager with the specified parameters
+- **MESSAGE_TYPE_SEND_TO_HUB (3)** - this message is used to route an ITS message via the ITS Hub. The ITS Hub applies certain security checks, and then routes it to the true destination chain.
+- **MESSAGE_TYPE_RECEIVE_FROM_HUB (4)** - this message is used to receive an ITS message from the ITS Hub. The ITS Hub applies certain security checks, and then routes it to the ITS contract.
+- 

@@ -433,6 +433,60 @@ describe('Flow limit', () => {
     });
   });
 
+  test('Transfer flow limiter', async () => {
+    const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
+
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'transferFlowLimiter',
+      gasLimit: 5_000_000,
+      funcArgs: [
+        deployer,
+        otherUser,
+      ],
+    }).assertFail({ code: 4, message: 'Missing any of roles' });
+
+    await user.callContract({
+      callee: tokenManager,
+      funcName: 'transferFlowLimiter',
+      gasLimit: 5_000_000,
+      funcArgs: [
+        deployer,
+        otherUser,
+      ],
+    }).assertFail({ code: 4, message: 'Missing all roles' });
+
+    await user.callContract({
+      callee: tokenManager,
+      funcName: 'addFlowLimiter',
+      gasLimit: 5_000_000,
+      funcArgs: [
+        deployer,
+      ],
+    });
+
+    await user.callContract({
+      callee: tokenManager,
+      funcName: 'transferFlowLimiter',
+      gasLimit: 5_000_000,
+      funcArgs: [
+        deployer,
+        otherUser,
+      ],
+    })
+
+    let kvs = await tokenManager.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs,
+
+        e.kvs.Mapper('account_roles', deployer).Value(e.U32(0)), // has no role
+        e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000100)), // flow limit role
+      ],
+    });
+  });
+
   test('Set flow limit', async () => {
     const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
 

@@ -5,9 +5,11 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
-use crate::abi::AbiEncodeDecode;
+use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::constants::{
-    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, TokenId,
+    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
+    SendToHubPayload, TokenId, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
+    MESSAGE_TYPE_RECEIVE_FROM_HUB,
 };
 use crate::{address_tracker, events, express_executor_tracker, proxy_gmp, proxy_its};
 
@@ -22,6 +24,59 @@ pub trait ExecutableModule:
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
+    fn get_execute_params(
+        &self,
+        source_chain: ManagedBuffer,
+        payload: ManagedBuffer,
+    ) -> (u64, ManagedBuffer, ManagedBuffer) {
+        let message_type = self.get_message_type(&payload);
+
+        // Unwrap ITS message if coming from ITS hub
+        if message_type != MESSAGE_TYPE_RECEIVE_FROM_HUB {
+            // Prevent receiving a direct message from the ITS Hub. This is not supported yet.
+            require!(
+                source_chain != ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+                "Untrusted chain"
+            );
+
+            return (message_type, source_chain, payload);
+        }
+
+        require!(
+            source_chain == ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+            "Untrusted chain"
+        );
+
+        let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
+
+        // Check whether the original source chain is expected to be routed via the ITS Hub
+        require!(
+            self.is_trusted_address(
+                &data.destination_chain,
+                &ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER)
+            ),
+            "Untrusted chain"
+        );
+
+        // Return original message type, source chain and payload
+        (
+            self.get_message_type(&data.payload),
+            data.destination_chain,
+            data.payload,
+        )
+    }
+
+    fn get_message_type(&self, payload: &ManagedBuffer) -> u64 {
+        let message_type = ParamType::Uint256
+            .abi_decode(payload, 0)
+            .token
+            .into_biguint()
+            .to_u64()
+            .unwrap();
+
+        message_type
+    }
+
     fn process_interchain_transfer_payload(
         &self,
         express_executor: ManagedAddress,

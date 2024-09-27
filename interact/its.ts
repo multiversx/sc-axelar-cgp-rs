@@ -205,7 +205,7 @@ export const setupITSCommands = (program: Command) => {
           e.Str(otherChainName),
           e.Str(otherChainAddress),
           e.TopBuffer(''), // No metadata, uses default
-          e.U(gasValue),
+          e.U(BigInt(gasValue)),
         ],
         esdts: (tokenIdentifier !== 'EGLD' ? [{ id: tokenIdentifier, amount: BigInt(amount) }] : []),
       });

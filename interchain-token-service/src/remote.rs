@@ -42,8 +42,8 @@ pub trait RemoteModule:
         let payload = data.abi_encode();
 
         self.call_contract(
-            &destination_chain,
-            &payload,
+            destination_chain.clone(),
+            payload,
             MetadataVersion::ContractCall,
             gas_token,
             gas_value,
@@ -82,8 +82,8 @@ pub trait RemoteModule:
         let payload = data.abi_encode();
 
         self.call_contract(
-            &destination_chain,
-            &payload,
+            destination_chain.clone(),
+            payload,
             MetadataVersion::ContractCall,
             gas_token,
             gas_value,
@@ -109,6 +109,8 @@ pub trait RemoteModule:
         metadata_version: MetadataVersion,
         data: ManagedBuffer,
     ) {
+        require!(transfer_and_gas_tokens.transfer_amount > 0, "Zero amount");
+
         let data_hash = if data.is_empty() {
             ManagedByteArray::from(&[0; KECCAK256_RESULT_LEN])
         } else {
@@ -127,8 +129,8 @@ pub trait RemoteModule:
         let payload = payload.abi_encode();
 
         self.call_contract(
-            &destination_chain,
-            &payload,
+            destination_chain.clone(),
+            payload,
             metadata_version,
             transfer_and_gas_tokens.gas_token,
             transfer_and_gas_tokens.gas_amount,

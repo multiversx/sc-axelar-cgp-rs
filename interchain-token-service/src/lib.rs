@@ -4,7 +4,7 @@ use core::ops::Deref;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use crate::abi::{AbiEncodeDecode, ParamType};
+use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     InterchainTransferPayload, TokenId, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
     MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
@@ -130,12 +130,8 @@ pub trait InterchainTokenServiceContract:
 
         let payload_hash = self.crypto().keccak256(&payload);
 
-        let message_type = ParamType::Uint256
-            .abi_decode(&payload, 0)
-            .token
-            .into_biguint()
-            .to_u64()
-            .unwrap();
+        let (message_type, original_source_chain, payload) =
+            self.get_execute_params(source_chain.clone(), payload);
 
         match message_type {
             MESSAGE_TYPE_INTERCHAIN_TRANSFER | MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER => {
@@ -182,7 +178,7 @@ pub trait InterchainTokenServiceContract:
 
                 self.process_interchain_transfer_payload(
                     express_executor,
-                    source_chain,
+                    original_source_chain,
                     message_id,
                     payload,
                 );

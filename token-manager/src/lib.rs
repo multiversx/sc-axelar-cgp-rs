@@ -104,6 +104,13 @@ pub trait TokenManagerLockUnlockContract:
         self.remove_role(flow_limiter, Roles::FLOW_LIMITER);
     }
 
+    #[endpoint(transferFlowLimiter)]
+    fn transfer_flow_limiter(&self, from: ManagedAddress, to: ManagedAddress) {
+        self.only_operator();
+
+        self.transfer_role(from, to, Roles::FLOW_LIMITER);
+    }
+
     #[endpoint(setFlowLimit)]
     fn set_flow_limit(&self, flow_limit: BigUint) {
         self.only_flow_limiter();

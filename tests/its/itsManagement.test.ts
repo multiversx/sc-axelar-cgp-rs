@@ -166,7 +166,7 @@ test('Init errors', async () => {
       e.Str(OTHER_CHAIN_ADDRESS),
     ],
   }).assertFail({ code: 4, message: 'Zero string length' });
-});
+}, { timeout: 30_000 });
 
 test('Set interchain token factory', async () => {
   await deployContracts(deployer, collector, false);

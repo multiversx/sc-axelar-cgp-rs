@@ -342,3 +342,5 @@ fn decode_deploy_interchain_token_payload() {
     assert_eq!(result.decimals, expected.decimals);
     assert_eq!(result.minter, expected.minter);
 }
+
+// TODO: Add test for decode SendToHubPayload
