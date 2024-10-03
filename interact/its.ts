@@ -152,6 +152,19 @@ export const setupITSCommands = (program: Command) => {
     console.log('Deployed Ping Pong Contract:', result.address);
   });
 
+  program.command('upgradePingPong').action(async () => {
+    const wallet = await loadWallet();
+
+    let result = await wallet.upgradeContract({
+      callee: envChain.select(data.addressPingPongInterchain),
+      code: data.codePingPongInterchain,
+      codeMetadata: ['upgradeable'],
+      gasLimit: 300_000_000,
+      codeArgs: [],
+    });
+    console.log('Result Ping Pong Interchain:', result);
+  });
+
   program.command('upgradeIts').action(async () => {
     const wallet = await loadWallet();
 
@@ -200,7 +213,8 @@ export const setupITSCommands = (program: Command) => {
     .argument('amount')
     .argument('destinationAddress')
     .argument('[gasValue]', '', 1000)
-    .action(async (tokenIdentifier, amount, destinationAddress, gasValue = 1000) => {
+    .argument('[gasToken]')
+    .action(async (tokenIdentifier, amount, destinationAddress, gasValue = 1000, gasToken = null) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
@@ -215,7 +229,41 @@ export const setupITSCommands = (program: Command) => {
           e.TopBuffer(''), // No metadata, uses default
           e.U(BigInt(gasValue)),
         ],
-        esdts: (tokenIdentifier !== 'EGLD' ? [{ id: tokenIdentifier, amount: BigInt(amount) }] : []),
+        esdts: (tokenIdentifier !== 'EGLD' ? [
+          { id: tokenIdentifier, amount: BigInt(amount) },
+          ...(gasToken ? [{ id: gasToken, amount: BigInt(gasValue) }] : []),
+        ] : []),
+      });
+
+      console.log(`Result`, result);
+    });
+
+  program.command('callContractWithInterchainToken')
+    .argument('tokenIdentifier')
+    .argument('amount')
+    .action(async (tokenIdentifier, amount) => {
+      const wallet = await loadWallet();
+
+      const abiCoded = AbiCoder.defaultAbiCoder().encode(['uint256'], [amount]).slice(2);
+
+      const metadata = Buffer.concat([
+        Buffer.from('fd3282c122c6c14b1eccebcb1743d5c55e15b2b2426c1aca9fda66db269e8cc6', 'hex'),
+        Buffer.from(abiCoded, 'hex'),
+        Buffer.from('F12372616f9c986355414BA06b3Ca954c0a7b0dC', 'hex')
+      ]);
+
+      const result = await wallet.callContract({
+        callee: envChain.select(data.addressIts),
+        funcName: 'callContractWithInterchainToken',
+        gasLimit: 20_000_000,
+        funcArgs: [
+          e.TopBuffer('dfbbd97a4e0c3ec2338d800be851dca6d08d4779398d4070d5cb18d2ebfe62d7'),
+          e.Str(otherChainName),
+          e.TopBuffer('94EC28e6Fceb5B3ce1AFb316520a03487b5dE027'),
+          e.TopBuffer(metadata),
+          e.U(BigInt(0)),
+        ],
+        esdts: [{ id: tokenIdentifier, amount: BigInt(amount) }],
       });
 
       console.log(`Result`, result);

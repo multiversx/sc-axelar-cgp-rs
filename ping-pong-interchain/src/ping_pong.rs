@@ -58,6 +58,9 @@ pub trait PingPong {
         self.max_funds().set(max_funds.into_option());
     }
 
+    #[upgrade]
+    fn upgrade(&self) {}
+
     #[endpoint(execute)]
     fn execute(
         &self,
@@ -141,10 +144,10 @@ pub trait PingPong {
             "smart contract not active yet"
         );
 
-        require!(
-            block_timestamp < self.deadline().get(),
-            "deadline has passed"
-        );
+        // require!(
+        //     block_timestamp < self.deadline().get(),
+        //     "deadline has passed"
+        // );
 
         if let Some(max_funds) = self.max_funds().get() {
             require!(
