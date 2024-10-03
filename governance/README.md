@@ -2,7 +2,7 @@
 
 This contract is used to manage cross-chain governance proposals. It is built on top of the CGP (Cross-chain Gateway Protocol).
 
-It is based on the [Axelar Interchain Governance Solidity implementation](https://github.com/axelarnetwork/axelar-gmp-sdk-solidity/blob/v5.6.4/contracts/governance/InterchainGovernance.sol) available at the time of writing: (v5.6.4)
+It is based on the [Axelar Service Governance Solidity implementation](https://github.com/axelarnetwork/axelar-gmp-sdk-solidity/blob/v5.10.0/contracts/governance/AxelarServiceGovernance.sol) available at the time of writing: (v5.10.0)
 
 For a general design of the contract check this document:
 https://github.com/axelarnetwork/axelar-gmp-sdk-solidity/blob/main/contracts/governance/DESIGN.md
@@ -15,7 +15,7 @@ This contract will be used instead of a multisig to manage the Gateway contract.
 
 - Governance contract will be owner of Gateway contract and itself (similar to multisig)
 - upgrading of Gateway will be done through this contract
-- it is based on Axelar General Message Passing, Axelar Validators need to first approve an execute call for this contract which comes from a trusted Governance Chain (most likely the Axelar Network chain)
+- it is based on Axelar General Message Passing, Axelar Validators need to first approve an execute call for this contract which comes from a trusted Governance Chain (the Axelar Network chain)
 - after a proposal is approved, there is at least a minimum time delay so validators can action and cancel the proposal if something is not right
 - after the time delay has passed, anyone can call the executeProposal with the appropriate arguments to actually execute the proposal
 

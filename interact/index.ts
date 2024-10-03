@@ -82,6 +82,10 @@ program.command('deploy').action(async () => {
   console.log('Deployed Gas Service Contract:', resultGasService.address);
 });
 
+// TODO: Handle signers properly, at first deploy set empty signers, then after CosmWASM contracts are deployed on Axelar
+// and validators are registered, upgrade the Gateway contract with the correct signers before deploying the Governance
+// contract and changing the owner to it
+
 program.command('deployGovernance').action(async () => {
   const wallet = await loadWallet();
 

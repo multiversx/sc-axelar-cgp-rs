@@ -1,4 +1,4 @@
-import { afterEach, assert, beforeEach, test } from 'vitest';
+import { afterEach, assert, beforeEach, describe, test } from 'vitest';
 import { assertAccount, d, e, Encodable, SContract, SWallet, SWorld } from 'xsuite';
 import { ADDRESS_ZERO, getKeccak256Hash, MESSAGE_ID } from './helpers';
 import createKeccakHash from 'keccak';
@@ -35,8 +35,7 @@ const baseKvs = () => {
     e.kvs.Mapper('minimum_time_lock_delay').Value(e.U64(10)),
     e.kvs.Mapper('governance_chain').Value(e.Str(GOVERNANCE_CHAIN)),
     e.kvs.Mapper('governance_address').Value(e.Str(GOVERNANCE_ADDRESS)),
-    e.kvs.Mapper('governance_chain_hash').Value(e.TopBuffer(getKeccak256Hash(GOVERNANCE_CHAIN))),
-    e.kvs.Mapper('governance_address_hash').Value(e.TopBuffer(getKeccak256Hash(GOVERNANCE_ADDRESS))),
+    e.kvs.Mapper('multisig').Value(deployer),
   ];
 };
 
@@ -52,6 +51,7 @@ const deployContract = async () => {
       e.Str(GOVERNANCE_CHAIN),
       e.Str(GOVERNANCE_ADDRESS),
       e.U64(10),
+      deployer,
     ],
   }));
 
@@ -93,7 +93,7 @@ const mockCallApprovedByGateway = async (payload: Encodable) => {
       e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
     ],
   });
-}
+};
 
 test('Init errors', async () => {
   await deployGatewayContract(deployer);
@@ -107,6 +107,7 @@ test('Init errors', async () => {
       e.Str(GOVERNANCE_CHAIN),
       e.Str(GOVERNANCE_ADDRESS),
       e.U64(10),
+      e.Addr(ADDRESS_ZERO),
     ],
   }).assertFail({ code: 4, message: 'Invalid address' });
 
@@ -119,6 +120,7 @@ test('Init errors', async () => {
       e.Str(''),
       e.Str(GOVERNANCE_ADDRESS),
       e.U64(10),
+      e.Addr(ADDRESS_ZERO),
     ],
   }).assertFail({ code: 4, message: 'Invalid address' });
 
@@ -131,193 +133,443 @@ test('Init errors', async () => {
       e.Str(GOVERNANCE_CHAIN),
       e.Str(''),
       e.U64(10),
+      e.Addr(ADDRESS_ZERO),
+    ],
+  }).assertFail({ code: 4, message: 'Invalid address' });
+
+  await deployer.deployContract({
+    code: 'file:governance/output/governance.wasm',
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      gateway,
+      e.Str(GOVERNANCE_CHAIN),
+      e.Str(GOVERNANCE_ADDRESS),
+      e.U64(10),
+      e.Addr(ADDRESS_ZERO),
     ],
   }).assertFail({ code: 4, message: 'Invalid address' });
 });
 
-test('Execute proposal errors', async () => {
-  await deployContract();
+describe('Execute proposal', () => {
+  test('Errors', async () => {
+    await deployContract();
 
-  const wrongCallData = e.TopBuffer(e.Tuple(
-    e.Str('endpoint'),
-  ).toTopU8A());
+    const wrongCallData = e.TopBuffer(e.Tuple(
+      e.Str('endpoint'),
+    ).toTopU8A());
 
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 100_000_000,
-    funcName: 'executeProposal',
-    funcArgs: [
-      gateway,
-      wrongCallData,
-      e.U(0),
-    ],
-  }).assertFail({ code: 4, message: 'Invalid time lock hash' });
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Invalid time lock hash' });
 
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    wrongCallData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+    const buffer = Buffer.concat([
+      gateway.toTopU8A(),
+      wrongCallData.toTopU8A(),
+      e.U(0).toTopU8A(),
+    ]);
+    const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
-  // Mock hash
-  await contract.setAccount({
-    ...await contract.getAccountWithKvs(),
-    kvs: [
-      ...baseKvs(),
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
-    ],
+        e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Time lock not ready' });
+
+    // Increase timestamp so finalize_time_lock passes
+    await world.setCurrentBlockInfo({ timestamp: 1 });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Could not decode call data' });
   });
 
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 100_000_000,
-    funcName: 'executeProposal',
-    funcArgs: [
-      gateway,
-      wrongCallData,
-      e.U(0),
-    ],
-  }).assertFail({ code: 4, message: 'Time lock not ready' });
+  test('Upgrade gateway', async () => {
+    await deployContract();
 
-  // Increase timestamp so finalize_time_lock passes
-  await world.setCurrentBlockInfo({ timestamp: 1 });
+    const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
 
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 100_000_000,
-    funcName: 'executeProposal',
-    funcArgs: [
-      gateway,
-      wrongCallData,
-      e.U(0),
-    ],
-  }).assertFail({ code: 4, message: 'Could not decode call data' });
+    const newOperator = await world.createWallet();
+
+    const callData = e.TopBuffer(e.Tuple(
+      e.Str('upgradeContract'),
+      e.List(
+        e.Buffer(gatewayCode), // code
+        e.Buffer('0100'), // upgrade metadata (upgradable)
+        e.Buffer(newOperator.toTopU8A()), // Arguments to upgrade function fo Gateway
+      ),
+    ).toTopU8A());
+
+    const buffer = Buffer.concat([
+      gateway.toTopU8A(),
+      callData.toTopU8A(),
+      e.U(0).toTopU8A(),
+    ]);
+    const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      ],
+    });
+    // Increase timestamp so finalize_time_lock passes
+    await world.setCurrentBlockInfo({ timestamp: 1 });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 20_000_000,
+      funcName: 'executeProposal',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Not enough gas left for async call' });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 200_000_000,
+      funcName: 'executeProposal',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+    });
+
+    // Time lock eta was deleted
+    assertAccount(await contract.getAccountWithKvs(), {
+      balance: 0n,
+      kvs: baseKvs(),
+    });
+
+    // Assert Gateway was successfully upgraded (operator was changed)
+    assertAccount(await gateway.getAccountWithKvs(), {
+      kvs: baseGatewayKvs(newOperator),
+    });
+  });
+
+  test('Upgrade gateway error', async () => {
+    await deployContract();
+
+    const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
+
+    const callData = e.TopBuffer(e.Tuple(
+      e.Str('upgradeContract'),
+      e.List(
+        e.Buffer(gatewayCode), // code
+        e.Buffer('0100'), // upgrade metadata (upgradable)
+        e.Str('wrongArgs'),
+      ),
+    ).toTopU8A());
+
+    const buffer = Buffer.concat([
+      gateway.toTopU8A(),
+      callData.toTopU8A(),
+      e.U(0).toTopU8A(),
+    ]);
+    const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      ],
+    });
+    // Increase timestamp so finalize_time_lock passes
+    await world.setCurrentBlockInfo({ timestamp: 1 });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 50_000_000,
+      funcName: 'executeProposal',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+    }); // async call actually fails
+
+    // Time lock eta was NOT deleted
+    let kvs = await contract.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      ],
+    });
+  });
 });
 
-test('Execute proposal upgrade gateway', async () => {
-  await deployContract();
+describe('Execute multisig proposal', () => {
+  test('Errors', async () => {
+    await deployContract();
 
-  const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
+    const wrongCallData = e.TopBuffer(e.Tuple(
+      e.Str('endpoint'),
+    ).toTopU8A());
 
-  const newOperator = await world.createWallet();
+    const user = await world.createWallet();
 
-  const callData = e.TopBuffer(e.Tuple(
-    e.Str('upgradeContract'),
-    e.List(
-      e.Buffer(gatewayCode), // code
-      e.Buffer('0100'), // upgrade metadata (upgradable)
-      e.Buffer(newOperator.toTopU8A()), // Arguments to upgrade function fo Gateway
-    ),
-  ).toTopU8A());
+    await user.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeMultisigProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Not authorized' });
 
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    callData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeMultisigProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Not approved' });
 
-  // Mock hash
-  await contract.setAccount({
-    ...await contract.getAccountWithKvs(),
-    kvs: [
-      ...baseKvs(),
+    const buffer = Buffer.concat([
+      gateway.toTopU8A(),
+      wrongCallData.toTopU8A(),
+      e.U(0).toTopU8A(),
+    ]);
+    const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
-    ],
-  });
-  // Increase timestamp so finalize_time_lock passes
-  await world.setCurrentBlockInfo({ timestamp: 1 });
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
 
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 20_000_000,
-    funcName: 'executeProposal',
-    funcArgs: [
-      gateway,
-      callData,
-      e.U(0),
-    ],
-  }).assertFail({ code: 4, message: 'Not enough gas left for async call' });
+        e.kvs.Mapper('multisig_approvals', e.TopBuffer(hash)).Value(e.Bool(true)),
+      ],
+    });
 
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 200_000_000,
-    funcName: 'executeProposal',
-    funcArgs: [
-      gateway,
-      callData,
-      e.U(0),
-    ],
-  });
-
-  // Time lock eta was deleted
-  assertAccount(await contract.getAccountWithKvs(), {
-    balance: 0n,
-    kvs: baseKvs(),
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeMultisigProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Could not decode call data' });
   });
 
-  // Assert Gateway was successfully upgraded (operator was changed)
-  assertAccount(await gateway.getAccountWithKvs(), {
-    kvs: baseGatewayKvs(newOperator),
+  test('Upgrade gateway', async () => {
+    await deployContract();
+
+    const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
+
+    const newOperator = await world.createWallet();
+
+    const callData = e.TopBuffer(e.Tuple(
+      e.Str('upgradeContract'),
+      e.List(
+        e.Buffer(gatewayCode), // code
+        e.Buffer('0100'), // upgrade metadata (upgradable)
+        e.Buffer(newOperator.toTopU8A()), // Arguments to upgrade function fo Gateway
+      ),
+    ).toTopU8A());
+
+    const buffer = Buffer.concat([
+      gateway.toTopU8A(),
+      callData.toTopU8A(),
+      e.U(0).toTopU8A(),
+    ]);
+    const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('multisig_approvals', e.TopBuffer(hash)).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 20_000_000,
+      funcName: 'executeMultisigProposal',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Not enough gas left for async call' });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 200_000_000,
+      funcName: 'executeMultisigProposal',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+    });
+
+    // Multisig approval was deleted
+    assertAccount(await contract.getAccountWithKvs(), {
+      balance: 0n,
+      kvs: baseKvs(),
+    });
+
+    // Assert Gateway was successfully upgraded (operator was changed)
+    assertAccount(await gateway.getAccountWithKvs(), {
+      kvs: baseGatewayKvs(newOperator),
+    });
   });
-});
 
-test('Execute proposal upgrade gateway error', async () => {
-  await deployContract();
+  test('Upgrade gateway error', async () => {
+    await deployContract();
 
-  const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
+    const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
 
-  const callData = e.TopBuffer(e.Tuple(
-    e.Str('upgradeContract'),
-    e.List(
-      e.Buffer(gatewayCode), // code
-      e.Buffer('0100'), // upgrade metadata (upgradable)
-      e.Str('wrongArgs'),
-    ),
-  ).toTopU8A());
+    const callData = e.TopBuffer(e.Tuple(
+      e.Str('upgradeContract'),
+      e.List(
+        e.Buffer(gatewayCode), // code
+        e.Buffer('0100'), // upgrade metadata (upgradable)
+        e.Str('wrongArgs'),
+      ),
+    ).toTopU8A());
 
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    callData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+    const buffer = Buffer.concat([
+      gateway.toTopU8A(),
+      callData.toTopU8A(),
+      e.U(0).toTopU8A(),
+    ]);
+    const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
 
-  // Mock hash
-  await contract.setAccount({
-    ...await contract.getAccountWithKvs(),
-    kvs: [
-      ...baseKvs(),
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
-    ],
+        e.kvs.Mapper('multisig_approvals', e.TopBuffer(hash)).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 50_000_000,
+      funcName: 'executeMultisigProposal',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+    }); // async call actually fails
+
+    // Multisig approval was NOT deleted
+    let kvs = await contract.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('multisig_approvals', e.TopBuffer(hash)).Value(e.Bool(true)),
+      ],
+    });
   });
-  // Increase timestamp so finalize_time_lock passes
-  await world.setCurrentBlockInfo({ timestamp: 1 });
 
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 50_000_000,
-    funcName: 'executeProposal',
-    funcArgs: [
-      gateway,
-      callData,
-      e.U(0),
-    ],
-  }); // async call actually fails
+  test('Transfer multisig', async () => {
+    await deployContract();
 
-  // Time lock eta was NOT deleted
-  let kvs = await contract.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0n,
-    kvs: [
-      ...baseKvs(),
+    const newMultisig = await world.createWallet();
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
-    ],
+    const callData = e.TopBuffer(e.Tuple(
+      e.Str('transferMultisig'),
+      e.List(
+        e.Buffer(newMultisig.toTopU8A()), // Arguments to transferMultisig function
+      ),
+    ).toTopU8A());
+
+    const buffer = Buffer.concat([
+      contract.toTopU8A(),
+      callData.toTopU8A(),
+      e.U(0).toTopU8A(),
+    ]);
+    const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('multisig_approvals', e.TopBuffer(hash)).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 200_000_000,
+      funcName: 'executeMultisigProposal',
+      funcArgs: [
+        contract,
+        callData,
+        e.U(0),
+      ],
+    });
+
+    // Multisig approval was deleted and multisig was changed
+    assertAccount(await contract.getAccountWithKvs(), {
+      balance: 0n,
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('multisig').Value(newMultisig),
+      ],
+    });
   });
 });
 
@@ -386,6 +638,85 @@ test('Withdraw', async () => {
   kvs = await deployer.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 10_000_000_100n,
+  });
+});
+
+test('Transfer multisig', async () => {
+  await deployContract();
+
+  const user = await world.createWallet();
+
+  await user.callContract({
+    callee: contract,
+    funcName: 'transferMultisig',
+    gasLimit: 10_000_000,
+    funcArgs: [
+      user,
+    ],
+  }).assertFail({ code: 4, message: 'Not authorized' });
+
+  await deployer.callContract({
+    callee: contract,
+    funcName: 'transferMultisig',
+    gasLimit: 10_000_000,
+    funcArgs: [
+      user,
+    ],
+  });
+
+  // Multisig was changed
+  assertAccount(await contract.getAccountWithKvs(), {
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('multisig').Value(user),
+    ]
+  });
+
+  // Need to call transferMultisig through executeProposal
+  const callData = e.TopBuffer(e.Tuple(
+    e.Str('transferMultisig'),
+    e.List(
+      e.Buffer(deployer.toNestBytes()),
+    ),
+  ).toTopU8A());
+
+  const buffer = Buffer.concat([
+    contract.toTopU8A(),
+    callData.toTopU8A(),
+    e.U(0).toTopU8A(),
+  ]);
+  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+
+  // Mock hash
+  await contract.setAccount({
+    ...await contract.getAccountWithKvs(),
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+    ],
+  });
+  // Increase timestamp so finalize_time_lock passes
+  await world.setCurrentBlockInfo({ timestamp: 1 });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      contract,
+      callData,
+      e.U(0),
+    ],
+  });
+
+  // Time lock eta was deleted and multisig was set back to deployer
+  let kvs = await contract.getAccountWithKvs();
+  assertAccount(kvs, {
+    kvs: [
+      ...baseKvs(),
+    ],
   });
 });
 
@@ -570,7 +901,7 @@ test('Execute schedule time lock proposal eta', async () => {
       gateway,
       callData,
       e.U(0),
-    ]
+    ],
   });
   assert(d.U64().topDecode(result.returnData[0]) === 11n);
 });
@@ -602,7 +933,7 @@ test('Execute cancel time lock proposal', async () => {
       ...baseKvs(),
 
       e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(10)),
-    ]
+    ],
   });
 
   await deployer.callContract({
