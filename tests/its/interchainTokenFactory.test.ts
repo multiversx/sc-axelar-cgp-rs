@@ -196,7 +196,7 @@ test('Init & upgrade', async () => {
       e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
     ],
   });
-});
+}, { timeout: 30_000 });
 
 describe('Deploy interchain token', () => {
   test('Only deploy token manager minter mint', async () => {

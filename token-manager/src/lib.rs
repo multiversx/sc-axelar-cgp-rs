@@ -5,7 +5,7 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use constants::{DeployTokenManagerParams, TokenManagerType};
 use operatable::roles::Roles;
 
-use crate::constants::DEFAULT_ESDT_ISSUE_COST;
+use crate::constants::{ManagedBufferAscii, DEFAULT_ESDT_ISSUE_COST};
 
 multiversx_sc::imports!();
 
@@ -221,8 +221,8 @@ pub trait TokenManagerLockUnlockContract:
             .esdt_system_sc_proxy()
             .issue_and_set_all_roles(
                 issue_cost,
-                name,
-                symbol,
+                name.to_normalized_token_name(),
+                symbol.to_normalized_token_ticker(),
                 EsdtTokenType::Fungible,
                 decimals as usize,
             )

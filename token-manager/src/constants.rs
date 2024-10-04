@@ -46,3 +46,76 @@ pub struct DeployTokenManagerParams<M: ManagedTypeApi> {
 
 // If this needs updating, the TokenManagerMintBurn contract from which deployments are made can be upgraded
 pub const DEFAULT_ESDT_ISSUE_COST: u64 = 50000000000000000; // 0.05 EGLD
+
+pub const TOKEN_NAME_MIN: usize = 3;
+pub const TOKEN_NAME_MAX: usize = 20;
+
+pub const TOKEN_TICKER_MIN: usize = 3;
+pub const TOKEN_TICKER_MAX: usize = 10;
+
+// Placeholder in case the token name/ticker is too short (unlikely to happen)
+pub const TOKEN_MIN_PLACEHOLDER: u8 = b'0';
+
+pub trait ManagedBufferAscii<M: ManagedTypeApi> {
+    fn to_normalized_token_name(&self) -> ManagedBuffer<M>;
+    fn to_normalized_token_ticker(&self) -> ManagedBuffer<M>;
+}
+
+impl<M: ManagedTypeApi> ManagedBufferAscii<M> for ManagedBuffer<M> {
+    // Normalize the string into a valid ESDT name (3-20 characters, alphanumeric only)
+    fn to_normalized_token_name(&self) -> ManagedBuffer<M> {
+        let mut result = ManagedBuffer::<M>::new();
+
+        self.for_each_batch::<32, _>(|batch| {
+            if result.len() == TOKEN_NAME_MAX {
+                return;
+            }
+
+            for &byte in batch {
+                if result.len() == TOKEN_NAME_MAX {
+                    continue;
+                }
+
+                if !byte.is_ascii_alphanumeric() {
+                    continue;
+                }
+
+                result.append_bytes(&[byte]);
+            }
+        });
+
+        while result.len() < TOKEN_NAME_MIN {
+            result.append_bytes(&[TOKEN_MIN_PLACEHOLDER]);
+        }
+
+        result
+    }
+
+    fn to_normalized_token_ticker(&self) -> ManagedBuffer<M> {
+        let mut result = ManagedBuffer::<M>::new();
+
+        self.for_each_batch::<32, _>(|batch| {
+            if result.len() == TOKEN_TICKER_MAX {
+                return;
+            }
+
+            for &byte in batch {
+                if result.len() == TOKEN_TICKER_MAX {
+                    continue;
+                }
+
+                if !byte.is_ascii_alphanumeric() {
+                    continue;
+                }
+
+                result.append_bytes(&[byte.to_ascii_uppercase()]);
+            }
+        });
+
+        while result.len() < TOKEN_TICKER_MIN {
+            result.append_bytes(&[TOKEN_MIN_PLACEHOLDER]);
+        }
+
+        result
+    }
+}
