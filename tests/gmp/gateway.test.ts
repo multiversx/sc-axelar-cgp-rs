@@ -1,5 +1,5 @@
 import { afterEach, assert, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSContract, LSWallet, LSWorld } from 'xsuite';
 import {
   ADDRESS_ZERO,
   ALICE_PUB_KEY,
@@ -21,14 +21,14 @@ import createKeccakHash from 'keccak';
 import { deployPingPongInterchain, gateway, its, mockGatewayMessageApproved, pingPong } from '../itsHelpers';
 import { Buffer } from 'buffer';
 
-let world: SWorld;
-let deployer: SWallet;
-let firstUser: SWallet;
-let contract: SContract;
+let world: LSWorld;
+let deployer: LSWallet;
+let firstUser: LSWallet;
+let contract: LSContract;
 let address: string;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,

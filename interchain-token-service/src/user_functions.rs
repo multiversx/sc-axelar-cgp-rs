@@ -367,6 +367,19 @@ pub trait UserFunctionsModule:
                 let second_payment = esdts.try_get(1);
 
                 if second_payment.is_none() {
+                    let egld_value = self.call_value().egld_value().clone_value();
+
+                    if egld_value > 0 {
+                        require!(egld_value == gas_amount, "Invalid gas value");
+
+                        return TransferAndGasTokens {
+                            transfer_token: token_identifier,
+                            transfer_amount: &amount - &gas_amount,
+                            gas_token: EgldOrEsdtTokenIdentifier::egld(),
+                            gas_amount,
+                        };
+                    }
+
                     require!(amount > gas_amount, "Invalid gas value");
 
                     return TransferAndGasTokens {

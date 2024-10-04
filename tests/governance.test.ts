@@ -1,5 +1,5 @@
 import { afterEach, assert, beforeEach, test } from 'vitest';
-import { assertAccount, d, e, Encodable, SContract, SWallet, SWorld } from 'xsuite';
+import { assertAccount, d, e, Encodable, LSContract, LSWallet, LSWorld } from 'xsuite';
 import { ADDRESS_ZERO, getKeccak256Hash, MESSAGE_ID } from './helpers';
 import createKeccakHash from 'keccak';
 import fs from 'fs';
@@ -8,13 +8,13 @@ import { baseGatewayKvs, deployGatewayContract, gateway } from './itsHelpers';
 const GOVERNANCE_CHAIN = 'Axelar';
 const GOVERNANCE_ADDRESS = 'axelar1u5jhn5876mjzmgw7j37mdvqh4qp5y6z2gc6rc3';
 
-let world: SWorld;
-let deployer: SWallet;
-let contract: SContract;
+let world: LSWorld;
+let deployer: LSWallet;
+let contract: LSContract;
 let address: string;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,

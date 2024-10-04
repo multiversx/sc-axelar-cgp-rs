@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import { INTERCHAIN_TOKEN_ID, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
   baseItsKvs,
@@ -11,14 +11,14 @@ import {
   LATEST_METADATA_VERSION,
 } from '../itsHelpers';
 
-let world: SWorld;
-let deployer: SWallet;
-let collector: SWallet;
-let user: SWallet;
-let otherUser: SWallet;
+let world: LSWorld;
+let deployer: LSWallet;
+let collector: LSWallet;
+let user: LSWallet;
+let otherUser: LSWallet;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -507,6 +507,46 @@ describe('Interchain transfer', () => {
         e.kvs.Esdts([
           { id: TOKEN_ID2, amount: 100 },
         ]),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      kvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
+  });
+
+  test('Gas token one esdt and egld', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(20),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: 'EGLD', amount: 20 },
+      ],
+    });
+
+    // Assert ESDT gas was paid for cross chain call in EGLD
+    let kvs = await gasService.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 20,
+      kvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
       ],
     });
 
