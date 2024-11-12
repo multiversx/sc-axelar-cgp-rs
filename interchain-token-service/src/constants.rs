@@ -20,7 +20,7 @@ pub const MESSAGE_TYPE_RECEIVE_FROM_HUB: u64 = 4;
  * Chain name where ITS Hub exists. This is used for routing ITS calls via ITS hub.
  * This is set as a constant, since the ITS Hub will exist on Axelar.
  */
-pub const ITS_HUB_CHAIN_NAME: &[u8] = b"axelarnet";
+pub const ITS_HUB_CHAIN_NAME: &[u8] = b"axelar";
 /**
  * Special identifier that the trusted address for a chain should be set to, which indicates if the ITS call
  * for that chain should be routed via the ITS hub.

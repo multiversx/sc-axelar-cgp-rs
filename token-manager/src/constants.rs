@@ -73,7 +73,7 @@ impl<M: ManagedTypeApi> ManagedBufferAscii<M> for ManagedBuffer<M> {
 
             for &byte in batch {
                 if result.len() == TOKEN_NAME_MAX {
-                    continue;
+                    break;
                 }
 
                 if !byte.is_ascii_alphanumeric() {
@@ -101,7 +101,7 @@ impl<M: ManagedTypeApi> ManagedBufferAscii<M> for ManagedBuffer<M> {
 
             for &byte in batch {
                 if result.len() == TOKEN_TICKER_MAX {
-                    continue;
+                    break;
                 }
 
                 if !byte.is_ascii_alphanumeric() {

@@ -33,7 +33,7 @@ export const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER = 2;
 export const MESSAGE_TYPE_SEND_TO_HUB = 3;
 export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
 
-export const ITS_HUB_CHAIN_NAME = 'axelarnet';
+export const ITS_HUB_CHAIN_NAME = 'axelar';
 export const ITS_HUB_ROUTING_IDENTIFIER = 'hub';
 export const ITS_HUB_ROUTING_IDENTIFIER_HASH: string = createKeccakHash('keccak256').update(ITS_HUB_ROUTING_IDENTIFIER).digest('hex');
 

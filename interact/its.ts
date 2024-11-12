@@ -25,7 +25,7 @@ import {
 // TODO: Update these when needed
 const chainName = 'multiversx';
 
-const itsHubChainName = 'axelarnet';
+const itsHubChainName = 'axelar';
 const itsHubChainAddress = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
 
 const otherChainName = 'avalanche-fuji';
