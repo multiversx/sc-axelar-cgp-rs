@@ -3,16 +3,19 @@ import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import {
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
-  OTHER_CHAIN_ADDRESS, OTHER_CHAIN_ADDRESS_HASH,
-  OTHER_CHAIN_NAME, OTHER_CHAIN_TOKEN_ADDRESS,
+  OTHER_CHAIN_ADDRESS,
+  OTHER_CHAIN_NAME,
+  OTHER_CHAIN_TOKEN_ADDRESS,
   TOKEN_ID,
-  TOKEN_ID2, TOKEN_MANAGER_ADDRESS, TOKEN_MANAGER_ADDRESS_2, TOKEN_SALT,
+  TOKEN_ID2,
+  TOKEN_MANAGER_ADDRESS,
+  TOKEN_MANAGER_ADDRESS_2,
+  TOKEN_SALT,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
   baseGatewayKvs,
   baseItsKvs,
-  computeExpressExecuteHash,
   computeInterchainTokenId,
   deployContracts,
   deployPingPongInterchain,
@@ -21,10 +24,8 @@ import {
   interchainTokenFactory,
   its,
   ITS_CHAIN_ADDRESS,
-  ITS_CHAIN_ADDRESS_HASH,
   ITS_HUB_CHAIN_NAME,
   ITS_HUB_ROUTING_IDENTIFIER,
-  ITS_HUB_ROUTING_IDENTIFIER_HASH,
   itsDeployTokenManagerLockUnlock,
   itsDeployTokenManagerMintBurn,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
@@ -714,10 +715,7 @@ describe('Deploy', () => {
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
-        e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.TopBuffer(ITS_HUB_ROUTING_IDENTIFIER_HASH)),
         e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
-
-        e.kvs.Mapper('trusted_address_hash', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.TopBuffer(ITS_CHAIN_ADDRESS_HASH)),
         e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_CHAIN_ADDRESS)),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
@@ -800,10 +798,7 @@ describe('Deploy', () => {
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
-        e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.TopBuffer(ITS_HUB_ROUTING_IDENTIFIER_HASH)),
         e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
-
-        e.kvs.Mapper('trusted_address_hash', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.TopBuffer(ITS_CHAIN_ADDRESS_HASH)),
         e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_CHAIN_ADDRESS)),
 
         e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(

@@ -8,7 +8,7 @@ use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     InterchainTransferPayload, MetadataVersion, TokenId, TransferAndGasTokens,
-    MESSAGE_TYPE_INTERCHAIN_TRANSFER, PREFIX_INTERCHAIN_TOKEN_ID,
+    ITS_HUB_ROUTING_IDENTIFIER, MESSAGE_TYPE_INTERCHAIN_TRANSFER, PREFIX_INTERCHAIN_TOKEN_ID,
 };
 use crate::{
     address_tracker, events, executable, express_executor_tracker, proxy_gmp, proxy_its, remote,
@@ -37,6 +37,8 @@ pub trait UserFunctionsModule:
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) -> TokenId<Self::Api> {
+        require!(!params.is_empty(), "Empty params");
+
         // Custom token managers can't be deployed with Interchain token mint burn type, which is reserved for interchain tokens
         require!(
             token_manager_type != TokenManagerType::NativeInterchainToken,
@@ -49,6 +51,13 @@ pub trait UserFunctionsModule:
 
         if deployer == self.interchain_token_factory().get() {
             deployer = ManagedAddress::zero();
+        } else if destination_chain.is_empty() {
+            // Restricted on ITS contracts deployed to Amplifier chains until ITS Hub adds support
+            require!(
+                self.trusted_address(&self.chain_name().get()).get()
+                    != ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER),
+                "Not supported"
+            );
         }
 
         let token_id = self.interchain_token_id(&deployer, &salt);
@@ -65,6 +74,11 @@ pub trait UserFunctionsModule:
 
             self.deploy_token_manager_raw(&token_id, token_manager_type, params);
         } else {
+            require!(
+                self.chain_name().get() != destination_chain,
+                "Cannot deploy remotely to self",
+            );
+
             self.deploy_remote_token_manager(
                 &token_id,
                 destination_chain,
@@ -102,6 +116,8 @@ pub trait UserFunctionsModule:
 
         let token_id = self.interchain_token_id(&deployer, &salt);
 
+        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
+
         if destination_chain.is_empty() {
             let minter_raw = ManagedAddress::try_from(minter);
             let minter = if minter_raw.is_err() {
@@ -128,7 +144,11 @@ pub trait UserFunctionsModule:
                 .top_encode(&mut params)
                 .unwrap();
 
-                self.deploy_token_manager_raw(&token_id, TokenManagerType::NativeInterchainToken, params);
+                self.deploy_token_manager_raw(
+                    &token_id,
+                    TokenManagerType::NativeInterchainToken,
+                    params,
+                );
 
                 return token_id;
             }
@@ -136,6 +156,11 @@ pub trait UserFunctionsModule:
             self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);
         } else {
             let gas_value = self.call_value().egld_value().clone_value();
+
+            require!(
+                self.chain_name().get() != destination_chain,
+                "Cannot deploy remotely to self",
+            );
 
             self.deploy_remote_interchain_token(
                 &token_id,
@@ -283,7 +308,8 @@ pub trait UserFunctionsModule:
         let destination_address =
             ManagedAddress::try_from(interchain_transfer_payload.destination_address).unwrap();
 
-        let token_identifier = self.valid_token_identifier(&interchain_transfer_payload.token_id);
+        let token_identifier =
+            self.registered_token_identifier(&interchain_transfer_payload.token_id);
 
         let (sent_token_identifier, sent_amount) = self.call_value().egld_or_single_fungible_esdt();
 

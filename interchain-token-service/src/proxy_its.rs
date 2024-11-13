@@ -50,7 +50,7 @@ pub trait ProxyItsModule:
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
     ) {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .take_token()
             .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(
                 token_identifier,
@@ -61,7 +61,7 @@ pub trait ProxyItsModule:
     }
 
     fn token_manager_set_flow_limit(&self, token_id: &TokenId<Self::Api>, flow_limit: &BigUint) {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .set_flow_limit(flow_limit)
             .execute_on_dest_context::<()>();
     }
@@ -72,7 +72,7 @@ pub trait ProxyItsModule:
         destination_address: &ManagedAddress,
         amount: &BigUint,
     ) -> (EgldOrEsdtTokenIdentifier, BigUint) {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .give_token(destination_address, amount)
             .execute_on_dest_context::<MultiValue2<EgldOrEsdtTokenIdentifier, BigUint>>()
             .into_tuple()
@@ -86,7 +86,7 @@ pub trait ProxyItsModule:
         symbol: ManagedBuffer,
         decimals: u8,
     ) {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .deploy_interchain_token(minter, name, symbol, decimals)
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
@@ -158,27 +158,27 @@ pub trait ProxyItsModule:
 
     #[view(flowLimit)]
     fn flow_limit(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
+        self.token_manager_proxy(self.deployed_token_manager(&token_id))
             .flow_limit()
             .execute_on_dest_context()
     }
 
     #[view(flowOutAmount)]
     fn flow_out_amount(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
+        self.token_manager_proxy(self.deployed_token_manager(&token_id))
             .get_flow_out_amount()
             .execute_on_dest_context()
     }
 
     #[view(flowInAmount)]
     fn flow_in_amount(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
+        self.token_manager_proxy(self.deployed_token_manager(&token_id))
             .get_flow_in_amount()
             .execute_on_dest_context()
     }
 
-    #[view(validTokenManagerAddress)]
-    fn valid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
+    #[view(deployedTokenManager)]
+    fn deployed_token_manager(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
         let token_manager_address_mapper = self.token_manager_address(token_id);
 
         require!(
@@ -189,9 +189,9 @@ pub trait ProxyItsModule:
         token_manager_address_mapper.get()
     }
 
-    #[view(validTokenIdentifier)]
-    fn valid_token_identifier(&self, token_id: &TokenId<Self::Api>) -> EgldOrEsdtTokenIdentifier {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+    #[view(registeredTokenIdentifier)]
+    fn registered_token_identifier(&self, token_id: &TokenId<Self::Api>) -> EgldOrEsdtTokenIdentifier {
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .token_identifier()
             .execute_on_dest_context()
     }

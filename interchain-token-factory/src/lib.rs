@@ -3,19 +3,22 @@
 use core::ops::Deref;
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
-use crate::constants::{Hash, TokenId, PREFIX_CANONICAL_TOKEN_SALT, PREFIX_INTERCHAIN_TOKEN_SALT};
+use crate::constants::{
+    DeployApproval, Hash, TokenId, PREFIX_CANONICAL_TOKEN_SALT, PREFIX_DEPLOY_APPROVAL,
+    PREFIX_INTERCHAIN_TOKEN_SALT,
+};
 use crate::proxy::CallbackProxy as _;
 
 multiversx_sc::imports!();
 
 pub mod constants;
+pub mod events;
 pub mod proxy;
 
 #[multiversx_sc::contract]
-pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
+pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsModule {
     #[init]
     fn init(&self, interchain_token_service: ManagedAddress) {
         require!(!interchain_token_service.is_zero(), "Zero address");
@@ -29,7 +32,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             .set_if_empty(&interchain_token_service);
 
         self.chain_name_hash()
-            .set_if_empty(self.its_chain_name_hash());
+            .set_if_empty(self.crypto().keccak256(&self.its_chain_name()));
     }
 
     #[upgrade]
@@ -57,6 +60,11 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         if initial_supply > 0 {
             minter_bytes = own_address.as_managed_buffer()
         } else if !minter.is_zero() {
+            require!(
+                minter != self.interchain_token_service().get(),
+                "Invalid minter"
+            );
+
             minter_bytes = minter.as_managed_buffer()
         };
 
@@ -117,28 +125,90 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
         token_id
     }
 
+    #[endpoint(approveDeployRemoteInterchainToken)]
+    fn approve_deploy_remote_interchain_token(
+        &self,
+        deployer: ManagedAddress,
+        salt: Hash<Self::Api>,
+        destination_chain: ManagedBuffer,
+        destination_minter: ManagedBuffer,
+    ) {
+        let minter = self.blockchain().get_caller();
+        let token_id = self.its_interchain_token_id(&deployer, &salt);
+        let token_manager = self.its_invalid_token_manager_address(&token_id);
+
+        require!(
+            self.token_manager_is_minter(token_manager, &minter),
+            "Invalid minter"
+        );
+
+        require!(
+            !self.its_trusted_address(&destination_chain).is_empty(),
+            "Invalid chain name"
+        );
+
+        self.deploy_remote_interchain_token_approval_event(
+            &minter,
+            &deployer,
+            &token_id,
+            &destination_chain,
+            &destination_minter,
+        );
+
+        let approval_key = self.deploy_approval_key(DeployApproval {
+            minter,
+            token_id,
+            destination_chain,
+        });
+
+        let destination_minter_hash = self.crypto().keccak256(destination_minter);
+
+        self.approved_destination_minters(approval_key)
+            .set(destination_minter_hash);
+    }
+
+    #[endpoint(revokeDeployRemoteInterchainToken)]
+    fn revoke_deploy_remote_interchain_token(
+        &self,
+        deployer: ManagedAddress,
+        salt: Hash<Self::Api>,
+        destination_chain: ManagedBuffer,
+    ) {
+        let minter = self.blockchain().get_caller();
+        let token_id = self.its_interchain_token_id(&deployer, &salt);
+
+        self.revoked_deploy_remote_interchain_token_approval_event(
+            &minter,
+            &deployer,
+            &token_id,
+            &destination_chain,
+        );
+
+        let approval_key = self.deploy_approval_key(DeployApproval {
+            minter,
+            token_id,
+            destination_chain,
+        });
+
+        self.approved_destination_minters(approval_key).clear();
+    }
+
     #[payable("EGLD")]
     #[endpoint(deployRemoteInterchainToken)]
     fn deploy_remote_interchain_token(
         &self,
-        original_chain_name: ManagedBuffer,
         salt: Hash<Self::Api>,
         minter: ManagedAddress,
         destination_chain: ManagedBuffer,
+        destination_minter: OptionalValue<ManagedBuffer>,
     ) -> TokenId<Self::Api> {
-        let mut minter_raw = &ManagedBuffer::new();
-
-        let chain_name_hash = if original_chain_name.is_empty() {
-            self.chain_name_hash().get()
-        } else {
-            self.crypto().keccak256(original_chain_name)
-        };
+        let mut minter_raw = ManagedBuffer::new();
 
         let sender = self.blockchain().get_caller();
-        let salt = self.interchain_token_salt(&chain_name_hash, &sender, &salt);
+        let salt = self.interchain_token_salt(&self.chain_name_hash().get(), &sender, &salt);
         let token_id = self.its_interchain_token_id(&ManagedAddress::zero(), &salt);
 
-        let token_manager = self.its_valid_token_manager_address(&token_id);
+        let token_manager = self.its_deployed_token_manager(&token_id);
 
         if !minter.is_zero() {
             require!(
@@ -146,14 +216,33 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
                 "Not minter"
             );
 
-            // The MultiversX address is used here as destination address, which means that this
-            // token can only be managed by this address from MultiversX network
-            minter_raw = minter.as_managed_buffer();
+            // Sanity check to prevent accidental use of the current ITS address as the destination minter
+            require!(
+                minter != self.interchain_token_service().get(),
+                "Invalid minter"
+            );
+
+            if let OptionalValue::Some(destination_minter) = destination_minter {
+                let approval = DeployApproval {
+                    minter,
+                    token_id: token_id.clone(),
+                    destination_chain: destination_chain.clone(),
+                };
+
+                self.use_deploy_approval(approval, destination_minter.clone());
+
+                minter_raw = destination_minter;
+            } else {
+                minter_raw = minter.as_managed_buffer().clone();
+            }
+        } else {
+            // If a destinationMinter is provided, the minter must not be zero address
+            require!(destination_minter.is_none(), "Invalid minter");
         }
 
         self.deploy_remote_interchain_token_raw(
             destination_chain,
-            minter_raw,
+            &minter_raw,
             sender,
             salt,
             token_manager,
@@ -194,7 +283,6 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
     #[endpoint(deployRemoteCanonicalInterchainToken)]
     fn deploy_remote_canonical_interchain_token(
         &self,
-        original_chain_name: ManagedBuffer,
         original_token_identifier: EgldOrEsdtTokenIdentifier,
         destination_chain: ManagedBuffer,
     ) -> TokenId<Self::Api> {
@@ -203,27 +291,56 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
             "Invalid token identifier"
         );
 
-        let chain_name_hash = if original_chain_name.is_empty() {
-            self.chain_name_hash().get()
-        } else {
-            self.crypto().keccak256(original_chain_name)
-        };
-
-        let salt =
-            self.canonical_interchain_token_salt(&chain_name_hash, original_token_identifier);
+        let salt = self.canonical_interchain_token_salt(
+            &self.chain_name_hash().get(),
+            original_token_identifier,
+        );
         let token_id = self.its_interchain_token_id(&ManagedAddress::zero(), &salt);
 
-        let token_manager = self.its_valid_token_manager_address(&token_id);
+        let token_manager = self.its_deployed_token_manager(&token_id);
+
+        let minter = ManagedBuffer::new(); // No additional minter is set on a canonical token deployment
 
         self.deploy_remote_interchain_token_raw(
             destination_chain,
-            &ManagedBuffer::new(),
+            &minter,
             self.blockchain().get_caller(),
             salt,
             token_manager,
         );
 
         token_id
+    }
+
+    fn deploy_approval_key(&self, approval: DeployApproval<Self::Api>) -> Hash<Self::Api> {
+        let prefix_deploy_approval = self
+            .crypto()
+            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_DEPLOY_APPROVAL));
+
+        let mut encoded = ManagedBuffer::new();
+
+        encoded.append(prefix_deploy_approval.as_managed_buffer());
+
+        approval
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode approval"));
+
+        self.crypto().keccak256(encoded)
+    }
+
+    fn use_deploy_approval(
+        &self,
+        approval: DeployApproval<Self::Api>,
+        destination_minter: ManagedBuffer,
+    ) {
+        let approval_key = self.deploy_approval_key(approval);
+
+        let destination_minter_hash = self.crypto().keccak256(destination_minter);
+
+        require!(
+            self.approved_destination_minters(approval_key).take() == destination_minter_hash,
+            "Remote deployment not approved"
+        );
     }
 
     fn deploy_remote_interchain_token_raw(
@@ -340,4 +457,11 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule {
     #[view(chainNameHash)]
     #[storage_mapper("chain_name_hash")]
     fn chain_name_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
+
+    #[view(approvedDestinationMinters)]
+    #[storage_mapper("approved_destination_minters")]
+    fn approved_destination_minters(
+        &self,
+        approval_key: Hash<Self::Api>,
+    ) -> SingleValueMapper<Hash<Self::Api>>;
 }

@@ -4,6 +4,7 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[multiversx_sc::module]
 pub trait ExpressExecutorTracker {
+    #[view(getExpressExecutor)]
     fn get_express_executor(
         &self,
         source_chain: &ManagedBuffer,

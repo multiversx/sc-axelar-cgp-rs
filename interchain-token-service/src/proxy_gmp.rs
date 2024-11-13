@@ -1,10 +1,10 @@
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use crate::abi::AbiEncodeDecode;
+use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::address_tracker;
 use crate::constants::{
-    MetadataVersion, SendToHubPayload, ITS_HUB_CHAIN_NAME,
-    ITS_HUB_ROUTING_IDENTIFIER, MESSAGE_TYPE_SEND_TO_HUB,
+    MetadataVersion, SendToHubPayload, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
+    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_SEND_TO_HUB,
 };
 use gas_service::ProxyTrait as _;
 use gateway::ProxyTrait as _;
@@ -211,10 +211,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         payload: ManagedBuffer,
     ) -> (ManagedBuffer, ManagedBuffer, ManagedBuffer) {
         // Prevent sending directly to the ITS Hub chain. This is not supported yet, so fail early to prevent the user from having their funds stuck.
-        require!(
-            destination_chain != *ITS_HUB_CHAIN_NAME,
-            "Untrusted chain"
-        );
+        require!(destination_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
 
         let destination_address = self.trusted_address(&destination_chain);
         require!(!destination_address.is_empty(), "Untrusted chain");
@@ -224,6 +221,12 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         if destination_address != *ITS_HUB_ROUTING_IDENTIFIER {
             return (destination_chain, destination_address, payload);
         }
+
+        // Prevent deploy token manager to be usable on ITS hub
+        require!(
+            self.get_message_type(&payload) != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+            "Not supported"
+        );
 
         let destination_address = self.trusted_address(&ManagedBuffer::from(ITS_HUB_CHAIN_NAME));
         require!(!destination_address.is_empty(), "Untrusted chain");
@@ -241,6 +244,15 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
             destination_address,
             data.abi_encode(),
         );
+    }
+
+    fn get_message_type(&self, payload: &ManagedBuffer) -> u64 {
+        ParamType::Uint256
+            .abi_decode(payload, 0)
+            .token
+            .into_biguint()
+            .to_u64()
+            .unwrap()
     }
 
     #[view]

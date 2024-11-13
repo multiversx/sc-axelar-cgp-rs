@@ -30,7 +30,7 @@ pub trait RemoteModule:
         gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
-        let _ = self.valid_token_manager_address(token_id);
+        let _ = self.deployed_token_manager(token_id);
 
         let data = DeployTokenManagerPayload {
             message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER),
@@ -68,7 +68,10 @@ pub trait RemoteModule:
         gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
-        self.valid_token_manager_address(token_id);
+        require!(!name.is_empty(), "Empty token name");
+        require!(!symbol.is_empty(), "Empty token symbol");
+
+        self.deployed_token_manager(token_id);
 
         let data = DeployInterchainTokenPayload {
             message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
@@ -109,6 +112,7 @@ pub trait RemoteModule:
         metadata_version: MetadataVersion,
         data: ManagedBuffer,
     ) {
+        require!(!destination_address.is_empty(), "Empty destination address");
         require!(transfer_and_gas_tokens.transfer_amount > 0, "Zero amount");
 
         let data_hash = if data.is_empty() {

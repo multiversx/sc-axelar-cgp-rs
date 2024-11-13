@@ -200,8 +200,8 @@ pub trait TokenManagerLockUnlockContract:
             "Not service or minter"
         );
 
-        require!(!name.is_empty(), "Token name empty");
-        require!(!symbol.is_empty(), "Token symbol empty");
+        require!(!name.is_empty(), "Empty token name");
+        require!(!symbol.is_empty(), "Empty token symbol");
 
         /*
          * Set the token service as a minter to allow it to mint and burn tokens.

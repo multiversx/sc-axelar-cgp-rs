@@ -5,11 +5,11 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
-use crate::abi::{AbiEncodeDecode, ParamType};
+use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
     SendToHubPayload, TokenId, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
-    MESSAGE_TYPE_RECEIVE_FROM_HUB,
+    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_RECEIVE_FROM_HUB,
 };
 use crate::{address_tracker, events, express_executor_tracker, proxy_gmp, proxy_its};
 
@@ -34,18 +34,12 @@ pub trait ExecutableModule:
         // Unwrap ITS message if coming from ITS hub
         if message_type != MESSAGE_TYPE_RECEIVE_FROM_HUB {
             // Prevent receiving a direct message from the ITS Hub. This is not supported yet.
-            require!(
-                source_chain != *ITS_HUB_CHAIN_NAME,
-                "Untrusted chain"
-            );
+            require!(source_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
 
             return (message_type, source_chain, payload);
         }
 
-        require!(
-            source_chain == *ITS_HUB_CHAIN_NAME,
-            "Untrusted chain"
-        );
+        require!(source_chain == *ITS_HUB_CHAIN_NAME, "Untrusted chain");
 
         let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
 
@@ -58,21 +52,16 @@ pub trait ExecutableModule:
             "Untrusted chain"
         );
 
-        // Return original message type, source chain and payload
-        (
-            self.get_message_type(&data.payload),
-            data.destination_chain,
-            data.payload,
-        )
-    }
+        let message_type = self.get_message_type(&data.payload);
 
-    fn get_message_type(&self, payload: &ManagedBuffer) -> u64 {
-        ParamType::Uint256
-            .abi_decode(payload, 0)
-            .token
-            .into_biguint()
-            .to_u64()
-            .unwrap()
+        // Prevent deploy token manager to be usable on ITS hub
+        require!(
+            message_type != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+            "Not supported"
+        );
+
+        // Return original message type, source chain and payload
+        (message_type, data.destination_chain, data.payload)
     }
 
     fn process_interchain_transfer_payload(

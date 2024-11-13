@@ -2,8 +2,6 @@
 
 use core::ops::Deref;
 
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 use crate::abi::AbiEncodeDecode;
 use crate::constants::{
     InterchainTransferPayload, TokenId, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
@@ -70,8 +68,6 @@ pub trait InterchainTokenServiceContract:
 
         self.add_operator(operator);
         self.set_chain_name(chain_name.clone());
-        self.chain_name_hash()
-            .set_if_empty(self.crypto().keccak256(chain_name));
 
         for (name, address) in trusted_chain_names
             .into_vec()
@@ -221,13 +217,9 @@ pub trait InterchainTokenServiceContract:
         );
 
         (
-            self.valid_token_identifier(&interchain_transfer_payload.token_id),
+            self.registered_token_identifier(&interchain_transfer_payload.token_id),
             interchain_transfer_payload.amount,
         )
             .into()
     }
-
-    #[view(chainNameHash)]
-    #[storage_mapper("chain_name_hash")]
-    fn chain_name_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 }

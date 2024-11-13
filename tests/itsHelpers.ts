@@ -11,7 +11,6 @@ import {
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
   OTHER_CHAIN_ADDRESS,
-  OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_MANAGER_ADDRESS,
@@ -524,10 +523,8 @@ export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory
     e.kvs.Mapper('token_manager').Value(tokenManager),
     e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000010)), // operator role
 
-    e.kvs.Mapper('chain_name_hash').Value(e.TopBuffer(CHAIN_NAME_HASH)),
     e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
 
-    e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.TopBuffer(OTHER_CHAIN_ADDRESS_HASH)),
     e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
 
     ...(interchainTokenFactory ? [e.kvs.Mapper('interchain_token_factory').Value(interchainTokenFactory)] : []),

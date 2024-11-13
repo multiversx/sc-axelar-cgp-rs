@@ -7,7 +7,7 @@ The contract is made to be permissionless, to allow anyone to register an existi
 a new token, as well as register a token remotely for another chain. The [Interchain Token Factory](../interchain-token-factory) contract exists
 to abstract some functionality regarding deployment of tokens.  
 
-This contract is based on the 9876ff5f47997053e1bc5e05bdee1a345ac89272 commit of the [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/9876ff5f47997053e1bc5e05bdee1a345ac89272/contracts/InterchainTokenService.sol).
+This contract is based on the 7e6916d0d5bfe0c2c1bc915cc1ac5b21f82d1b36 commit of the [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/7e6916d0d5bfe0c2c1bc915cc1ac5b21f82d1b36/contracts/InterchainTokenService.sol).
 
 ## User callable endpoints
 - **deployTokenManager** (salt, destination_chain, token_manager_type, params) - deploys a custom token manager on MultiversX or another chain

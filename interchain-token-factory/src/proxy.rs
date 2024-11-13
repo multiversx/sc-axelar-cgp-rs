@@ -4,9 +4,9 @@ use crate::constants::{Hash, ManagedBufferAscii, TokenId};
 use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
+use interchain_token_service::address_tracker::ProxyTrait as _;
 use interchain_token_service::proxy_its::ProxyTrait as _;
 use interchain_token_service::user_functions::ProxyTrait as _;
-use interchain_token_service::ProxyTrait as _;
 use operatable::ProxyTrait as _;
 use token_manager::constants::TokenManagerType;
 use token_manager::mintership::ProxyTrait as _;
@@ -14,9 +14,9 @@ use token_manager::ProxyTrait as _;
 
 #[multiversx_sc::module]
 pub trait ProxyModule {
-    fn its_chain_name_hash(&self) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+    fn its_chain_name(&self) -> ManagedBuffer {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .chain_name_hash()
+            .chain_name()
             .execute_on_dest_context()
     }
 
@@ -52,9 +52,9 @@ pub trait ProxyModule {
             .execute_on_dest_context()
     }
 
-    fn its_valid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
+    fn its_deployed_token_manager(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .valid_token_manager_address(token_id)
+            .deployed_token_manager(token_id)
             .execute_on_dest_context()
     }
 
@@ -69,6 +69,12 @@ pub trait ProxyModule {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
             .deploy_token_manager(salt, destination_chain, token_manager_type, params)
             .with_egld_transfer(gas_value)
+            .execute_on_dest_context()
+    }
+
+    fn its_trusted_address(&self, chain_name: &ManagedBuffer) -> ManagedBuffer {
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
+            .trusted_address(chain_name)
             .execute_on_dest_context()
     }
 

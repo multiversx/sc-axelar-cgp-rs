@@ -602,7 +602,6 @@ describe('Address tracker', () => {
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
-        e.kvs.Mapper('trusted_address_hash', e.Str(someChainName)).Value(e.TopBuffer(someChainAddressHash)),
         e.kvs.Mapper('trusted_address', e.Str(someChainName)).Value(e.Str(someChainAddress)),
       ],
     });
@@ -647,7 +646,6 @@ describe('Address tracker', () => {
         e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
 
         // OTHER_CHAIN_NAME was deleted
-        e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Buffer('')),
         e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Buffer('')),
       ],
     });
@@ -673,18 +671,6 @@ describe('Address tracker', () => {
     });
 
     assert(result.returnData[0] === e.Str(OTHER_CHAIN_ADDRESS).toTopHex());
-
-    result = await world.query({
-      callee: its,
-      funcName: 'trustedAddressHash',
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-      ],
-    });
-
-    const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS).digest('hex');
-
-    assert(result.returnData[0] === otherChainAddressHash);
   });
 });
 

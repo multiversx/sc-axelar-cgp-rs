@@ -459,7 +459,7 @@ describe('Deploy interchain token', () => {
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
       ],
-    }).assertFail({ code: 4, message: 'Token name empty' });
+    }).assertFail({ code: 4, message: 'Empty token name' });
 
     await user.callContract({
       callee: tokenManager,
@@ -471,7 +471,7 @@ describe('Deploy interchain token', () => {
         e.Str(''),
         e.U8(18),
       ],
-    }).assertFail({ code: 4, message: 'Token symbol empty' });
+    }).assertFail({ code: 4, message: 'Empty token symbol' });
 
     // Manually set token identifier
     await tokenManager.setAccount({
