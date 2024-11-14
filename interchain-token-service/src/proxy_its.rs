@@ -4,7 +4,7 @@ use token_manager::flow_limit::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
 use crate::constants::{TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS, KEEP_EXTRA_GAS};
-use crate::{address_tracker, events, express_executor_tracker, proxy_gmp};
+use crate::{address_tracker, events, proxy_gmp};
 
 multiversx_sc::imports!();
 
@@ -26,24 +26,12 @@ pub mod executable_contract_proxy {
             data: ManagedBuffer,
             token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         );
-
-        #[payable("*")]
-        #[endpoint(expressExecuteWithInterchainToken)]
-        fn express_execute_with_interchain_token(
-            &self,
-            source_chain: &ManagedBuffer,
-            message_id: &ManagedBuffer,
-            source_address: ManagedBuffer,
-            data: ManagedBuffer,
-            token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        );
     }
 }
 
 #[multiversx_sc::module]
 pub trait ProxyItsModule:
     events::EventsModule
-    + express_executor_tracker::ExpressExecutorTracker
     + proxy_gmp::ProxyGmpModule
     + address_tracker::AddressTracker
 {
@@ -145,58 +133,6 @@ pub trait ProxyItsModule:
                 token_id,
                 token_identifier,
                 amount,
-            ))
-            .with_extra_gas_for_callback(EXECUTE_WITH_TOKEN_CALLBACK_GAS)
-            .register_promise();
-    }
-
-    fn executable_contract_express_execute_with_interchain_token(
-        &self,
-        destination_address: ManagedAddress,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        data: ManagedBuffer,
-        token_id: TokenId<Self::Api>,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
-        express_executor: ManagedAddress,
-        express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) {
-        let gas_left = self.blockchain().get_gas_left();
-
-        require!(
-            gas_left > EXECUTE_WITH_TOKEN_CALLBACK_GAS + KEEP_EXTRA_GAS,
-            "Not enough gas left for async call"
-        );
-
-        let gas_limit = gas_left - EXECUTE_WITH_TOKEN_CALLBACK_GAS - KEEP_EXTRA_GAS;
-
-        require!(
-            self.transfer_with_data_lock(&source_chain, &message_id).is_empty(),
-            "Async call in progress"
-        );
-
-        self.transfer_with_data_lock(&source_chain, &message_id)
-            .set(true);
-
-        self.executable_contract_proxy(destination_address)
-            .express_execute_with_interchain_token(
-                &source_chain,
-                &message_id,
-                source_address,
-                data,
-                token_id,
-            )
-            .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
-            .with_gas_limit(gas_limit)
-            .with_callback(self.callbacks().exp_execute_with_token_callback(
-                express_executor,
-                source_chain,
-                message_id,
-                token_identifier,
-                amount,
-                express_hash,
             ))
             .with_extra_gas_for_callback(EXECUTE_WITH_TOKEN_CALLBACK_GAS)
             .register_promise();
@@ -306,46 +242,6 @@ pub trait ProxyItsModule:
                 self.token_manager_take_token(&token_id, token_identifier, amount);
 
                 self.execute_with_interchain_token_failed_event(source_chain, message_id);
-            }
-        }
-    }
-
-    #[promises_callback]
-    fn exp_execute_with_token_callback(
-        &self,
-        express_executor: ManagedAddress,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
-        express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
-    ) {
-        match result {
-            ManagedAsyncCallResult::Ok(_) => {
-                self.transfer_with_data_lock(&source_chain, &message_id)
-                    .clear();
-
-                self.express_execute_with_interchain_token_success_event(
-                    source_chain,
-                    message_id,
-                    express_executor,
-                );
-            }
-            ManagedAsyncCallResult::Err(_) => {
-                self.transfer_with_data_lock(&source_chain, &message_id)
-                    .clear();
-
-                self.send()
-                    .direct(&express_executor, &token_identifier, 0, &amount);
-
-                self.express_execute(&express_hash).clear();
-
-                self.express_execute_with_interchain_token_failed_event(
-                    source_chain,
-                    message_id,
-                    express_executor,
-                );
             }
         }
     }

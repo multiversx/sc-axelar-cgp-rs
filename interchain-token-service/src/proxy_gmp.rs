@@ -67,60 +67,6 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
             .execute_on_dest_context::<()>();
     }
 
-    fn gas_service_pay_gas_for_express_call(
-        &self,
-        destination_chain: &ManagedBuffer,
-        destination_address: &ManagedBuffer,
-        payload: &ManagedBuffer,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        gas_value: BigUint,
-    ) {
-        if token_identifier.is_egld() {
-            self.gas_service_pay_native_gas_for_express_call(
-                destination_chain,
-                destination_address,
-                payload,
-                gas_value,
-            );
-
-            return;
-        }
-
-        self.gas_service_proxy(self.gas_service().get())
-            .pay_gas_for_express_call(
-                self.blockchain().get_sc_address(),
-                destination_chain,
-                destination_address,
-                payload,
-                self.blockchain().get_caller(),
-            )
-            .with_esdt_transfer(EsdtTokenPayment::new(
-                token_identifier.unwrap_esdt(),
-                0,
-                gas_value,
-            ))
-            .execute_on_dest_context::<()>();
-    }
-
-    fn gas_service_pay_native_gas_for_express_call(
-        &self,
-        destination_chain: &ManagedBuffer,
-        destination_address: &ManagedBuffer,
-        payload: &ManagedBuffer,
-        gas_value: BigUint,
-    ) {
-        self.gas_service_proxy(self.gas_service().get())
-            .pay_native_gas_for_express_call(
-                self.blockchain().get_sc_address(),
-                destination_chain,
-                destination_address,
-                payload,
-                self.blockchain().get_caller(),
-            )
-            .with_egld_transfer(gas_value)
-            .execute_on_dest_context::<()>();
-    }
-
     fn gateway_call_contract(
         &self,
         destination_chain: &ManagedBuffer,
@@ -187,13 +133,6 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         if gas_value > 0 {
             match metadata_version {
                 MetadataVersion::ContractCall => self.gas_service_pay_gas_for_contract_call(
-                    &destination_chain,
-                    &destination_address,
-                    &payload,
-                    gas_token,
-                    gas_value,
-                ),
-                MetadataVersion::ExpressCall => self.gas_service_pay_gas_for_express_call(
                     &destination_chain,
                     &destination_address,
                     &payload,

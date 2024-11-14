@@ -32,20 +32,18 @@ pub const KEEP_EXTRA_GAS: u64 = 15_000_000; // Extra gas to keep in contract bef
 
 pub enum MetadataVersion {
     ContractCall,
-    ExpressCall,
 }
 
 impl From<u32> for MetadataVersion {
     fn from(value: u32) -> Self {
         match value {
             0 => MetadataVersion::ContractCall,
-            1 => MetadataVersion::ExpressCall,
             _ => panic!("Unsupported metadata version"),
         }
     }
 }
 
-pub const LATEST_METADATA_VERSION: u32 = 1;
+pub const LATEST_METADATA_VERSION: u32 = 0;
 
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 

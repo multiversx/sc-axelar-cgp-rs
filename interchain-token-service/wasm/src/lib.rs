@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           36
+// Endpoints:                           33
 // Async Callback (empty):               1
-// Promise callbacks:                    2
-// Total number of exported functions:  41
+// Promise callbacks:                    1
+// Total number of exported functions:  37
 
 #![no_std]
 
@@ -24,10 +24,8 @@ multiversx_sc_wasm_adapter::endpoints! {
         setInterchainTokenFactory => set_interchain_token_factory
         setFlowLimits => set_flow_limits
         execute => execute
-        contractCallValue => contract_call_value
         deployTokenManager => deploy_token_manager
         deployInterchainToken => deploy_interchain_token
-        expressExecute => express_execute_endpoint
         interchainTransfer => interchain_transfer
         callContractWithInterchainToken => call_contract_with_interchain_token
         interchainTokenId => interchain_token_id
@@ -38,7 +36,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         isOperator => is_operator
         getAccountRoles => account_roles
         getProposedRoles => proposed_roles
-        getExpressExecutor => get_express_executor
         setTrustedAddress => set_trusted_address
         removeTrustedAddress => remove_trusted_address
         chainName => chain_name
@@ -58,7 +55,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         unpause => unpause_endpoint
         isPaused => paused_status
         execute_with_token_callback => execute_with_token_callback
-        exp_execute_with_token_callback => exp_execute_with_token_callback
     )
 }
 

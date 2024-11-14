@@ -34,13 +34,10 @@ export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
 
 export const ITS_HUB_CHAIN_NAME = 'axelar';
 export const ITS_HUB_ROUTING_IDENTIFIER = 'hub';
-export const ITS_HUB_ROUTING_IDENTIFIER_HASH: string = createKeccakHash('keccak256').update(ITS_HUB_ROUTING_IDENTIFIER).digest(
-  'hex');
 
 export const ITS_CHAIN_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
-export const ITS_CHAIN_ADDRESS_HASH: string = createKeccakHash('keccak256').update(ITS_CHAIN_ADDRESS).digest('hex');
 
-export const LATEST_METADATA_VERSION = 1;
+export const LATEST_METADATA_VERSION = 0;
 
 export const TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN = 0;
 export const TOKEN_MANAGER_TYPE_LOCK_UNLOCK = 2;
@@ -481,18 +478,6 @@ export const computeInterchainTokenId = (user: Encodable, salt = TOKEN_SALT) => 
   ]);
 
   return createKeccakHash('keccak256').update(buffer).digest('hex');
-};
-
-export const computeExpressExecuteHash = (payload: string) => {
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest();
-  const data = Buffer.concat([
-    Buffer.from(OTHER_CHAIN_NAME),
-    Buffer.from(MESSAGE_ID),
-    Buffer.from(OTHER_CHAIN_ADDRESS),
-    payloadHash,
-  ]);
-
-  return createKeccakHash('keccak256').update(data).digest('hex');
 };
 
 export const computeInterchainTokenSalt = (chain_name: string, user: Encodable, salt = TOKEN_SALT) => {

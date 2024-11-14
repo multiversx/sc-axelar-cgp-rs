@@ -442,28 +442,6 @@ describe('Pause unpause', () => {
       ],
     }).assertFail({ code: 4, message: 'Contract is paused' });
 
-    await world.query({
-      callee: its,
-      funcName: 'contractCallValue',
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(OTHER_CHAIN_ADDRESS),
-        e.Buffer(''),
-      ],
-    }).assertFail({ code: 4, message: 'Contract is paused' });
-
-    await user.callContract({
-      callee: its,
-      funcName: 'expressExecute',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(OTHER_CHAIN_ADDRESS),
-        e.Buffer(''),
-      ],
-    }).assertFail({ code: 4, message: 'Contract is paused' });
-
     await user.callContract({
       callee: its,
       funcName: 'interchainTransfer',

@@ -228,7 +228,7 @@ describe('Interchain transfer', () => {
         e.Str(OTHER_CHAIN_NAME),
         e.Str(OTHER_CHAIN_ADDRESS),
         e.Tuple(
-          e.U32(2), // Wrong Metadata version,
+          e.U32(1), // Wrong Metadata version,
           e.Str('sth'),
         ),
         e.U(0),

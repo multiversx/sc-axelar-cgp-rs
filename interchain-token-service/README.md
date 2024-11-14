@@ -18,8 +18,6 @@ This contract is based on the 7e6916d0d5bfe0c2c1bc915cc1ac5b21f82d1b36 commit of
   - the generated token id depends on the caller and the salt provided
   - it also takes EGLD payment to pay for cross-chain gas costs (if applicable) OR pay for ESDT issue cost
   - if deploying on MultiversX, **it needs to be called twice**, first time it will deploy the Token Manager and the second time it will issue the ESDT through the Token Manager
-- **expressExecute** (source_chain, message_id, source_address, payload) - can be called by anyone to complete a cross-chain call faster, if they provide the required tokens
-  - the caller will get back his tokens after the cross-chain call is fully executed by the Axelar Validators and Relayer services
 - **interchainTransfer** (token_id, destination_chain, destination_address, metadata, gas_value) - initiates a new cross-chain transfer for the received token
   - it will call the appropriate token manager for the token id that will either burn or lock the tokens on MultiversX
   - it will then call the destination chain ITS contract execute receive token command using a cross chain call through the CGP Gateway contract

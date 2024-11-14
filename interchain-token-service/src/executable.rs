@@ -11,14 +11,13 @@ use crate::constants::{
     SendToHubPayload, TokenId, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
     MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_RECEIVE_FROM_HUB,
 };
-use crate::{address_tracker, events, express_executor_tracker, proxy_gmp, proxy_its};
+use crate::{address_tracker, events, proxy_gmp, proxy_its};
 
 multiversx_sc::imports!();
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:
-    express_executor_tracker::ExpressExecutorTracker
-    + multiversx_sc_modules::pause::PauseModule
+    multiversx_sc_modules::pause::PauseModule
     + events::EventsModule
     + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
@@ -66,7 +65,6 @@ pub trait ExecutableModule:
 
     fn process_interchain_transfer_payload(
         &self,
-        express_executor: ManagedAddress,
         original_source_chain: ManagedBuffer,
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
@@ -76,35 +74,8 @@ pub trait ExecutableModule:
     ) {
         let send_token_payload = InterchainTransferPayload::<Self::Api>::abi_decode(payload);
 
-        if !express_executor.is_zero() {
-            let valid = self.gateway_validate_message(
-                &source_chain,
-                &message_id,
-                &source_address,
-                &payload_hash,
-            );
-
-            require!(valid, "Not approved by gateway");
-
-            // Make sure async call is finished before giving tokens back
-            if !send_token_payload.data.is_empty() {
-                require!(
-                    self.transfer_with_data_lock(&source_chain, &message_id).is_empty(),
-                    "Async call in progress"
-                );
-            }
-
-            self.token_manager_give_token(
-                &send_token_payload.token_id,
-                &express_executor,
-                &send_token_payload.amount,
-            );
-
-            return;
-        }
-
         let destination_address =
-            ManagedAddress::try_from(send_token_payload.destination_address.clone()).unwrap();
+            ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
 
         self.interchain_transfer_received_event(
             &send_token_payload.token_id,
@@ -139,27 +110,6 @@ pub trait ExecutableModule:
             return;
         }
 
-        self.process_interchain_transfer_payload_with_data(
-            original_source_chain,
-            source_chain,
-            message_id,
-            source_address,
-            payload_hash,
-            send_token_payload,
-            destination_address,
-        );
-    }
-
-    fn process_interchain_transfer_payload_with_data(
-        &self,
-        original_source_chain: ManagedBuffer,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        send_token_payload: InterchainTransferPayload<Self::Api>,
-        destination_address: ManagedAddress,
-    ) {
         // Only check that the call is valid and only mark it as executed after the async call has finished
         let valid = self.gateway_is_message_approved(
             &source_chain,

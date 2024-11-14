@@ -12,7 +12,6 @@ import { Buffer } from 'buffer';
 import {
   baseGatewayKvs,
   baseItsKvs,
-  computeExpressExecuteHash,
   deployContracts,
   gateway,
   interchainTokenFactory,
@@ -283,96 +282,6 @@ test('Flow limit', async () => {
 
       e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(1_000)),
       e.kvs.Mapper('flow_in_amount', e.U64(1)).Value(e.U(1_000)),
-    ],
-  });
-});
-
-test('Express executor', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(
-    world,
-    user,
-  );
-
-  const { payload, commandId } = await mockGatewayCall(computedTokenId);
-
-  const expressExecuteHash = computeExpressExecuteHash(payload);
-
-  // Mock user as express executor
-  await its.setAccount({
-    ...(await its.getAccountWithKvs()),
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
-
-      e.kvs.Mapper('express_execute', e.TopBuffer(expressExecuteHash)).Value(user),
-    ],
-  });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'execute',
-    gasLimit: 25_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(MESSAGE_ID),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
-    ],
-  });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'execute',
-    gasLimit: 25_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(MESSAGE_ID),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Not approved by gateway' });
-
-  // Tokens should be minted for user (express executor)
-  const userKvs = await user.getAccountWithKvs();
-  assertAccount(userKvs, {
-    balance: BigInt('10000000000000000'),
-    kvs: [
-      e.kvs.Esdts([
-        {
-          id: TOKEN_ID,
-          amount: 101_000,
-        },
-        {
-          id: TOKEN_ID2,
-          amount: 10_000,
-        },
-      ]),
-    ],
-  });
-
-  // Gateway message was marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
-    kvs: [
-      ...baseGatewayKvs(deployer),
-
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
-    ],
-  });
-
-  // Assert express receive token slot was deleted
-  const kvs = await its.getAccountWithKvs();
-  assertAccount(kvs, {
-    balance: 0n,
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
-    ],
-  });
-
-  // Nothing changed for token manager
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
-  assertAccount(tokenManagerKvs, {
-    balance: 0,
-    kvs: [
-      ...baseTokenManagerKvs,
     ],
   });
 });
