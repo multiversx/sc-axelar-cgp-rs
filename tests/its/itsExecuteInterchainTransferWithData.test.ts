@@ -107,7 +107,7 @@ test('Transfer with data', async () => {
   await user.callContract({
     callee: its,
     funcName: 'execute',
-    gasLimit: 50_000_000,
+    gasLimit: 100_000_000,
     funcArgs: [
       e.Str(OTHER_CHAIN_NAME),
       e.Str(MESSAGE_ID),
@@ -116,7 +116,19 @@ test('Transfer with data', async () => {
     ],
   });
 
-  // Assert no tokens left in its contract
+  await user.callContract({
+    callee: its,
+    funcName: 'execute',
+    gasLimit: 100_000_000,
+    funcArgs: [
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Not approved by gateway' });
+
+  // Assert no tokens left in its contract & lock removed
   const kvs = await its.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
@@ -174,7 +186,7 @@ test('Transfer with data contract error', async () => {
     'EGLD',
   );
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId, 'wrong');
+  const { payload, commandId, messageHash } = await mockGatewayCall(computedTokenId, 'wrong');
 
   await user.callContract({
     callee: its,
@@ -188,7 +200,7 @@ test('Transfer with data contract error', async () => {
     ],
   });
 
-  // Assert its doesn't have balance
+  // Assert its doesn't have balance & lock removed
   assertAccount(await its.getAccountWithKvs(), {
     balance: 0n,
     kvs: [
@@ -214,12 +226,12 @@ test('Transfer with data contract error', async () => {
     ],
   });
 
-  // Gateway message was marked as executed
+  // Gateway message was NOT marked as executed
   assertAccount(await gateway.getAccountWithKvs(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
     ],
   });
 });
@@ -326,16 +338,4 @@ test('Errors', async () => {
       payload,
     ],
   }).assertFail({ code: 4, message: 'Not remote service' });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'execute',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(MESSAGE_ID),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Not approved by gateway' });
 });

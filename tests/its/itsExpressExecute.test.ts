@@ -171,7 +171,7 @@ test('Express execute with data', async () => {
   await user.callContract({
     callee: its,
     funcName: 'expressExecute',
-    gasLimit: 30_000_000,
+    gasLimit: 100_000_000,
     value: 1_000,
     funcArgs: [
       e.Str(OTHER_CHAIN_NAME),

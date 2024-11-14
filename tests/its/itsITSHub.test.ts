@@ -288,7 +288,7 @@ describe('Execute', () => {
     await user.callContract({
       callee: its,
       funcName: 'execute',
-      gasLimit: 50_000_000,
+      gasLimit: 100_000_000,
       funcArgs: [
         e.Str(ITS_HUB_CHAIN_NAME),
         e.Str(MESSAGE_ID),

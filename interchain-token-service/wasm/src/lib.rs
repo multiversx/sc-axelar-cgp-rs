@@ -6,9 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           35
-// Async Callback:                       1
-// Total number of exported functions:  38
+// Endpoints:                           36
+// Async Callback (empty):               1
+// Promise callbacks:                    2
+// Total number of exported functions:  41
 
 #![no_std]
 
@@ -51,11 +52,14 @@ multiversx_sc_wasm_adapter::endpoints! {
         registeredTokenIdentifier => registered_token_identifier
         invalidTokenManagerAddress => invalid_token_manager_address
         tokenManagerAddress => token_manager_address
+        transferWithDataLock => transfer_with_data_lock
         tokenManagerImplementation => token_manager
         pause => pause_endpoint
         unpause => unpause_endpoint
         isPaused => paused_status
+        execute_with_token_callback => execute_with_token_callback
+        exp_execute_with_token_callback => exp_execute_with_token_callback
     )
 }
 
-multiversx_sc_wasm_adapter::async_callback! { interchain_token_service }
+multiversx_sc_wasm_adapter::async_callback_empty! {}

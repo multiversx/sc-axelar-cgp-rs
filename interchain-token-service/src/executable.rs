@@ -67,13 +67,33 @@ pub trait ExecutableModule:
     fn process_interchain_transfer_payload(
         &self,
         express_executor: ManagedAddress,
+        original_source_chain: ManagedBuffer,
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
+        source_address: ManagedBuffer,
+        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
         payload: ManagedBuffer,
     ) {
         let send_token_payload = InterchainTransferPayload::<Self::Api>::abi_decode(payload);
 
         if !express_executor.is_zero() {
+            let valid = self.gateway_validate_message(
+                &source_chain,
+                &message_id,
+                &source_address,
+                &payload_hash,
+            );
+
+            require!(valid, "Not approved by gateway");
+
+            // Make sure async call is finished before giving tokens back
+            if !send_token_payload.data.is_empty() {
+                require!(
+                    self.transfer_with_data_lock(&source_chain, &message_id).is_empty(),
+                    "Async call in progress"
+                );
+            }
+
             self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &express_executor,
@@ -84,11 +104,11 @@ pub trait ExecutableModule:
         }
 
         let destination_address =
-            ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
+            ManagedAddress::try_from(send_token_payload.destination_address.clone()).unwrap();
 
         self.interchain_transfer_received_event(
             &send_token_payload.token_id,
-            &source_chain,
+            &original_source_chain,
             &message_id,
             &send_token_payload.source_address,
             &destination_address,
@@ -101,6 +121,15 @@ pub trait ExecutableModule:
         );
 
         if send_token_payload.data.is_empty() {
+            let valid = self.gateway_validate_message(
+                &source_chain,
+                &message_id,
+                &source_address,
+                &payload_hash,
+            );
+
+            require!(valid, "Not approved by gateway");
+
             let _ = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -109,6 +138,37 @@ pub trait ExecutableModule:
 
             return;
         }
+
+        self.process_interchain_transfer_payload_with_data(
+            original_source_chain,
+            source_chain,
+            message_id,
+            source_address,
+            payload_hash,
+            send_token_payload,
+            destination_address,
+        );
+    }
+
+    fn process_interchain_transfer_payload_with_data(
+        &self,
+        original_source_chain: ManagedBuffer,
+        source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
+        source_address: ManagedBuffer,
+        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        send_token_payload: InterchainTransferPayload<Self::Api>,
+        destination_address: ManagedAddress,
+    ) {
+        // Only check that the call is valid and only mark it as executed after the async call has finished
+        let valid = self.gateway_is_message_approved(
+            &source_chain,
+            &message_id,
+            &source_address,
+            &payload_hash,
+        );
+
+        require!(valid, "Not approved by gateway");
 
         // Here we give the tokens to this contract and then call the executable contract with the tokens
         // In case of async call error, the token_manager_take_token method is called to revert this
@@ -120,8 +180,11 @@ pub trait ExecutableModule:
 
         self.executable_contract_execute_with_interchain_token(
             destination_address,
+            original_source_chain,
             source_chain,
             message_id,
+            source_address,
+            payload_hash,
             send_token_payload.source_address,
             send_token_payload.data,
             send_token_payload.token_id,

@@ -117,6 +117,18 @@ test('Transfer mint burn', async () => {
     ],
   });
 
+  await user.callContract({
+    callee: its,
+    funcName: 'execute',
+    gasLimit: 20_000_000,
+    funcArgs: [
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Not approved by gateway' });
+
   // Tokens should be minted for otherUser
   const otherUserKvs = await otherUser.getAccountWithKvs();
   assertAccount(otherUserKvs, {
@@ -307,6 +319,18 @@ test('Express executor', async () => {
     ],
   });
 
+  await user.callContract({
+    callee: its,
+    funcName: 'execute',
+    gasLimit: 25_000_000,
+    funcArgs: [
+      e.Str(OTHER_CHAIN_NAME),
+      e.Str(MESSAGE_ID),
+      e.Str(OTHER_CHAIN_ADDRESS),
+      payload,
+    ],
+  }).assertFail({ code: 4, message: 'Not approved by gateway' });
+
   // Tokens should be minted for user (express executor)
   const userKvs = await user.getAccountWithKvs();
   assertAccount(userKvs, {
@@ -373,18 +397,6 @@ test('Errors', async () => {
       payload,
     ],
   }).assertFail({ code: 4, message: 'Not remote service' });
-
-  await user.callContract({
-    callee: its,
-    funcName: 'execute',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(MESSAGE_ID),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
   payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256'],

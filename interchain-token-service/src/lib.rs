@@ -130,34 +130,12 @@ pub trait InterchainTokenServiceContract:
             self.get_execute_params(source_chain.clone(), payload);
 
         match message_type {
-            MESSAGE_TYPE_INTERCHAIN_TRANSFER | MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER => {
+            MESSAGE_TYPE_INTERCHAIN_TRANSFER => {
                 require!(
                     self.call_value().egld_value().deref() == &BigUint::zero(),
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
-                // TODO: For MESSAGE_TYPE_INTERCHAIN_TRANSFER with payload only check initially that the message is valid
-                // and in the callback actually validate it to prevent gas attacks. Also add a lock so the same call can not be executed multiple times
-                // if it is in progress
-                let valid = self.gateway_validate_message(
-                    &source_chain,
-                    &message_id,
-                    &source_address,
-                    &payload_hash,
-                );
-
-                require!(valid, "Not approved by gateway");
-            }
-            MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN => {
-                // This is checked inside process_deploy_interchain_token_payload function
-            }
-            _ => {
-                sc_panic!("Invalid message type");
-            }
-        }
-
-        match message_type {
-            MESSAGE_TYPE_INTERCHAIN_TRANSFER => {
                 let express_executor = self.pop_express_executor(
                     &source_chain,
                     &message_id,
@@ -178,11 +156,28 @@ pub trait InterchainTokenServiceContract:
                 self.process_interchain_transfer_payload(
                     express_executor,
                     original_source_chain,
+                    source_chain,
                     message_id,
+                    source_address,
+                    payload_hash,
                     payload,
                 );
             }
             MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER => {
+                require!(
+                    self.call_value().egld_value().deref() == &BigUint::zero(),
+                    "Can not send EGLD payment if not issuing ESDT"
+                );
+
+                let valid = self.gateway_validate_message(
+                    &source_chain,
+                    &message_id,
+                    &source_address,
+                    &payload_hash,
+                );
+
+                require!(valid, "Not approved by gateway");
+
                 self.process_deploy_token_manager_payload(payload);
             }
             MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN => {

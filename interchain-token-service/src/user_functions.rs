@@ -177,6 +177,8 @@ pub trait UserFunctionsModule:
         token_id
     }
 
+    // TODO: Do we even need to support express execute inbound on MultiversX since the chain finality is not an issue?
+    // And this is only supported for non ITS Hub chains anyways, which will not be the case on MultiversX
     #[payable("*")]
     #[endpoint(expressExecute)]
     fn express_execute_endpoint(
@@ -333,29 +335,28 @@ pub trait UserFunctionsModule:
             &interchain_transfer_payload.amount,
         );
 
-        if !interchain_transfer_payload.data.is_empty() {
-            self.executable_contract_express_execute_with_interchain_token(
-                destination_address,
-                source_chain,
-                message_id,
-                interchain_transfer_payload.source_address,
-                interchain_transfer_payload.data,
-                interchain_transfer_payload.token_id,
-                token_identifier,
-                interchain_transfer_payload.amount,
-                express_executor,
-                express_hash,
+        if interchain_transfer_payload.data.is_empty() {
+            self.send().direct(
+                &destination_address,
+                &token_identifier,
+                0,
+                &interchain_transfer_payload.amount,
             );
 
-            // Not technically needed, the async call above will end the execution
             return;
         }
 
-        self.send().direct(
-            &destination_address,
-            &token_identifier,
-            0,
-            &interchain_transfer_payload.amount,
+        self.executable_contract_express_execute_with_interchain_token(
+            destination_address,
+            source_chain,
+            message_id,
+            interchain_transfer_payload.source_address,
+            interchain_transfer_payload.data,
+            interchain_transfer_payload.token_id,
+            token_identifier,
+            interchain_transfer_payload.amount,
+            express_executor,
+            express_hash,
         );
     }
 
