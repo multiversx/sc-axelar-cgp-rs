@@ -5,7 +5,7 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
-use crate::abi::AbiEncodeDecode;
+use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::constants::{
     DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
     SendToHubPayload, TokenId, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
@@ -260,6 +260,15 @@ pub trait ExecutableModule:
         token_manager_address_mapper.set(address.clone());
 
         address
+    }
+
+    fn get_message_type(&self, payload: &ManagedBuffer) -> u64 {
+        ParamType::Uint256
+            .abi_decode(payload, 0)
+            .token
+            .into_biguint()
+            .to_u64()
+            .unwrap()
     }
 
     #[view(tokenManagerImplementation)]

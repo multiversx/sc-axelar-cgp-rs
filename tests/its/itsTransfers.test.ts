@@ -266,6 +266,20 @@ describe('Interchain transfer', () => {
       ],
       esdts: [{ id: TOKEN_ID, amount: 1_000 }],
     }).assertFail({ code: 4, message: 'Untrusted chain' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str('Unsupported-Chain'),
+        e.Buffer(''), // empty destination address
+        e.Buffer(''), // No metadata
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    }).assertFail({ code: 4, message: 'Empty destination address' });
   });
 
   test('Gas token errors', async () => {

@@ -386,29 +386,30 @@ describe('Execute', () => {
         e.Str(ITS_CHAIN_ADDRESS),
         payload,
       ],
-    });
+    }).assertFail({ code: 4, message: 'Not supported' });
 
-    const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
-    assertAccount(tokenManagerKvs, {
-      balance: 0,
-      kvs: [
-        e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
-        e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_MINT_BURN)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-        e.kvs.Mapper('interchain_token_service').Value(its),
-        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
-      ],
-    });
-
-    // Gateway message was marked as executed
-    assertAccount(await gateway.getAccountWithKvs(), {
-      kvs: [
-        ...baseGatewayKvs(deployer),
-
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
-      ],
-    });
+    // For now ITS Hub does not support deploy token manager
+    // const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
+    // const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    // assertAccount(tokenManagerKvs, {
+    //   balance: 0,
+    //   kvs: [
+    //     e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
+    //     e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_MINT_BURN)),
+    //     e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+    //     e.kvs.Mapper('interchain_token_service').Value(its),
+    //     e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
+    //   ],
+    // });
+    //
+    // // Gateway message was marked as executed
+    // assertAccount(await gateway.getAccountWithKvs(), {
+    //   kvs: [
+    //     ...baseGatewayKvs(deployer),
+    //
+    //     e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+    //   ],
+    // });
   });
 
   test('Errors', async () => {
@@ -685,7 +686,7 @@ describe('Deploy', () => {
       ],
     });
 
-    let result = await user.callContract({
+    await user.callContract({
       callee: its,
       funcName: 'deployTokenManager',
       gasLimit: 20_000_000,
@@ -704,37 +705,38 @@ describe('Deploy', () => {
           ).substring(2),
         ),
       ],
-    });
+    }).assertFail({ code: 4, message: 'Not supported' });
 
-    assert(result.returnData[0] === computeInterchainTokenId(user));
-
-    // Nothing changes for its keys
-    let kvs = await its.getAccountWithKvs();
-    assertAccount(kvs, {
-      balance: 0n,
-      kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory),
-
-        e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
-        e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_CHAIN_ADDRESS)),
-
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
-          TOKEN_MANAGER_ADDRESS)),
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(e.Addr(
-          TOKEN_MANAGER_ADDRESS_2)),
-      ],
-    });
-
-    // Assert gas was paid for cross chain call
-    kvs = await gasService.getAccountWithKvs();
-    assertAccount(kvs, {
-      balance: 100_000,
-      kvs: [
-        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-      ],
-    });
-
-    // There are events emitted for the Gateway contract, but there is no way to test those currently...
+    // For now ITS Hub does not support deploy token manager
+    // assert(result.returnData[0] === computeInterchainTokenId(user));
+    //
+    // // Nothing changes for its keys
+    // let kvs = await its.getAccountWithKvs();
+    // assertAccount(kvs, {
+    //   balance: 0n,
+    //   kvs: [
+    //     ...baseItsKvs(deployer, interchainTokenFactory),
+    //
+    //     e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
+    //     e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_CHAIN_ADDRESS)),
+    //
+    //     e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
+    //       TOKEN_MANAGER_ADDRESS)),
+    //     e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(e.Addr(
+    //       TOKEN_MANAGER_ADDRESS_2)),
+    //   ],
+    // });
+    //
+    // // Assert gas was paid for cross chain call
+    // kvs = await gasService.getAccountWithKvs();
+    // assertAccount(kvs, {
+    //   balance: 100_000,
+    //   kvs: [
+    //     e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+    //   ],
+    // });
+    //
+    // // There are events emitted for the Gateway contract, but there is no way to test those currently...
   });
 
   test('Remote interchain token', async () => {

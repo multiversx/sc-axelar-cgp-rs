@@ -32,8 +32,9 @@ pub trait RemoteModule:
     ) {
         let _ = self.deployed_token_manager(token_id);
 
+        let message_type = BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER);
         let data = DeployTokenManagerPayload {
-            message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER),
+            message_type: message_type.clone(),
             token_id: token_id.clone(),
             token_manager_type,
             params: params.clone(),
@@ -42,6 +43,7 @@ pub trait RemoteModule:
         let payload = data.abi_encode();
 
         self.call_contract(
+            message_type,
             destination_chain.clone(),
             payload,
             MetadataVersion::ContractCall,
@@ -73,8 +75,9 @@ pub trait RemoteModule:
 
         self.deployed_token_manager(token_id);
 
+        let message_type = BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN);
         let data = DeployInterchainTokenPayload {
-            message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
+            message_type: message_type.clone(),
             token_id: token_id.clone(),
             name: name.clone(),
             symbol: symbol.clone(),
@@ -85,6 +88,7 @@ pub trait RemoteModule:
         let payload = data.abi_encode();
 
         self.call_contract(
+            message_type,
             destination_chain.clone(),
             payload,
             MetadataVersion::ContractCall,
@@ -121,8 +125,9 @@ pub trait RemoteModule:
             self.crypto().keccak256(&data)
         };
 
+        let message_type = BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER);
         let payload = InterchainTransferPayload {
-            message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER),
+            message_type: message_type.clone(),
             token_id: token_id.clone(),
             source_address: source_address.as_managed_buffer().clone(),
             destination_address: destination_address.clone(),
@@ -133,6 +138,7 @@ pub trait RemoteModule:
         let payload = payload.abi_encode();
 
         self.call_contract(
+            message_type,
             destination_chain.clone(),
             payload,
             metadata_version,

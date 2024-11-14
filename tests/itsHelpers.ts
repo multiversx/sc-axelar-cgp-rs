@@ -34,7 +34,8 @@ export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
 
 export const ITS_HUB_CHAIN_NAME = 'axelar';
 export const ITS_HUB_ROUTING_IDENTIFIER = 'hub';
-export const ITS_HUB_ROUTING_IDENTIFIER_HASH: string = createKeccakHash('keccak256').update(ITS_HUB_ROUTING_IDENTIFIER).digest('hex');
+export const ITS_HUB_ROUTING_IDENTIFIER_HASH: string = createKeccakHash('keccak256').update(ITS_HUB_ROUTING_IDENTIFIER).digest(
+  'hex');
 
 export const ITS_CHAIN_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
 export const ITS_CHAIN_ADDRESS_HASH: string = createKeccakHash('keccak256').update(ITS_CHAIN_ADDRESS).digest('hex');
@@ -179,7 +180,10 @@ export const deployTokenManagerInterchainToken = async (
           e.kvs.Esdts([{ id: tokenIdentifier, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }]),
         ] : []),
 
-      ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
+      ...(its !== operator ? [e.kvs.Mapper(
+        'account_roles',
+        its,
+      ).Value(e.U32(tokenIdentifier && burnRole ? 0b00000111 : 0b00000110))] : []), // all roles OR flow limit & operator role
       ...(minter ? [e.kvs.Mapper(
         'account_roles',
         minter,
@@ -537,7 +541,7 @@ export async function mockGatewayMessageApproved(
   payload: string,
   operator: SWallet,
   sourceChain: string = OTHER_CHAIN_NAME,
-  sourceAddress: string = OTHER_CHAIN_ADDRESS
+  sourceAddress: string = OTHER_CHAIN_ADDRESS,
 ) {
   const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
 

@@ -1,6 +1,6 @@
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-use crate::abi::{AbiEncodeDecode, ParamType};
+use crate::abi::AbiEncodeDecode;
 use crate::address_tracker;
 use crate::constants::{
     MetadataVersion, SendToHubPayload, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
@@ -174,6 +174,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
 
     fn call_contract(
         &self,
+        message_type: BigUint,
         destination_chain: ManagedBuffer,
         payload: ManagedBuffer,
         metadata_version: MetadataVersion,
@@ -181,7 +182,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         gas_value: BigUint,
     ) {
         let (destination_chain, destination_address, payload) =
-            self.get_call_params(destination_chain, payload);
+            self.get_call_params(message_type, destination_chain, payload);
 
         if gas_value > 0 {
             match metadata_version {
@@ -207,6 +208,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
 
     fn get_call_params(
         &self,
+        message_type: BigUint,
         destination_chain: ManagedBuffer,
         payload: ManagedBuffer,
     ) -> (ManagedBuffer, ManagedBuffer, ManagedBuffer) {
@@ -222,15 +224,15 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
             return (destination_chain, destination_address, payload);
         }
 
-        // Prevent deploy token manager to be usable on ITS hub
-        require!(
-            self.get_message_type(&payload) != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
-            "Not supported"
-        );
-
         let destination_address = self.trusted_address(&ManagedBuffer::from(ITS_HUB_CHAIN_NAME));
         require!(!destination_address.is_empty(), "Untrusted chain");
         let destination_address = destination_address.get();
+
+        // Prevent deploy token manager to be usable on ITS hub
+        require!(
+            message_type != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+            "Not supported"
+        );
 
         let data = SendToHubPayload::<Self::Api> {
             message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
@@ -239,20 +241,11 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         };
 
         // Send wrapped message to ITS Hub chain and to ITS Hub true address
-        return (
+        (
             ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
             destination_address,
             data.abi_encode(),
-        );
-    }
-
-    fn get_message_type(&self, payload: &ManagedBuffer) -> u64 {
-        ParamType::Uint256
-            .abi_decode(payload, 0)
-            .token
-            .into_biguint()
-            .to_u64()
-            .unwrap()
+        )
     }
 
     #[view]

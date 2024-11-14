@@ -136,6 +136,9 @@ pub trait InterchainTokenServiceContract:
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
+                // TODO: For MESSAGE_TYPE_INTERCHAIN_TRANSFER with payload only check initially that the message is valid
+                // and in the callback actually validate it to prevent gas attacks. Also add a lock so the same call can not be executed multiple times
+                // if it is in progress
                 let valid = self.gateway_validate_message(
                     &source_chain,
                     &message_id,

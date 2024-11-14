@@ -409,7 +409,7 @@ describe('Deploy interchain token', () => {
       hasKvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // minter role was added to user
+        e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // minter role was added to user (ITS)
 
         // ESDT token deployment was tested on Devnet and it works fine
         e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -515,7 +515,7 @@ describe('Deploy interchain token', () => {
 
 describe('Mint burn', () => {
   test('Mint', async () => {
-    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, TOKEN_ID, true, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_ID, true, user);
 
     // Only minter can call this
     await otherUser.callContract({
@@ -559,7 +559,7 @@ describe('Mint burn', () => {
   });
 
   test('Burn', async () => {
-    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, TOKEN_ID, true, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_ID, true, user);
 
     // Only minter can call this
     await otherUser.callContract({

@@ -138,7 +138,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         let token_manager = self.its_invalid_token_manager_address(&token_id);
 
         require!(
-            self.token_manager_is_minter(token_manager, &minter),
+            !token_manager.is_zero() && self.token_manager_is_minter(token_manager, &minter),
             "Invalid minter"
         );
 
@@ -163,7 +163,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
 
         let destination_minter_hash = self.crypto().keccak256(destination_minter);
 
-        self.approved_destination_minters(approval_key)
+        self.approved_destination_minters(&approval_key)
             .set(destination_minter_hash);
     }
 
@@ -190,7 +190,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
             destination_chain,
         });
 
-        self.approved_destination_minters(approval_key).clear();
+        self.approved_destination_minters(&approval_key).clear();
     }
 
     #[payable("EGLD")]
@@ -338,7 +338,9 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         let destination_minter_hash = self.crypto().keccak256(destination_minter);
 
         require!(
-            self.approved_destination_minters(approval_key).take() == destination_minter_hash,
+            !self.approved_destination_minters(&approval_key).is_empty()
+                && self.approved_destination_minters(&approval_key).take()
+                    == destination_minter_hash,
             "Remote deployment not approved"
         );
     }
@@ -462,6 +464,6 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
     #[storage_mapper("approved_destination_minters")]
     fn approved_destination_minters(
         &self,
-        approval_key: Hash<Self::Api>,
+        approval_key: &Hash<Self::Api>,
     ) -> SingleValueMapper<Hash<Self::Api>>;
 }

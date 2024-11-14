@@ -1,7 +1,7 @@
 import { afterEach, assert, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, SWallet, SWorld } from 'xsuite';
 import {
-  ADDRESS_ZERO,
+  ADDRESS_ZERO, CHAIN_NAME,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   OTHER_CHAIN_TOKEN_ADDRESS,
@@ -162,6 +162,19 @@ describe('Deploy token manager', () => {
   });
 
   test('Errors', async () => {
+    // Params can not be empty
+    await user.callContract({
+      callee: its,
+      funcName: 'deployTokenManager',
+      gasLimit: 100_000_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(''), // destination chain empty
+        e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), // Lock/unlock
+        e.Buffer(''),
+      ],
+    }).assertFail({ code: 4, message: 'Empty params' });
+
     // Can not deploy type interchain token
     await otherUser.callContract({
       callee: its,
@@ -411,6 +424,21 @@ describe('Deploy token manager remote', () => {
         ).toTopU8A()),
       ],
     }).assertFail({ code: 4, message: 'Untrusted chain' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'deployTokenManager',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(CHAIN_NAME),
+        e.U8(2), // Lock/unlock
+        e.Buffer(e.Tuple(
+          e.Option(user),
+          e.Option(e.Str(TOKEN_ID2)),
+        ).toTopU8A()),
+      ],
+    }).assertFail({ code: 4, message: 'Cannot deploy remotely to self' });
   });
 
 });
@@ -708,6 +736,36 @@ describe('Deploy interchain token remote', () => {
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
         e.Str(OTHER_CHAIN_NAME),
+        e.Str(''),
+        e.Str('TOKEN-SYMBOL'),
+        e.U8(18),
+        e.Str(OTHER_CHAIN_ADDRESS), // minter
+      ],
+    }).assertFail({ code: 4, message: 'Empty token name' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'deployInterchainToken',
+      gasLimit: 20_000_000,
+      value: 100_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str('Token Name'),
+        e.Str(''),
+        e.U8(18),
+        e.Str(OTHER_CHAIN_ADDRESS), // minter
+      ],
+    }).assertFail({ code: 4, message: 'Empty token symbol' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'deployInterchainToken',
+      gasLimit: 20_000_000,
+      value: 100_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(OTHER_CHAIN_NAME),
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
@@ -818,5 +876,20 @@ describe('Deploy interchain token remote', () => {
         e.Str(OTHER_CHAIN_ADDRESS), // minter
       ],
     }).assertFail({ code: 4, message: 'Untrusted chain' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'deployInterchainToken',
+      gasLimit: 20_000_000,
+      value: 100_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(CHAIN_NAME),
+        e.Str('Token Name'),
+        e.Str('TOKEN-SYMBOL'),
+        e.U8(18),
+        e.Str(OTHER_CHAIN_ADDRESS), // minter
+      ],
+    }).assertFail({ code: 4, message: 'Cannot deploy remotely to self' });
   });
 });
