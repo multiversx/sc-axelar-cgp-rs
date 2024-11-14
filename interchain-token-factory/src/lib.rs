@@ -32,7 +32,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
             .set_if_empty(&interchain_token_service);
 
         self.chain_name_hash()
-            .set_if_empty(self.crypto().keccak256(&self.its_chain_name()));
+            .set_if_empty(self.crypto().keccak256(self.its_chain_name()));
     }
 
     #[upgrade]

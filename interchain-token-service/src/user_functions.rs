@@ -55,7 +55,7 @@ pub trait UserFunctionsModule:
             // Restricted on ITS contracts deployed to Amplifier chains until ITS Hub adds support
             require!(
                 self.trusted_address(&self.chain_name().get()).get()
-                    != ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER),
+                    != *ITS_HUB_ROUTING_IDENTIFIER,
                 "Not supported"
             );
         }
