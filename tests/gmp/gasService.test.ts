@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, test } from 'vitest';
-import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSContract, LSWallet, LSWorld } from 'xsuite';
 import { TOKEN_ID } from '../helpers';
 
-let world: SWorld;
-let deployer: SWallet;
-let collector: SWallet;
-let contract: SContract;
+let world: LSWorld;
+let deployer: LSWallet;
+let collector: LSWallet;
+let contract: LSContract;
 let address: string;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,

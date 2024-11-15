@@ -1,4 +1,4 @@
-import { assertAccount, e, Encodable, SContract, SWallet } from 'xsuite';
+import { assertAccount, e, Encodable, LSContract, LSWallet } from 'xsuite';
 import {
   ALICE_PUB_KEY,
   BOB_PUB_KEY,
@@ -44,12 +44,12 @@ export const TOKEN_MANAGER_TYPE_LOCK_UNLOCK = 2;
 export const TOKEN_MANAGER_TYPE_MINT_BURN = 4;
 
 let address: string;
-export let gateway: SContract;
-export let gasService: SContract;
-export let interchainTokenFactory: SContract;
-export let tokenManager: SContract;
-export let its: SContract;
-export let pingPong: SContract;
+export let gateway: LSContract;
+export let gasService: LSContract;
+export let interchainTokenFactory: LSContract;
+export let tokenManager: LSContract;
+export let its: LSContract;
+export let pingPong: LSContract;
 
 export const defaultWeightedSigners = e.Tuple(
   e.List(
@@ -71,7 +71,7 @@ export const defaultSignersHash = getSignersHash(
   getKeccak256Hash('nonce1'),
 );
 
-export const baseGatewayKvs = (operator: SWallet) => {
+export const baseGatewayKvs = (operator: LSWallet) => {
   return [
     e.kvs.Mapper('previous_signers_retention').Value(e.U(16)),
     e.kvs.Mapper('domain_separator').Value(e.TopBuffer(DOMAIN_SEPARATOR)),
@@ -84,7 +84,7 @@ export const baseGatewayKvs = (operator: SWallet) => {
   ];
 };
 
-export const deployGatewayContract = async (deployer: SWallet) => {
+export const deployGatewayContract = async (deployer: LSWallet) => {
   ({ contract: gateway, address } = await deployer.deployContract({
     code: 'file:gateway/output/gateway.wasm',
     codeMetadata: ['upgradeable'],
@@ -105,7 +105,7 @@ export const deployGatewayContract = async (deployer: SWallet) => {
   });
 };
 
-export const deployGasService = async (deployer: SWallet, collector: SWallet) => {
+export const deployGasService = async (deployer: LSWallet, collector: LSWallet) => {
   ({ contract: gasService, address } = await deployer.deployContract({
     code: 'file:gas-service/output/gas-service.wasm',
     codeMetadata: ['upgradeable'],
@@ -125,12 +125,12 @@ export const deployGasService = async (deployer: SWallet, collector: SWallet) =>
 };
 
 export const deployTokenManagerInterchainToken = async (
-  deployer: SWallet,
-  operator: SWallet | SContract = deployer,
-  its: SWallet | SContract = operator,
+  deployer: LSWallet,
+  operator: LSWallet | LSContract = deployer,
+  its: LSWallet | LSContract = operator,
   tokenIdentifier: string | null = null,
   burnRole: boolean = true,
-  minter: SWallet | SContract | null = null,
+  minter: LSWallet | LSContract | null = null,
 ): Promise<Kvs> => {
   ({ contract: tokenManager, address } = await deployer.deployContract({
     code: 'file:token-manager/output/token-manager.wasm',
@@ -198,9 +198,9 @@ export const deployTokenManagerInterchainToken = async (
 };
 
 export const deployTokenManagerMintBurn = async (
-  deployer: SWallet,
-  operator: SWallet | SContract = deployer,
-  its: SWallet | SContract = operator,
+  deployer: LSWallet,
+  operator: LSWallet | LSContract = deployer,
+  its: LSWallet | LSContract = operator,
   tokenIdentifier: string = TOKEN_ID,
   burnRole: boolean = true,
 ): Promise<Kvs> => {
@@ -250,9 +250,9 @@ export const deployTokenManagerMintBurn = async (
 };
 
 export const deployTokenManagerLockUnlock = async (
-  deployer: SWallet,
-  its: SWallet | SContract = deployer,
-  operator: SWallet = deployer,
+  deployer: LSWallet,
+  its: LSWallet | LSContract = deployer,
+  operator: LSWallet = deployer,
   tokenId: string = TOKEN_ID,
   interchainTokenId: string = INTERCHAIN_TOKEN_ID,
 ): Promise<EncodableKvs> => {
@@ -290,7 +290,7 @@ export const deployTokenManagerLockUnlock = async (
   return baseKvs;
 };
 
-export const deployIts = async (deployer: SWallet) => {
+export const deployIts = async (deployer: LSWallet) => {
   ({ contract: its, address } = await deployer.deployContract({
     code: 'file:interchain-token-service/output/interchain-token-service.wasm',
     codeMetadata: ['upgradeable'],
@@ -320,7 +320,7 @@ export const deployIts = async (deployer: SWallet) => {
   });
 };
 
-export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: boolean = true) => {
+export const deployInterchainTokenFactory = async (deployer: LSWallet, callIts: boolean = true) => {
   ({ contract: interchainTokenFactory, address } = await deployer.deployContract({
     code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
     codeMetadata: ['upgradeable'],
@@ -352,13 +352,13 @@ export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: b
   }
 };
 
-export const deployPingPongInterchain = async (deployer: SWallet, amount = 1_000, itsContract = its) => {
+export const deployPingPongInterchain = async (deployer: LSWallet, amount = 1_000, itLSContract = its) => {
   ({ contract: pingPong } = await deployer.deployContract({
     code: 'file:ping-pong-interchain/output/ping-ping-interchain.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
-      itsContract,
+      itLSContract,
       e.U(amount),
       e.U64(10),
       e.Option(null),
@@ -366,7 +366,7 @@ export const deployPingPongInterchain = async (deployer: SWallet, amount = 1_000
   }));
 };
 
-export const deployContracts = async (deployer: SWallet, collector: SWallet, includeIts: boolean = true) => {
+export const deployContracts = async (deployer: LSWallet, collector: LSWallet, includeIts: boolean = true) => {
   await deployGatewayContract(deployer);
   await deployGasService(deployer, collector);
   await deployTokenManagerLockUnlock(deployer);
@@ -377,7 +377,7 @@ export const deployContracts = async (deployer: SWallet, collector: SWallet, inc
   }
 };
 
-export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addTokens: boolean = false, tokenIdentifier: string = TOKEN_ID) => {
+export const itsDeployTokenManagerLockUnlock = async (world, user: LSWallet, addTokens: boolean = false, tokenIdentifier: string = TOKEN_ID) => {
   const computedTokenId = computeInterchainTokenId(user);
 
   await user.callContract({
@@ -429,7 +429,7 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addT
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
 };
 
-export const itsDeployTokenManagerMintBurn = async (world, user: SWallet, flowLimit: number = 0) => {
+export const itsDeployTokenManagerMintBurn = async (world, user: LSWallet, flowLimit: number = 0) => {
   const computedTokenId = computeInterchainTokenId(user);
 
   await user.callContract({
@@ -505,7 +505,7 @@ export const computeCanonicalInterchainTokenSalt = (chain_name: string, tokenIde
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory: SContract | null = null, computedTokenId: string | null = null) => {
+export const baseItsKvs = (operator: LSWallet | LSContract, interchainTokenFactory: LSContract | null = null, computedTokenId: string | null = null) => {
   return [
     e.kvs.Mapper('gateway').Value(gateway),
     e.kvs.Mapper('gas_service').Value(gasService),
@@ -524,7 +524,7 @@ export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory
 
 export async function mockGatewayMessageApproved(
   payload: string,
-  operator: SWallet,
+  operator: LSWallet,
   sourceChain: string = OTHER_CHAIN_NAME,
   sourceAddress: string = OTHER_CHAIN_ADDRESS,
 ) {

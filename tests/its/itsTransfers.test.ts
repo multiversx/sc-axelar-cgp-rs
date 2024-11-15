@@ -1,24 +1,22 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import { INTERCHAIN_TOKEN_ID, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
-  baseItsKvs,
   deployContracts,
   gasService,
-  interchainTokenFactory,
   its,
   itsDeployTokenManagerLockUnlock,
   LATEST_METADATA_VERSION,
 } from '../itsHelpers';
 
-let world: SWorld;
-let deployer: SWallet;
-let collector: SWallet;
-let user: SWallet;
-let otherUser: SWallet;
+let world: LSWorld;
+let deployer: LSWallet;
+let collector: LSWallet;
+let user: LSWallet;
+let otherUser: LSWallet;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -335,7 +333,7 @@ describe('Interchain transfer', () => {
       esdts: [
         { id: TOKEN_ID, amount: 1_000 },
         { id: TOKEN_ID2, amount: 1_000 },
-        { id: 'TOKEN3-987654', amount: 1_000, }
+        { id: 'TOKEN3-987654', amount: 1_000 },
       ],
     }).assertFail({ code: 4, message: 'A maximum of two esdt payments are supported' });
 
@@ -413,7 +411,7 @@ describe('Interchain transfer', () => {
       world,
       user,
       false,
-      'EGLD'
+      'EGLD',
     );
 
     await user.callContract({
@@ -692,7 +690,7 @@ describe('Call contract with interchain token', () => {
       esdts: [
         { id: TOKEN_ID, amount: 1_000 },
         { id: TOKEN_ID2, amount: 1_000 },
-        { id: 'TOKEN3-987654', amount: 1_000, }
+        { id: 'TOKEN3-987654', amount: 1_000 },
       ],
     }).assertFail({ code: 4, message: 'A maximum of two esdt payments are supported' });
 
@@ -770,7 +768,7 @@ describe('Call contract with interchain token', () => {
       world,
       user,
       false,
-      'EGLD'
+      'EGLD',
     );
 
     await user.callContract({
