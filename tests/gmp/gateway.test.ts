@@ -1374,6 +1374,66 @@ describe('View functions', () => {
       ],
     }).assertFail({ code: 4, message: 'Invalid signers' });
   });
+
+  test('Validate proof manipulate signers hash ', async () => {
+    await deployContract();
+
+    const data = e.List();
+    const dataHash = getKeccak256Hash(Buffer.concat([
+      Buffer.from('00', 'hex'), // ApproveMessages command type,
+      data.toTopU8A(),
+    ]));
+
+    const spoofedWeight = 198540501017381061748170477501535016683251460902464757637395385927941042274417159n;
+    const signers = [
+      { signer: ALICE_PUB_KEY, weight: 5n },
+      {
+        signer: BOB_PUB_KEY,
+        weight: spoofedWeight,
+      },
+    ];
+    let dataForSignersHashToSpoof = Buffer.concat([
+      ...signers.map(signer => {
+        let weightHex = signer.weight.toString(16);
+        if (weightHex.length % 2) {
+          weightHex = '0' + weightHex;
+        }
+
+        return Buffer.concat([
+          Buffer.from(signer.signer, 'hex'),
+          Buffer.from(weightHex, 'hex'),
+        ]);
+      }),
+      Buffer.from('0a', 'hex'), // threshold
+      Buffer.from(getKeccak256Hash('nonce1'), 'hex'),
+    ]);
+    const spoofedWeightedSigners = e.Tuple(
+      e.List(
+        e.Tuple(e.TopBuffer(ALICE_PUB_KEY), e.U(5)),
+        e.Tuple(e.TopBuffer(BOB_PUB_KEY), e.U(spoofedWeight)),
+      ),
+      e.U(10),
+      e.TopBuffer(getKeccak256Hash('nonce1')),
+    );
+
+    // Hash can not be the same
+    assert(getKeccak256Hash(dataForSignersHashToSpoof) != defaultSignersHash.toString('hex'));
+
+    // Bob spoofed signature, but it will not work
+    await world.query({
+      callee: contract,
+      funcName: 'validateProof',
+      funcArgs: [
+        e.TopBuffer(dataHash),
+        generateProof(
+          spoofedWeightedSigners, [
+            null,
+            generateMessageSignature(defaultSignersHash, data, './bob.pem'),
+          ],
+        ),
+      ],
+    }).assertFail({ code: 4, message: 'Invalid signers' })
+  });
 });
 
 test('Approve validate execute external contract', async () => {
@@ -1460,7 +1520,7 @@ test('Approve validate execute external contract', async () => {
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
-  }).assertFail({ code: 4, message: "can't withdraw before deadline" });
+  }).assertFail({ code: 4, message: 'can\'t withdraw before deadline' });
 
   await world.setCurrentBlockInfo({
     timestamp: 10,
@@ -1484,7 +1544,7 @@ test('Approve validate execute external contract', async () => {
       ...baseKvs(),
 
       // Message was executed
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
     ],
   });
   // Other user received funds
@@ -1523,7 +1583,8 @@ const multisigSignersHash = getSignersHash(
   '290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563',
 );
 
-test('Approve messages with multisig prover encoded data', async () => {
+// TODO: Update CosmWasm contracts
+test.skip('Approve messages with multisig prover encoded data', async () => {
   await deployContract();
 
   // Mock multisig signers in contract
@@ -1534,7 +1595,7 @@ test('Approve messages with multisig prover encoded data', async () => {
 
       e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
       e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
-    ]
+    ],
   });
 
   // 00000009 67616e616368652d31 - length of `ganache-1` source chain string followed by it as hex
@@ -1563,8 +1624,8 @@ test('Approve messages with multisig prover encoded data', async () => {
   // 00 - fifth signature encoded as a None option (the fifth signer didn't specify any signature)
   const proof = Buffer.from(
     '000000050139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba0000000101ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b60000000101ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56300000005019543286a58ded1c031fcf8e5fcdc7c5b48b6304c539bdf7a30a0b780451a64318420fe654a13be7a33cae4f221cd26e1e033d01da144901453474c73b520450d01199b7e0f25ff4c24637bbdfdc18d338f422793f492a81140afd080019061088ddf667f018d88928a28dcb77a2c253c66ee5a83be2d4134ff3ab3141f0fdb170d014f883c316682c6e000bf4c92536a138f78c6af265f4f13d7210110e40350bb4d99e049677db13e7c12f8a4e617a5cb9bf32f5142cd58f7146505078e2d6757030000',
-    'hex'
-  )
+    'hex',
+  );
 
   await deployer.callContract({
     callee: contract,
@@ -1587,12 +1648,14 @@ test('Approve messages with multisig prover encoded data', async () => {
       e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
 
       // Message was executed
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer('b8fe5d23fe5954fa900ec37278b8661a98d061dfa34e7ebdd2e3ae98fbee5d8d')),
+      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(
+        'b8fe5d23fe5954fa900ec37278b8661a98d061dfa34e7ebdd2e3ae98fbee5d8d')),
     ],
   });
 });
 
-test('Rotate signers with multisig prover encoded data', async () => {
+// TODO: Update CosmWasm contracts
+test.skip('Rotate signers with multisig prover encoded data', async () => {
   await deployContract();
 
   // Mock multisig signers in contract
@@ -1603,7 +1666,7 @@ test('Rotate signers with multisig prover encoded data', async () => {
 
       e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
       e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
-    ]
+    ],
   });
 
   // 00000003 - length of new signers
@@ -1636,7 +1699,7 @@ test('Rotate signers with multisig prover encoded data', async () => {
   // 00 - fifth signature encoded as a None option (the fifth signer didn't specify any signature)
   const proof = Buffer.from(
     '000000050139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba0000000101ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b60000000101ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56300000005015c98a98d1e47adecf83a10d4fdc542aae1cb13ab8e6d3f5e237ad75ccb6608631c0d3f8735e3f5f481e82f088fe5215d431ae8c6abf68b96797df4bbe610cd0501ca0999eac93ee855ea88680b8094660635a06743e9acdb8d1987a9c48a60e9f794bd22a10748bb9c3c961ddc3068a96abfae00a9c38252a4b3ad99caeb06080501deca8b224a38ad99ec4cb4f3d8e86778544c55ab0c4513ce8af834b81b3e934eef29727cc76c364f316a44c2eea82fa655f209f0c5205a209461d8a7fbbacf030000',
-    'hex'
+    'hex',
   );
 
   await world.setCurrentBlockInfo({

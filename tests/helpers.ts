@@ -80,29 +80,42 @@ export const generateRotateSignersSignature = (signersHash: Buffer, data: Encoda
 };
 
 export const getSignersHash = (signers: { signer: string, weight: number } [], threshold: number, nonce: string) => {
-  let thresholdHex = threshold.toString(16);
-  if (thresholdHex.length % 2) {
-    thresholdHex = '0' + thresholdHex;
-  }
+  let signersLengthHex = numberToHex(signers.length, 4);
+
+  let thresholdHex = numberToHex(threshold);
 
   let data = Buffer.concat([
+    Buffer.from(signersLengthHex, 'hex'),
     ...signers.map(signer => {
-      let weightHex = signer.weight.toString(16);
-      if (weightHex.length % 2) {
-        weightHex = '0' + weightHex;
-      }
+      let weightHex = numberToHex(signer.weight);
+      let weightHexLengthHex = numberToHex(weightHex.length / 2, 4);
 
       return Buffer.concat([
         Buffer.from(signer.signer, 'hex'),
+        Buffer.from(weightHexLengthHex, 'hex'),
         Buffer.from(weightHex, 'hex'),
       ]);
     }),
+    Buffer.from(numberToHex(thresholdHex.length / 2, 4), 'hex'),
     Buffer.from(thresholdHex, 'hex'),
     Buffer.from(nonce, 'hex'),
   ]);
 
   return createKeccakHash('keccak256').update(data).digest();
 };
+
+const numberToHex = (nb: number, size: number = 0): string => {
+  let nbHex = nb.toString(16);
+  if (nbHex.length % 2) {
+    nbHex = '0' + nbHex;
+  }
+
+  while (size && nbHex.length < size * 2) {
+    nbHex = '00' + nbHex;
+  }
+
+  return nbHex;
+}
 
 export const getSignersHashAndEncodable = (signers: {
   signer: string,
