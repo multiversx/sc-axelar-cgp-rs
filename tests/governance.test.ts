@@ -1,6 +1,6 @@
 import { afterEach, assert, beforeEach, test } from 'vitest';
 import { assertAccount, d, e, Encodable, SContract, SWallet, SWorld } from 'xsuite';
-import { ADDRESS_ZERO, getKeccak256Hash, MESSAGE_ID } from './helpers';
+import { ADDRESS_ZERO, getKeccak256Hash, getMessageHash, MESSAGE_ID } from './helpers';
 import createKeccakHash from 'keccak';
 import fs from 'fs';
 import { baseGatewayKvs, deployGatewayContract, gateway } from './itsHelpers';
@@ -71,16 +71,9 @@ const deployContract = async () => {
 const mockCallApprovedByGateway = async (payload: Encodable) => {
   const payloadHash = getKeccak256Hash(Buffer.from(payload.toTopU8A()));
 
-  const messageData = Buffer.concat([
-    Buffer.from(GOVERNANCE_CHAIN),
-    Buffer.from(MESSAGE_ID),
-    Buffer.from(GOVERNANCE_ADDRESS),
-    contract.toTopU8A(),
-    Buffer.from(payloadHash, 'hex'),
-  ]);
-  const messageHash = getKeccak256Hash(messageData);
+  const messageHash = getMessageHash(GOVERNANCE_CHAIN, MESSAGE_ID, GOVERNANCE_ADDRESS, contract, payloadHash);
 
-  const commandId = getKeccak256Hash(GOVERNANCE_CHAIN + '_' + MESSAGE_ID);
+  const crossChainId = e.Tuple(e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID));
 
   // Mock call approved by gateway
   await gateway.setAccount({
@@ -90,7 +83,7 @@ const mockCallApprovedByGateway = async (payload: Encodable) => {
       ...baseGatewayKvs(deployer),
 
       // Manually approve message
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
 }

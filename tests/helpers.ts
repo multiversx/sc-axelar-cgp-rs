@@ -2,6 +2,7 @@ import fs from 'fs';
 import { UserSecretKey } from '@multiversx/sdk-wallet/out';
 import createKeccakHash from 'keccak';
 import { e, Encodable } from 'xsuite';
+import { Buffer } from 'buffer';
 
 export const MOCK_CONTRACT_ADDRESS_1: string = 'erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax';
 export const MOCK_CONTRACT_ADDRESS_2: string = 'erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh';
@@ -79,6 +80,23 @@ export const generateRotateSignersSignature = (signersHash: Buffer, data: Encoda
   return privateKey.sign(Buffer.from(messageHashToSign, 'hex'));
 };
 
+export const getMessageHash = (
+  sourceChain: string,
+  messageId: string,
+  sourceAddress: string,
+  contractAddress: Encodable,
+  payloadHash: string = PAYLOAD_HASH
+): Encodable => {
+  const messageData = Buffer.concat([
+    e.Tuple(e.Str(sourceChain), e.Str(messageId)).toNestU8A(),
+    e.Str(sourceAddress).toNestU8A(),
+    contractAddress.toTopU8A(),
+    Buffer.from(payloadHash, 'hex'),
+  ]);
+
+  return e.TopBuffer(getKeccak256Hash(messageData));
+};
+
 export const getSignersHash = (signers: { signer: string, weight: number } [], threshold: number, nonce: string) => {
   let signersLengthHex = numberToHex(signers.length, 4);
 
@@ -115,7 +133,7 @@ const numberToHex = (nb: number, size: number = 0): string => {
   }
 
   return nbHex;
-}
+};
 
 export const getSignersHashAndEncodable = (signers: {
   signer: string,
@@ -140,6 +158,6 @@ export const generateProof = (weightedSigners: Encodable, signatures: (Buffer | 
   })));
 };
 
-export const getKeccak256Hash = (payload: string | Buffer = 'commandId') => {
+export const getKeccak256Hash = (payload: string | Buffer) => {
   return createKeccakHash('keccak256').update(Buffer.from(payload)).digest('hex');
 };

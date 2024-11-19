@@ -19,7 +19,6 @@ pub trait Events {
     #[event("message_approved_event")]
     fn message_approved_event(
         &self,
-        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] source_chain: ManagedBuffer,
         #[indexed] message_id: ManagedBuffer,
         #[indexed] source_address: ManagedBuffer,
@@ -30,7 +29,6 @@ pub trait Events {
     #[event("message_executed_event")]
     fn message_executed_event(
         &self,
-        #[indexed] command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] source_chain: &ManagedBuffer,
         #[indexed] message_id: &ManagedBuffer,
     );
