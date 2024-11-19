@@ -169,7 +169,7 @@ pub trait AuthModule: events::Events {
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        let _ = signers
+        signers
             .dep_encode(&mut encoded)
             .unwrap_or_else(|_| sc_panic!("Could not encode weighted signers"));
 

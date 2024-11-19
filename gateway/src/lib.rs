@@ -177,11 +177,11 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        let _ = cross_chain_id
+        cross_chain_id
             .dep_encode(&mut encoded)
             .unwrap_or_else(|_| sc_panic!("Could not encode cross chain id"));
 
-        let _ = source_address
+        source_address
             .dep_encode(&mut encoded)
             .unwrap_or_else(|_| sc_panic!("Could not encode source address"));
 
