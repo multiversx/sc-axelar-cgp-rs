@@ -1,9 +1,10 @@
 import { afterEach, assert, beforeEach, test } from 'vitest';
 import { assertAccount, d, e, Encodable, SContract, SWallet, SWorld } from 'xsuite';
-import { ADDRESS_ZERO, getKeccak256Hash, getMessageHash, MESSAGE_ID } from './helpers';
+import { ADDRESS_ZERO, getKeccak256Hash, getMessageHash, MESSAGE_ID, PAYLOAD_HASH, TOKEN_ID } from './helpers';
 import createKeccakHash from 'keccak';
 import fs from 'fs';
 import { baseGatewayKvs, deployGatewayContract, gateway } from './itsHelpers';
+import { Buffer } from 'buffer';
 
 const GOVERNANCE_CHAIN = 'Axelar';
 const GOVERNANCE_ADDRESS = 'axelar1u5jhn5876mjzmgw7j37mdvqh4qp5y6z2gc6rc3';
@@ -22,6 +23,9 @@ beforeEach(async () => {
 
   deployer = await world.createWallet({
     balance: 10_000_000_000n,
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+    ],
   });
 });
 
@@ -86,7 +90,21 @@ const mockCallApprovedByGateway = async (payload: Encodable) => {
       e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
-}
+};
+
+const getProposalHash = (
+  target: Encodable,
+  callDataTopBuffer: Encodable,
+  nativeValue: Encodable,
+): Encodable => {
+  const hashData = Buffer.concat([
+    target.toTopU8A(),
+    e.Buffer(callDataTopBuffer.toTopU8A()).toNestU8A(),
+    nativeValue.toNestU8A(),
+  ]);
+
+  return e.TopBuffer(getKeccak256Hash(hashData));
+};
 
 test('Init errors', async () => {
   await deployGatewayContract(deployer);
@@ -146,12 +164,7 @@ test('Execute proposal errors', async () => {
     ],
   }).assertFail({ code: 4, message: 'Invalid time lock hash' });
 
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    wrongCallData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+  const proposalHash = getProposalHash(gateway, wrongCallData, e.U(0));
 
   // Mock hash
   await contract.setAccount({
@@ -159,7 +172,7 @@ test('Execute proposal errors', async () => {
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
     ],
   });
 
@@ -189,6 +202,55 @@ test('Execute proposal errors', async () => {
   }).assertFail({ code: 4, message: 'Could not decode call data' });
 });
 
+test('Execute proposal esdt errors', async () => {
+  await deployContract();
+
+  // Increase timestamp so finalize_time_lock passes
+  await world.setCurrentBlockInfo({ timestamp: 1 });
+
+  const callData = e.TopBuffer(e.Tuple(
+    e.Str('function'),
+    e.List(),
+    e.U64(0), // min gas limit
+  ).toTopU8A());
+
+  const proposalHashWithEgld = getProposalHash(gateway, callData, e.U(1_000));
+
+  // Mock hash
+  await contract.setAccount({
+    ...await contract.getAccountWithKvs(),
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('time_lock_eta', proposalHashWithEgld).Value(e.U64(1)),
+    ],
+  });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 100_000_000,
+    funcName: 'executeProposal',
+    value: 999,
+    funcArgs: [
+      gateway,
+      callData,
+      e.U(1_000),
+    ],
+  }).assertFail({ code: 4, message: 'Not enough egld sent' });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 100_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      gateway,
+      callData,
+      e.U(1_000),
+    ],
+    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+  }).assertFail({ code: 4, message: 'No egld payment sent' });
+});
+
 test('Execute proposal upgrade gateway', async () => {
   await deployContract();
 
@@ -203,14 +265,10 @@ test('Execute proposal upgrade gateway', async () => {
       e.Buffer('0100'), // upgrade metadata (upgradable)
       e.Buffer(newOperator.toTopU8A()), // Arguments to upgrade function fo Gateway
     ),
+    e.U64(20_000_000), // min gas limit
   ).toTopU8A());
 
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    callData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+  const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
   // Mock hash
   await contract.setAccount({
@@ -218,7 +276,7 @@ test('Execute proposal upgrade gateway', async () => {
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
     ],
   });
   // Increase timestamp so finalize_time_lock passes
@@ -226,7 +284,7 @@ test('Execute proposal upgrade gateway', async () => {
 
   await deployer.callContract({
     callee: contract,
-    gasLimit: 20_000_000,
+    gasLimit: 30_000_000,
     funcName: 'executeProposal',
     funcArgs: [
       gateway,
@@ -234,6 +292,17 @@ test('Execute proposal upgrade gateway', async () => {
       e.U(0),
     ],
   }).assertFail({ code: 4, message: 'Not enough gas left for async call' });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      gateway,
+      callData,
+      e.U(0),
+    ],
+  }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
 
   await deployer.callContract({
     callee: contract,
@@ -270,14 +339,10 @@ test('Execute proposal upgrade gateway error', async () => {
       e.Buffer('0100'), // upgrade metadata (upgradable)
       e.Str('wrongArgs'),
     ),
+    e.U64(1_000_000), // min gas limit
   ).toTopU8A());
 
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    callData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+  const proposalHash = getProposalHash(gateway, callData, e.U(1_000));
 
   // Mock hash
   await contract.setAccount({
@@ -285,7 +350,7 @@ test('Execute proposal upgrade gateway error', async () => {
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
     ],
   });
   // Increase timestamp so finalize_time_lock passes
@@ -295,10 +360,11 @@ test('Execute proposal upgrade gateway error', async () => {
     callee: contract,
     gasLimit: 50_000_000,
     funcName: 'executeProposal',
+    value: 1_000, // also send egld
     funcArgs: [
       gateway,
       callData,
-      e.U(0),
+      e.U(1_000),
     ],
   }); // async call actually fails
 
@@ -309,7 +375,84 @@ test('Execute proposal upgrade gateway error', async () => {
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+    ],
+  });
+
+  assertAccount(await deployer.getAccountWithKvs(), {
+    balance: 10_000_000_000n, // got egld back
+  });
+});
+
+
+test('Execute proposal upgrade gateway esdt error', async () => {
+  await deployContract();
+
+  const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
+
+  const callData = e.TopBuffer(e.Tuple(
+    e.Str('upgradeContract'),
+    e.List(
+      e.Buffer(gatewayCode), // code
+      e.Buffer('0100'), // upgrade metadata (upgradable)
+      e.Str('wrongArgs'),
+    ),
+    e.U64(1_000_000), // min gas limit
+  ).toTopU8A());
+
+  const proposalHash = getProposalHash(gateway, callData, e.U(0));
+
+  // Mock hash
+  await contract.setAccount({
+    ...await contract.getAccountWithKvs(),
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+    ],
+  });
+  // Increase timestamp so finalize_time_lock passes
+  await world.setCurrentBlockInfo({ timestamp: 1 });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 47_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      gateway,
+      callData,
+      e.U(0),
+    ],
+    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+  }).assertFail({ code: 4, message: 'Not enough gas left for async call payments' });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      gateway,
+      callData,
+      e.U(0),
+    ],
+    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+  }); // async call actually fails
+
+  // Time lock eta was NOT deleted
+  let kvs = await contract.getAccountWithKvs();
+  assertAccount(kvs, {
+    balance: 0n,
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+    ],
+  });
+
+  assertAccount(await deployer.getAccountWithKvs(), {
+    balance: 10_000_000_000n,
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // got esdt back
     ],
   });
 });
@@ -334,14 +477,10 @@ test('Withdraw', async () => {
       e.Buffer(deployer.toNestBytes()),
       e.U(100),
     ),
+    e.U64(1_000_000), // min gas limit
   ).toTopU8A());
 
-  const buffer = Buffer.concat([
-    contract.toTopU8A(),
-    callData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+  const proposalHash = getProposalHash(contract, callData, e.U(0));
 
   // Mock hash & balance
   await contract.setAccount({
@@ -350,7 +489,7 @@ test('Withdraw', async () => {
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(1)),
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
     ],
   });
   // Increase timestamp so finalize_time_lock passes
@@ -483,12 +622,7 @@ test('Execute schedule time lock proposal min eta', async () => {
     ],
   });
 
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    callData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+  const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
   let kvs = await contract.getAccountWithKvs();
   assertAccount(kvs, {
@@ -496,7 +630,7 @@ test('Execute schedule time lock proposal min eta', async () => {
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(10)),
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(10)),
     ],
   });
 });
@@ -526,12 +660,7 @@ test('Execute schedule time lock proposal eta', async () => {
     ],
   });
 
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    callData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+  const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
   let kvs = await contract.getAccountWithKvs();
   assertAccount(kvs, {
@@ -539,7 +668,7 @@ test('Execute schedule time lock proposal eta', async () => {
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(11)),
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(11)),
     ],
   });
 
@@ -563,7 +692,7 @@ test('Execute schedule time lock proposal eta', async () => {
       gateway,
       callData,
       e.U(0),
-    ]
+    ],
   });
   assert(d.U64().topDecode(result.returnData[0]) === 11n);
 });
@@ -582,20 +711,15 @@ test('Execute cancel time lock proposal', async () => {
   await mockCallApprovedByGateway(payload);
 
   // Mock time lock era set
-  const buffer = Buffer.concat([
-    gateway.toTopU8A(),
-    callData.toTopU8A(),
-    e.U(0).toTopU8A(),
-  ]);
-  const hash = createKeccakHash('keccak256').update(buffer).digest('hex');
+  const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
   await contract.setAccount({
     ...await contract.getAccountWithKvs(),
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('time_lock_eta', e.TopBuffer(hash)).Value(e.U64(10)),
-    ]
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(10)),
+    ],
   });
 
   await deployer.callContract({
