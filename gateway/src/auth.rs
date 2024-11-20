@@ -169,8 +169,9 @@ pub trait AuthModule: events::Events {
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
+        // Will nest encode struct fields
         signers
-            .dep_encode(&mut encoded)
+            .top_encode(&mut encoded)
             .unwrap_or_else(|_| sc_panic!("Could not encode weighted signers"));
 
         self.crypto().keccak256(encoded)

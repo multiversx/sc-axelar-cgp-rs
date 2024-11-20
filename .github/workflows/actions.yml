@@ -14,10 +14,10 @@ permissions:
 jobs:
   contracts:
     name: Contracts
-    uses: multiversx/mx-sc-actions/.github/workflows/contracts.yml@v3.2.0
+    uses: multiversx/mx-sc-actions/.github/workflows/contracts.yml@v3.3.1
     with:
-      rust-toolchain: 1.78.0
-      pip-mxpy-args: "multiversx-sdk-cli==v9.5.5"
+      rust-toolchain: 1.81.0
+      pip-mxpy-args: "multiversx-sdk-cli==v9.7.0"
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -25,7 +25,7 @@ jobs:
     name: xSuite Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Install rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -35,7 +35,7 @@ jobs:
 
       - name: Install prerequisites
         run: |
-          pipx install multiversx-sdk-cli==v9.5.5
+          pipx install "multiversx-sdk-cli==v9.7.0"
           
           wget -O binaryen.tar.gz https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz
           tar -xf binaryen.tar.gz
@@ -43,9 +43,10 @@ jobs:
 
           sudo apt install -y wabt=1.0.27-1
 
+          cargo install wasm-opt
           cargo install twiggy
           
-          cargo install multiversx-sc-meta --locked
+          cargo install multiversx-sc-meta --version 0.50.3 --locked
 
           which mxpy
           which wasm-opt
