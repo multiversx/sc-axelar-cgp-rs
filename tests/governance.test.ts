@@ -202,6 +202,93 @@ test('Execute proposal errors', async () => {
   }).assertFail({ code: 4, message: 'Could not decode call data' });
 });
 
+test('Execute proposal esdt', async () => {
+  await deployContract();
+
+  const user = await world.createWallet();
+
+  const callData = e.TopBuffer(e.Tuple(
+    e.Str('MultiESDTNFTTransfer'),
+    e.List(
+      e.Buffer(user.toTopU8A()),
+      e.Buffer(e.U32(1).toTopU8A()),
+      e.Str(TOKEN_ID),
+      e.Buffer(e.U64(0).toTopU8A()),
+      e.Buffer(e.U(1_000).toTopU8A()),
+    ), // arguments to MultiESDTNFTTransfer function
+    e.U64(10_000_000), // min gas limit
+  ).toTopU8A());
+
+  const proposalHash = getProposalHash(contract, callData, e.U(0));
+
+  // Mock hash
+  await contract.setAccount({
+    ...await contract.getAccountWithKvs(),
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+    ],
+  });
+  // Increase timestamp so finalize_time_lock passes
+  await world.setCurrentBlockInfo({ timestamp: 1 });
+
+  // Async call actually fails
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      contract,
+      callData,
+      e.U(0),
+    ],
+  });
+
+  // Time lock eta was NOT deleted
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+    ],
+  });
+
+  // Assert deployer still has the tokens
+  assertAccount(await deployer.getAccountWithKvs(), {
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+    ],
+  });
+
+  // Deployer needs to send correct tokens
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 200_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      contract,
+      callData,
+      e.U(0),
+    ],
+    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+  });
+
+  // Time lock eta was deleted
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: baseKvs(),
+  });
+
+  // Assert user received tokens
+  assertAccount(await user.getAccountWithKvs(), {
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+    ],
+  });
+});
+
 test('Execute proposal upgrade gateway', async () => {
   await deployContract();
 
@@ -323,7 +410,6 @@ test('Execute proposal upgrade gateway error', async () => {
     balance: 10_000_000_000n, // got egld back
   });
 });
-
 
 test('Execute proposal upgrade gateway esdt error', async () => {
   await deployContract();
