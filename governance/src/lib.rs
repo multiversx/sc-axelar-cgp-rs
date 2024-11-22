@@ -90,52 +90,32 @@ pub trait Governance: events::Events {
             DecodedCallData::<Self::Api>::top_decode(call_data)
                 .unwrap_or_else(|_| sc_panic!("Could not decode call data"));
 
-        let gas_left = self.blockchain().get_gas_left();
-
-        require!(
-            gas_left > EXECUTE_PROPOSAL_CALLBACK_GAS + KEEP_EXTRA_GAS,
-            "Not enough gas left for async call"
-        );
-
-        let mut gas_limit = gas_left - EXECUTE_PROPOSAL_CALLBACK_GAS - KEEP_EXTRA_GAS;
-
-        require!(
-            gas_limit >= decoded_call_data.min_gas_limit,
-            "Insufficient gas for execution"
-        );
-
         let caller = self.blockchain().get_caller();
 
         let mut extra_gas_for_callback = EXECUTE_PROPOSAL_CALLBACK_GAS;
 
         let payments = self.call_value().any_payment();
 
-        match payments.as_refs() {
-            EgldOrMultiEsdtPaymentRefs::Egld(egld_value) => {
-                if native_value > 0 {
-                    require!(egld_value >= &native_value, "Not enough egld sent");
-                }
-            }
-            EgldOrMultiEsdtPaymentRefs::MultiEsdt(payments) => {
-                if native_value > 0 {
-                    require!(payments.is_empty(), "No egld payment sent");
-                }
+        if let EgldOrMultiEsdtPaymentRefs::MultiEsdt(payments) = payments.as_refs() {
+            // Reserve extra gas for callback to make sure we can send back the tokens instead of async call error
+            let gas_for_payments =
+                EXECUTE_PROPOSAL_CALLBACK_GAS_PER_PAYMENT * payments.len() as u64;
 
-                let gas_for_payments = EXECUTE_PROPOSAL_CALLBACK_GAS_PER_PAYMENT * payments.len() as u64;
-
-                require!(
-                    gas_limit >= gas_for_payments,
-                    "Not enough gas left for async call payments"
-                );
-
-                gas_limit -= gas_for_payments;
-                extra_gas_for_callback += gas_for_payments;
-            }
+            extra_gas_for_callback += gas_for_payments;
         }
+
+        let gas_left = self.blockchain().get_gas_left();
+
+        require!(
+            gas_left > extra_gas_for_callback + KEEP_EXTRA_GAS + decoded_call_data.min_gas_limit,
+            "Insufficient gas for execution"
+        );
+
+        let gas_limit = gas_left - extra_gas_for_callback - KEEP_EXTRA_GAS;
 
         self.send()
             .contract_call::<()>(target, decoded_call_data.endpoint_name)
-            .with_any_payment(payments.clone())
+            .with_egld_transfer(native_value)
             .with_raw_arguments(decoded_call_data.arguments.into())
             .with_gas_limit(gas_limit)
             .async_call_promise()
@@ -277,12 +257,12 @@ pub trait Governance: events::Events {
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        encoded.append(target.as_managed_buffer());
-
+        target
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode target"));
         call_data
             .dep_encode(&mut encoded)
             .unwrap_or_else(|_| sc_panic!("Could not encode call data"));
-
         native_value
             .dep_encode(&mut encoded)
             .unwrap_or_else(|_| sc_panic!("Could not encode native value"));

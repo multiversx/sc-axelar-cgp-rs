@@ -202,55 +202,6 @@ test('Execute proposal errors', async () => {
   }).assertFail({ code: 4, message: 'Could not decode call data' });
 });
 
-test('Execute proposal esdt errors', async () => {
-  await deployContract();
-
-  // Increase timestamp so finalize_time_lock passes
-  await world.setCurrentBlockInfo({ timestamp: 1 });
-
-  const callData = e.TopBuffer(e.Tuple(
-    e.Str('function'),
-    e.List(),
-    e.U64(0), // min gas limit
-  ).toTopU8A());
-
-  const proposalHashWithEgld = getProposalHash(gateway, callData, e.U(1_000));
-
-  // Mock hash
-  await contract.setAccount({
-    ...await contract.getAccountWithKvs(),
-    kvs: [
-      ...baseKvs(),
-
-      e.kvs.Mapper('time_lock_eta', proposalHashWithEgld).Value(e.U64(1)),
-    ],
-  });
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 100_000_000,
-    funcName: 'executeProposal',
-    value: 999,
-    funcArgs: [
-      gateway,
-      callData,
-      e.U(1_000),
-    ],
-  }).assertFail({ code: 4, message: 'Not enough egld sent' });
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 100_000_000,
-    funcName: 'executeProposal',
-    funcArgs: [
-      gateway,
-      callData,
-      e.U(1_000),
-    ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  }).assertFail({ code: 4, message: 'No egld payment sent' });
-});
-
 test('Execute proposal upgrade gateway', async () => {
   await deployContract();
 
@@ -281,17 +232,6 @@ test('Execute proposal upgrade gateway', async () => {
   });
   // Increase timestamp so finalize_time_lock passes
   await world.setCurrentBlockInfo({ timestamp: 1 });
-
-  await deployer.callContract({
-    callee: contract,
-    gasLimit: 30_000_000,
-    funcName: 'executeProposal',
-    funcArgs: [
-      gateway,
-      callData,
-      e.U(0),
-    ],
-  }).assertFail({ code: 4, message: 'Not enough gas left for async call' });
 
   await deployer.callContract({
     callee: contract,
@@ -424,7 +364,7 @@ test('Execute proposal upgrade gateway esdt error', async () => {
       e.U(0),
     ],
     esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-  }).assertFail({ code: 4, message: 'Not enough gas left for async call payments' });
+  }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
 
   await deployer.callContract({
     callee: contract,

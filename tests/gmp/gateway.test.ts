@@ -1373,9 +1373,17 @@ describe('View functions', () => {
       data.toTopU8A(),
     ]));
 
-    const spoofedWeight = 198540501017381061748170477501535016683251460902464757637395385927941042274417159n;
+    // Spoof by top encoding Carol pub key in the weight of bob, without actually having the carol pub key
+    // in the signer set
+    const spoofedWeight = Buffer.concat([
+      Buffer.from('06', 'hex'), // weight of bob
+      Buffer.from(CAROL_PUB_KEY, 'hex'), // carol pub key
+      Buffer.from('07', 'hex'), // weight of carol
+    ]).toString('hex');
+
+    // Omit carol from defaultWeightedSigners since we are trying to spoof it using the weight of bob
     const signers = [
-      { signer: ALICE_PUB_KEY, weight: 5n },
+      { signer: ALICE_PUB_KEY, weight: '05' },
       {
         signer: BOB_PUB_KEY,
         weight: spoofedWeight,
@@ -1383,14 +1391,9 @@ describe('View functions', () => {
     ];
     let dataForSignersHashToSpoof = Buffer.concat([
       ...signers.map(signer => {
-        let weightHex = signer.weight.toString(16);
-        if (weightHex.length % 2) {
-          weightHex = '0' + weightHex;
-        }
-
         return Buffer.concat([
           Buffer.from(signer.signer, 'hex'),
-          Buffer.from(weightHex, 'hex'),
+          Buffer.from(signer.weight, 'hex'),
         ]);
       }),
       Buffer.from('0a', 'hex'), // threshold
@@ -1399,7 +1402,7 @@ describe('View functions', () => {
     const spoofedWeightedSigners = e.Tuple(
       e.List(
         e.Tuple(e.TopBuffer(ALICE_PUB_KEY), e.U(5)),
-        e.Tuple(e.TopBuffer(BOB_PUB_KEY), e.U(spoofedWeight)),
+        e.Tuple(e.TopBuffer(BOB_PUB_KEY), e.Buffer(spoofedWeight)), // use custom spoofed top encoded hex instead of weight
       ),
       e.U(10),
       e.TopBuffer(getKeccak256Hash('nonce1')),
@@ -1408,7 +1411,7 @@ describe('View functions', () => {
     // Hash can not be the same
     assert(getKeccak256Hash(dataForSignersHashToSpoof) != defaultSignersHash.toString('hex'));
 
-    // Bob spoofed signature, but it will not work
+    // Bob spoofed signature, but it will not work since we use nested encoding in contract which can not be spoofed
     await world.query({
       callee: contract,
       funcName: 'validateProof',

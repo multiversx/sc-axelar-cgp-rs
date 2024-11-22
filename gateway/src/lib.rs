@@ -180,13 +180,15 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
         cross_chain_id
             .dep_encode(&mut encoded)
             .unwrap_or_else(|_| sc_panic!("Could not encode cross chain id"));
-
         source_address
             .dep_encode(&mut encoded)
             .unwrap_or_else(|_| sc_panic!("Could not encode source address"));
-
-        encoded.append(contract_address.as_managed_buffer());
-        encoded.append(payload_hash.as_managed_buffer());
+        contract_address
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode contract address"));
+        payload_hash
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode payload hash"));
 
         self.crypto().keccak256(encoded)
     }
@@ -231,11 +233,7 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
     }
 
     #[view(isMessageExecuted)]
-    fn is_message_executed(
-        &self,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-    ) -> bool {
+    fn is_message_executed(&self, source_chain: ManagedBuffer, message_id: ManagedBuffer) -> bool {
         let cross_chain_id = CrossChainId {
             source_chain,
             message_id,
