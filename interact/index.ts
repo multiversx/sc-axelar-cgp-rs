@@ -58,7 +58,7 @@ program.command('deploy').action(async () => {
     gasLimit: 100_000_000,
     codeArgs: [
       e.U(16),
-      e.TopBuffer(data.domainSeparator),
+      e.TopBuffer(envChain.select(data.domainSeparator)),
       e.U64(3600),
       wallet,
       firstSigners,
