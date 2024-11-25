@@ -24,7 +24,7 @@ beforeEach(async () => {
   deployer = await world.createWallet({
     balance: 10_000_000_000n,
     kvs: [
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
     ],
   });
 });
@@ -213,7 +213,7 @@ test('Execute proposal esdt', async () => {
       e.Buffer(user.toTopU8A()),
       e.Buffer(e.U32(1).toTopU8A()),
       e.Str(TOKEN_ID),
-      e.Buffer(e.U64(0).toTopU8A()),
+      e.Buffer(e.U64(1).toTopU8A()),
       e.Buffer(e.U(1_000).toTopU8A()),
     ), // arguments to MultiESDTNFTTransfer function
     e.U64(10_000_000), // min gas limit
@@ -258,7 +258,7 @@ test('Execute proposal esdt', async () => {
   // Assert deployer still has the tokens
   assertAccount(await deployer.getAccountWithKvs(), {
     kvs: [
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
     ],
   });
 
@@ -272,7 +272,7 @@ test('Execute proposal esdt', async () => {
       callData,
       e.U(0),
     ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
   });
 
   // Time lock eta was deleted
@@ -284,7 +284,7 @@ test('Execute proposal esdt', async () => {
   // Assert user received tokens
   assertAccount(await user.getAccountWithKvs(), {
     kvs: [
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
     ],
   });
 });
@@ -395,14 +395,25 @@ test('Execute proposal upgrade gateway error', async () => {
     ],
   }); // async call actually fails
 
-  // Time lock eta was NOT deleted
+  // Time lock eta was NOT deleted and refund token was created
   let kvs = await contract.getAccountWithKvs();
   assertAccount(kvs, {
-    balance: 0n,
+    balance: 1_000, // EGLD still in contract
     kvs: [
       ...baseKvs(),
 
       e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+      e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000)),
+    ],
+  });
+
+  // Deployer can withdraw his funds in case of failure
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'withdrawRefundToken',
+    funcArgs: [
+      e.Tuple(e.Str('EGLD'), e.U64(0)),
     ],
   });
 
@@ -449,7 +460,7 @@ test('Execute proposal upgrade gateway esdt error', async () => {
       callData,
       e.U(0),
     ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
   }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
 
   await deployer.callContract({
@@ -461,10 +472,10 @@ test('Execute proposal upgrade gateway esdt error', async () => {
       callData,
       e.U(0),
     ],
-    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    esdts: [{ id: TOKEN_ID, amount: 500, nonce: 1 }],
   }); // async call actually fails
 
-  // Time lock eta was NOT deleted
+  // Time lock eta was NOT deleted and refund token was created
   let kvs = await contract.getAccountWithKvs();
   assertAccount(kvs, {
     balance: 0n,
@@ -472,14 +483,134 @@ test('Execute proposal upgrade gateway esdt error', async () => {
       ...baseKvs(),
 
       e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+      e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(500)),
+
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 500, nonce: 1 }]), // esdt still in contract
+    ],
+  });
+
+  // Try to execute again
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'executeProposal',
+    funcArgs: [
+      gateway,
+      callData,
+      e.U(0),
+    ],
+    esdts: [{ id: TOKEN_ID, amount: 500, nonce: 1 }],
+  }); // async call actually fails
+
+  // Amount was added to refund token
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+      e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(1_000)),
+
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
+    ],
+  });
+
+  // Deployer can withdraw his funds in case of failure
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'withdrawRefundToken',
+    funcArgs: [
+      e.Tuple(e.Str(TOKEN_ID), e.U64(1)),
     ],
   });
 
   assertAccount(await deployer.getAccountWithKvs(), {
     balance: 10_000_000_000n,
     kvs: [
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // got esdt back
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]), // got esdt back
     ],
+  });
+});
+
+test('Withdraw refund token', async () => {
+  await deployContract();
+
+  // Will do nothing
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'withdrawRefundToken',
+    funcArgs: [
+      e.Tuple(e.Str(TOKEN_ID), e.U64(1)),
+    ],
+  });
+
+  // Nothing has changed
+  assertAccount(await deployer.getAccountWithKvs(), {
+    balance: 10_000_000_000n,
+  });
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0n,
+    kvs: baseKvs(),
+  });
+
+  // Mock refund tokens
+  await contract.setAccount({
+    ...(await contract.getAccountWithKvs()),
+    balance: 1_000n,
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(1_000)),
+      e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000)),
+
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
+    ],
+  });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'withdrawRefundToken',
+    funcArgs: [
+      e.Tuple(e.Str(TOKEN_ID), e.U64(1)),
+    ],
+  });
+
+  assertAccount(await deployer.getAccountWithKvs(), {
+    balance: 10_000_000_000n,
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 2_000, nonce: 1 }]), // got esdt back
+    ],
+  });
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 1_000n,
+    kvs: [
+      ...baseKvs(),
+
+      e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000)),
+    ],
+  });
+
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 50_000_000,
+    funcName: 'withdrawRefundToken',
+    funcArgs: [
+      e.Tuple(e.Str('EGLD'), e.U64(0)),
+    ],
+  });
+
+  assertAccount(await deployer.getAccountWithKvs(), {
+    balance: 10_000_001_000n, // got egld back
+    kvs: [
+      e.kvs.Esdts([{ id: TOKEN_ID, amount: 2_000, nonce: 1 }]),
+    ],
+  });
+  assertAccount(await contract.getAccountWithKvs(), {
+    balance: 0,
+    kvs: baseKvs(),
   });
 });
 

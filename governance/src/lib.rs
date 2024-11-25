@@ -31,6 +31,12 @@ pub struct ExecutePayload<M: ManagedTypeApi> {
     pub eta: u64,
 }
 
+#[derive(TypeAbi, TopDecode, TopEncode, NestedDecode, NestedEncode, Clone)]
+pub struct EgldOrEsdtToken<M: ManagedTypeApi> {
+    pub token_identifier: EgldOrEsdtTokenIdentifier<M>,
+    pub token_nonce: u64,
+}
+
 const EXECUTE_PROPOSAL_CALLBACK_GAS: u64 = 10_000_000;
 const EXECUTE_PROPOSAL_CALLBACK_GAS_PER_PAYMENT: u64 = 2_000_000;
 // This is overkill, but the callback should be prevented from failing at all costs
@@ -168,6 +174,14 @@ pub trait Governance: events::Events {
         self.process_command(execute_payload);
     }
 
+    #[endpoint(withdrawRefundToken)]
+    fn withdraw_refund_token(&self, token: EgldOrEsdtToken<Self::Api>) {
+        let caller = self.blockchain().get_caller();
+        let value = self.refund_token(&caller, token.clone()).take();
+
+        self.send().direct_non_zero(&caller, &token.token_identifier, token.token_nonce, &value);
+    }
+
     fn process_command(&self, execute_payload: ExecutePayload<Self::Api>) {
         let proposal_hash = self.get_proposal_hash(
             &execute_payload.target,
@@ -294,10 +308,28 @@ pub trait Governance: events::Events {
             ManagedAsyncCallResult::Err(err) => {
                 match payments {
                     EgldOrMultiEsdtPayment::Egld(egld_value) => {
-                        self.send().direct_non_zero_egld(&caller, &egld_value);
+                        self.refund_token(
+                            &caller,
+                            EgldOrEsdtToken {
+                                token_identifier: EgldOrEsdtTokenIdentifier::egld(),
+                                token_nonce: 0,
+                            },
+                        )
+                        .update(|old| *old += &egld_value);
                     }
                     EgldOrMultiEsdtPayment::MultiEsdt(esdts) => {
-                        self.send().direct_multi(&caller, &esdts);
+                        for esdt in esdts.iter() {
+                            self.refund_token(
+                                &caller,
+                                EgldOrEsdtToken {
+                                    token_identifier: EgldOrEsdtTokenIdentifier::esdt(
+                                        esdt.token_identifier,
+                                    ),
+                                    token_nonce: esdt.token_nonce,
+                                },
+                            )
+                            .update(|old| *old += &esdt.amount);
+                        }
                     }
                 }
 
@@ -351,6 +383,14 @@ pub trait Governance: events::Events {
         &self,
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> SingleValueMapper<u64>;
+
+    #[view(getRefundToken)]
+    #[storage_mapper("refund_token")]
+    fn refund_token(
+        &self,
+        user: &ManagedAddress,
+        token: EgldOrEsdtToken<Self::Api>,
+    ) -> SingleValueMapper<BigUint>;
 
     #[proxy]
     fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway::Proxy<Self::Api>;
