@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           14
+// Endpoints:                           16
 // Async Callback (empty):               1
 // Promise callbacks:                    2
-// Total number of exported functions:  19
+// Total number of exported functions:  21
 
 #![no_std]
 
@@ -26,6 +26,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         withdraw => withdraw
         transferMultisig => transfer_multisig
         execute => execute
+        withdrawRefundToken => withdraw_refund_token
         getProposalEta => get_proposal_eta
         isMultisigProposalApproved => is_multisig_proposal_approved
         gateway => gateway
@@ -34,6 +35,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         getGovernanceAddress => governance_address
         getMultisig => multisig
         getTimeLockEta => time_lock_eta
+        getRefundToken => refund_token
         getMultisigApprovals => multisig_approvals
         execute_proposal_callback => execute_proposal_callback
         execute_multisig_proposal_callback => execute_multisig_proposal_callback

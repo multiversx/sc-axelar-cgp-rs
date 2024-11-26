@@ -21,6 +21,7 @@ pub enum ServiceGovernanceCommand {
 pub struct DecodedCallData<M: ManagedTypeApi> {
     pub endpoint_name: ManagedBuffer<M>,
     pub arguments: ManagedVec<M, ManagedBuffer<M>>,
+    pub min_gas_limit: u64,
 }
 
 #[derive(TypeAbi, TopDecode)]
@@ -32,7 +33,14 @@ pub struct ExecutePayload<M: ManagedTypeApi> {
     pub eta: u64,
 }
 
-const EXECUTE_PROPOSAL_CALLBACK_GAS: u64 = 5_000_000;
+#[derive(TypeAbi, TopDecode, TopEncode, NestedDecode, NestedEncode, Clone)]
+pub struct EgldOrEsdtToken<M: ManagedTypeApi> {
+    pub token_identifier: EgldOrEsdtTokenIdentifier<M>,
+    pub token_nonce: u64,
+}
+
+const EXECUTE_PROPOSAL_CALLBACK_GAS: u64 = 10_000_000;
+const EXECUTE_PROPOSAL_CALLBACK_GAS_PER_PAYMENT: u64 = 2_000_000;
 // This is overkill, but the callback should be prevented from failing at all costs
 const KEEP_EXTRA_GAS: u64 = 15_000_000; // Extra gas to keep in contract before registering async promise. This needs to be a somewhat larger value
 
@@ -67,7 +75,7 @@ pub trait Governance: events::Events {
     #[upgrade]
     fn upgrade(&self) {}
 
-    #[payable("EGLD")]
+    #[payable("*")]
     #[endpoint(executeProposal)]
     fn execute_proposal(
         &self,
@@ -92,14 +100,28 @@ pub trait Governance: events::Events {
             DecodedCallData::<Self::Api>::top_decode(call_data)
                 .unwrap_or_else(|_| sc_panic!("Could not decode call data"));
 
+        let caller = self.blockchain().get_caller();
+
+        let mut extra_gas_for_callback = EXECUTE_PROPOSAL_CALLBACK_GAS;
+
+        let payments = self.call_value().any_payment();
+
+        if let EgldOrMultiEsdtPaymentRefs::MultiEsdt(payments) = payments.as_refs() {
+            // Reserve extra gas for callback to make sure we can send back the tokens instead of async call error
+            let gas_for_payments =
+                EXECUTE_PROPOSAL_CALLBACK_GAS_PER_PAYMENT * payments.len() as u64;
+
+            extra_gas_for_callback += gas_for_payments;
+        }
+
         let gas_left = self.blockchain().get_gas_left();
 
         require!(
-            gas_left > EXECUTE_PROPOSAL_CALLBACK_GAS + KEEP_EXTRA_GAS,
-            "Not enough gas left for async call"
+            gas_left > extra_gas_for_callback + KEEP_EXTRA_GAS + decoded_call_data.min_gas_limit,
+            "Insufficient gas for execution"
         );
 
-        let gas_limit = gas_left - EXECUTE_PROPOSAL_CALLBACK_GAS - KEEP_EXTRA_GAS;
+        let gas_limit = gas_left - extra_gas_for_callback - KEEP_EXTRA_GAS;
 
         self.send()
             .contract_call::<()>(target, decoded_call_data.endpoint_name)
@@ -107,11 +129,13 @@ pub trait Governance: events::Events {
             .with_raw_arguments(decoded_call_data.arguments.into())
             .with_gas_limit(gas_limit)
             .async_call_promise()
-            .with_callback(
-                self.callbacks()
-                    .execute_proposal_callback(&proposal_hash, eta),
-            )
-            .with_extra_gas_for_callback(EXECUTE_PROPOSAL_CALLBACK_GAS)
+            .with_callback(self.callbacks().execute_proposal_callback(
+                &proposal_hash,
+                eta,
+                caller,
+                payments,
+            ))
+            .with_extra_gas_for_callback(extra_gas_for_callback)
             .register_promise();
     }
 
@@ -230,6 +254,14 @@ pub trait Governance: events::Events {
         self.process_command(execute_payload);
     }
 
+    #[endpoint(withdrawRefundToken)]
+    fn withdraw_refund_token(&self, token: EgldOrEsdtToken<Self::Api>) {
+        let caller = self.blockchain().get_caller();
+        let value = self.refund_token(&caller, token.clone()).take();
+
+        self.send().direct_non_zero(&caller, &token.token_identifier, token.token_nonce, &value);
+    }
+
     fn process_command(&self, execute_payload: ExecutePayload<Self::Api>) {
         let proposal_hash = self.get_proposal_hash(
             &execute_payload.target,
@@ -343,9 +375,15 @@ pub trait Governance: events::Events {
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        encoded.append(target.as_managed_buffer());
-        encoded.append(call_data);
-        encoded.append(&native_value.to_bytes_be_buffer());
+        target
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode target"));
+        call_data
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode call data"));
+        native_value
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode native value"));
 
         self.crypto().keccak256(encoded)
     }
@@ -355,6 +393,8 @@ pub trait Governance: events::Events {
         &self,
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         eta: u64,
+        caller: ManagedAddress,
+        payments: EgldOrMultiEsdtPayment<Self::Api>,
         #[call_result] call_result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
     ) {
         match call_result {
@@ -362,6 +402,33 @@ pub trait Governance: events::Events {
                 self.execute_proposal_success_event(hash, results);
             }
             ManagedAsyncCallResult::Err(err) => {
+                match payments {
+                    EgldOrMultiEsdtPayment::Egld(egld_value) => {
+                        self.refund_token(
+                            &caller,
+                            EgldOrEsdtToken {
+                                token_identifier: EgldOrEsdtTokenIdentifier::egld(),
+                                token_nonce: 0,
+                            },
+                        )
+                        .update(|old| *old += &egld_value);
+                    }
+                    EgldOrMultiEsdtPayment::MultiEsdt(esdts) => {
+                        for esdt in esdts.iter() {
+                            self.refund_token(
+                                &caller,
+                                EgldOrEsdtToken {
+                                    token_identifier: EgldOrEsdtTokenIdentifier::esdt(
+                                        esdt.token_identifier,
+                                    ),
+                                    token_nonce: esdt.token_nonce,
+                                },
+                            )
+                            .update(|old| *old += &esdt.amount);
+                        }
+                    }
+                }
+
                 // Let call be retried in case of failure, mostly because async call
                 // can fail with out of gas since it can be triggered by anyone
                 self.time_lock_eta(hash).set(eta);
@@ -439,6 +506,14 @@ pub trait Governance: events::Events {
         &self,
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> SingleValueMapper<u64>;
+
+    #[view(getRefundToken)]
+    #[storage_mapper("refund_token")]
+    fn refund_token(
+        &self,
+        user: &ManagedAddress,
+        token: EgldOrEsdtToken<Self::Api>,
+    ) -> SingleValueMapper<BigUint>;
 
     #[view(getMultisigApprovals)]
     #[storage_mapper("multisig_approvals")]

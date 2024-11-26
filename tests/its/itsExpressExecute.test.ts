@@ -405,7 +405,7 @@ test('Express execute errors', async () => {
     ],
   }).assertFail({ code: 4, message: 'Express executor already set' });
 
-  const commandId = getKeccak256Hash(OTHER_CHAIN_NAME + '_' + MESSAGE_ID);
+  const crossChainId = e.Tuple(e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID));
 
   // Mock Gateway message already executed
   await gateway.setAccount({
@@ -415,7 +415,7 @@ test('Express execute errors', async () => {
       ...baseGatewayKvs(deployer),
 
       // Manually approve message
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 

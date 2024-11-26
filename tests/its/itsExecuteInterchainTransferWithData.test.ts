@@ -87,9 +87,9 @@ const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
     ],
   ).substring(2);
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 test('Transfer with data', async () => {
@@ -102,7 +102,7 @@ test('Transfer with data', async () => {
     'EGLD',
   );
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId);
+  const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
   await user.callContract({
     callee: its,
@@ -159,7 +159,7 @@ test('Transfer with data', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 });
@@ -174,7 +174,7 @@ test('Transfer with data contract error', async () => {
     'EGLD',
   );
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId, 'wrong');
+  const { payload, crossChainId } = await mockGatewayCall(computedTokenId, 'wrong');
 
   await user.callContract({
     callee: its,
@@ -219,7 +219,7 @@ test('Transfer with data contract error', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 });
@@ -234,7 +234,7 @@ test('Express executor', async () => {
     'EGLD',
   );
 
-  let { payload, commandId } = await mockGatewayCall(computedTokenId);
+  let { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
   const expressExecuteHash = computeExpressExecuteHash(payload);
 
@@ -283,7 +283,7 @@ test('Express executor', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 

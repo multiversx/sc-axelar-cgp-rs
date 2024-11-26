@@ -13,8 +13,8 @@ import { Buffer } from 'buffer';
 import {
   baseGatewayKvs,
   baseItsKvs,
-  deployContracts, deployTokenManagerInterchainToken,
-  deployTokenManagerMintBurn,
+  deployContracts,
+  deployTokenManagerInterchainToken,
   gateway,
   interchainTokenFactory,
   its,
@@ -89,13 +89,13 @@ const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
     ],
   ).substring(2);
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 test('Only deploy token manager', async () => {
-  const { payload, commandId, messageHash } = await mockGatewayCall();
+  const { payload, crossChainId, messageHash } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
@@ -134,7 +134,7 @@ test('Only deploy token manager', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
 });
@@ -152,7 +152,7 @@ test('Only issue esdt', async () => {
     ],
   });
 
-  const { payload, commandId } = await mockGatewayCall();
+  const { payload, crossChainId } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
@@ -200,7 +200,7 @@ test('Only issue esdt', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
     ],
   });
 });

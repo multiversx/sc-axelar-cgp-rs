@@ -2,7 +2,7 @@
 
 This contract is used to manage cross-chain governance proposals. It is built on top of the CGP (Cross-chain Gateway Protocol).
 
-It is based on the [Axelar Service Governance Solidity implementation](https://github.com/axelarnetwork/axelar-gmp-sdk-solidity/blob/v5.10.0/contracts/governance/AxelarServiceGovernance.sol) available at the time of writing: (v5.10.0)
+It is based on the [Axelar Service Governance Solidity implementation](https://github.com/axelarnetwork/axelar-gmp-sdk-solidity/blob/v6.0.4/contracts/governance/AxelarServiceGovernance.sol) available at the time of writing: (v6.0.4)
 
 For a general design of the contract check this document:
 https://github.com/axelarnetwork/axelar-gmp-sdk-solidity/blob/main/contracts/governance/DESIGN.md
