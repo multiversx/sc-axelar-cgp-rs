@@ -1,5 +1,6 @@
 import { assertAccount, e, Encodable, LSContract, LSWallet } from 'xsuite';
 import {
+  ADDRESS_ZERO,
   ALICE_PUB_KEY,
   BOB_PUB_KEY,
   CAROL_PUB_KEY,
@@ -469,20 +470,20 @@ export const itsDeployTokenManagerMintBurn = async (world, user: LSWallet, flowL
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
 };
 
-export const computeInterchainTokenId = (user: Encodable, salt = TOKEN_SALT) => {
+export const computeInterchainTokenId = (user: Encodable = e.Addr(ADDRESS_ZERO), deploySalt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_ID).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
     Buffer.from(user.toTopHex(), 'hex'),
-    Buffer.from(salt, 'hex'),
+    Buffer.from(deploySalt, 'hex'),
   ]);
 
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const computeInterchainTokenSalt = (chain_name: string, user: Encodable, salt = TOKEN_SALT) => {
+export const computeInterchainTokenDeploySalt = (user: Encodable, salt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_SALT).digest('hex');
-  const chain_name_hash = createKeccakHash('keccak256').update(chain_name).digest('hex');
+  const chain_name_hash = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
     Buffer.from(chain_name_hash, 'hex'),
@@ -493,9 +494,9 @@ export const computeInterchainTokenSalt = (chain_name: string, user: Encodable, 
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const computeCanonicalInterchainTokenSalt = (chain_name: string, tokenIdentifier: string = TOKEN_ID) => {
+export const computeCanonicalInterchainTokenDeploySalt = (tokenIdentifier: string = TOKEN_ID) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_CANONICAL_TOKEN_SALT).digest('hex');
-  const chain_name_hash = createKeccakHash('keccak256').update(chain_name).digest('hex');
+  const chain_name_hash = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
     Buffer.from(chain_name_hash, 'hex'),
@@ -505,7 +506,11 @@ export const computeCanonicalInterchainTokenSalt = (chain_name: string, tokenIde
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const baseItsKvs = (operator: LSWallet | LSContract, interchainTokenFactory: LSContract | null = null, computedTokenId: string | null = null) => {
+export const baseItsKvs = (
+  operator: LSWallet | LSContract,
+  interchainTokenFactory: LSContract | LSWallet | null = null,
+  computedTokenId: string | null = null
+) => {
   return [
     e.kvs.Mapper('gateway').Value(gateway),
     e.kvs.Mapper('gas_service').Value(gasService),

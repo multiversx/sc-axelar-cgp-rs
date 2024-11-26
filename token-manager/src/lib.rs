@@ -137,7 +137,6 @@ pub trait TokenManagerLockUnlockContract:
             | TokenManagerType::MintBurnFrom => {
                 self.give_token_mint_burn(&token_identifier, destination_address, &amount);
             }
-            // nothing to do for lock/unlock, tokens remain in contract
             TokenManagerType::LockUnlock | TokenManagerType::LockUnlockFee => {
                 self.give_token_lock_unlock(&token_identifier, destination_address, &amount);
             }

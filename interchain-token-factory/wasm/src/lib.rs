@@ -26,8 +26,8 @@ multiversx_sc_wasm_adapter::endpoints! {
         deployRemoteInterchainToken => deploy_remote_interchain_token
         registerCanonicalInterchainToken => register_canonical_interchain_token
         deployRemoteCanonicalInterchainToken => deploy_remote_canonical_interchain_token
-        interchainTokenSalt => interchain_token_salt
-        canonicalInterchainTokenSalt => canonical_interchain_token_salt
+        interchainTokenDeploySalt => interchain_token_deploy_salt
+        canonicalInterchainTokenDeploySalt => canonical_interchain_token_deploy_salt
         interchainTokenId => interchain_token_id
         canonicalInterchainTokenId => canonical_interchain_token_id
         chainNameHash => chain_name_hash

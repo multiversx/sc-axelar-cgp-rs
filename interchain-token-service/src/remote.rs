@@ -29,7 +29,7 @@ pub trait RemoteModule:
         gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
-        let _ = self.deployed_token_manager(token_id);
+        self.deployed_token_manager(token_id);
 
         let message_type = BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER);
         let data = DeployTokenManagerPayload {
@@ -155,6 +155,7 @@ pub trait RemoteModule:
         );
     }
 
+    #[allow(clippy::absurd_extreme_comparisons)]
     fn decode_metadata(&self, raw_metadata: ManagedBuffer) -> (MetadataVersion, ManagedBuffer) {
         let decoded_metadata = Metadata::<Self::Api>::top_decode(raw_metadata);
 

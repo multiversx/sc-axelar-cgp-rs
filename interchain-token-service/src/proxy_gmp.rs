@@ -1,9 +1,7 @@
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 use crate::abi::AbiEncodeDecode;
 use crate::address_tracker;
 use crate::constants::{
-    MetadataVersion, SendToHubPayload, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
+    Hash, MetadataVersion, SendToHubPayload, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
     MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_SEND_TO_HUB,
 };
 use gas_service::ProxyTrait as _;
@@ -83,7 +81,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         source_chain: &ManagedBuffer,
         message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
-        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        payload_hash: &Hash<Self::Api>,
     ) -> bool {
         self.gateway_proxy(self.gateway().get())
             .validate_message(source_chain, message_id, source_address, payload_hash)
@@ -95,7 +93,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         source_chain: &ManagedBuffer,
         message_id: &ManagedBuffer,
         source_address: &ManagedBuffer,
-        payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        payload_hash: &Hash<Self::Api>,
     ) -> bool {
         self.gateway_proxy(self.gateway().get())
             .is_message_approved(
@@ -154,37 +152,39 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         // Prevent sending directly to the ITS Hub chain. This is not supported yet, so fail early to prevent the user from having their funds stuck.
         require!(destination_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
 
+        // Check whether no trusted address was set for the destination chain
         let destination_address = self.trusted_address(&destination_chain);
         require!(!destination_address.is_empty(), "Untrusted chain");
         let destination_address = destination_address.get();
 
         // Check whether the ITS call should be routed via ITS hub for this destination chain
-        if destination_address != *ITS_HUB_ROUTING_IDENTIFIER {
-            return (destination_chain, destination_address, payload);
+        if destination_address == *ITS_HUB_ROUTING_IDENTIFIER {
+            // Prevent deploy token manager to be usable on ITS hub
+            require!(
+                message_type != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+                "Not supported"
+            );
+
+            let destination_address =
+                self.trusted_address(&ManagedBuffer::from(ITS_HUB_CHAIN_NAME));
+            require!(!destination_address.is_empty(), "Untrusted chain");
+            let destination_address = destination_address.get();
+
+            let data = SendToHubPayload::<Self::Api> {
+                message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
+                destination_chain,
+                payload,
+            };
+
+            // Send wrapped message to ITS Hub chain and to ITS Hub true address
+            return (
+                ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+                destination_address,
+                data.abi_encode(),
+            );
         }
 
-        let destination_address = self.trusted_address(&ManagedBuffer::from(ITS_HUB_CHAIN_NAME));
-        require!(!destination_address.is_empty(), "Untrusted chain");
-        let destination_address = destination_address.get();
-
-        // Prevent deploy token manager to be usable on ITS hub
-        require!(
-            message_type != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
-            "Not supported"
-        );
-
-        let data = SendToHubPayload::<Self::Api> {
-            message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
-            destination_chain,
-            payload,
-        };
-
-        // Send wrapped message to ITS Hub chain and to ITS Hub true address
-        (
-            ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
-            destination_address,
-            data.abi_encode(),
-        )
+        (destination_chain, destination_address, payload)
     }
 
     #[view]

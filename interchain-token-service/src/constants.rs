@@ -45,6 +45,7 @@ impl From<u32> for MetadataVersion {
 
 pub const LATEST_METADATA_VERSION: u32 = 0;
 
+pub type Hash<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 
 #[derive(TypeAbi)]
@@ -73,7 +74,7 @@ impl<M: ManagedTypeApi> TopDecode for Metadata<M> {
 
 pub struct InterchainTransferPayload<M: ManagedTypeApi> {
     pub message_type: BigUint<M>,
-    pub token_id: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
+    pub token_id: TokenId<M>,
     pub source_address: ManagedBuffer<M>,
     pub destination_address: ManagedBuffer<M>,
     pub amount: BigUint<M>,

@@ -7,7 +7,7 @@ use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
 use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::constants::{
-    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
+    DeployInterchainTokenPayload, DeployTokenManagerPayload, Hash, InterchainTransferPayload,
     SendToHubPayload, TokenId, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
     MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_RECEIVE_FROM_HUB,
 };
@@ -23,6 +23,7 @@ pub trait ExecutableModule:
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
+    // Returns (message_type, original_source_chain, payload)
     fn get_execute_params(
         &self,
         source_chain: ManagedBuffer,
@@ -31,36 +32,36 @@ pub trait ExecutableModule:
         let message_type = self.get_message_type(&payload);
 
         // Unwrap ITS message if coming from ITS hub
-        if message_type != MESSAGE_TYPE_RECEIVE_FROM_HUB {
-            // Prevent receiving a direct message from the ITS Hub. This is not supported yet.
-            require!(source_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
+        if message_type == MESSAGE_TYPE_RECEIVE_FROM_HUB {
+            require!(source_chain == *ITS_HUB_CHAIN_NAME, "Untrusted chain");
 
-            return (message_type, source_chain, payload);
+            let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
+
+            // Check whether the original source chain is expected to be routed via the ITS Hub
+            require!(
+                self.is_trusted_address(
+                    &data.destination_chain,
+                    &ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER)
+                ),
+                "Untrusted chain"
+            );
+
+            let message_type = self.get_message_type(&data.payload);
+
+            // Prevent deploy token manager to be usable on ITS hub
+            require!(
+                message_type != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+                "Not supported"
+            );
+
+            // Return original message type, source chain and payload
+            return (message_type, data.destination_chain, data.payload);
         }
 
-        require!(source_chain == *ITS_HUB_CHAIN_NAME, "Untrusted chain");
+        // Prevent receiving a direct message from the ITS Hub. This is not supported yet.
+        require!(source_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
 
-        let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
-
-        // Check whether the original source chain is expected to be routed via the ITS Hub
-        require!(
-            self.is_trusted_address(
-                &data.destination_chain,
-                &ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER)
-            ),
-            "Untrusted chain"
-        );
-
-        let message_type = self.get_message_type(&data.payload);
-
-        // Prevent deploy token manager to be usable on ITS hub
-        require!(
-            message_type != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
-            "Not supported"
-        );
-
-        // Return original message type, source chain and payload
-        (message_type, data.destination_chain, data.payload)
+        (message_type, source_chain, payload)
     }
 
     fn process_interchain_transfer_payload(
@@ -69,7 +70,7 @@ pub trait ExecutableModule:
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
         source_address: ManagedBuffer,
-        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        payload_hash: Hash<Self::Api>,
         payload: ManagedBuffer,
     ) {
         let send_token_payload = InterchainTransferPayload::<Self::Api>::abi_decode(payload);
@@ -165,7 +166,7 @@ pub trait ExecutableModule:
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
         source_address: ManagedBuffer,
-        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        payload_hash: Hash<Self::Api>,
         payload: ManagedBuffer,
     ) {
         let data = DeployInterchainTokenPayload::<Self::Api>::abi_decode(payload);

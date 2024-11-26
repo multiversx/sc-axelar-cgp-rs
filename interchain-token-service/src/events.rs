@@ -1,8 +1,6 @@
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 use token_manager::constants::TokenManagerType;
 
-use crate::constants::TokenId;
+use crate::constants::{Hash, TokenId};
 
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
@@ -129,7 +127,7 @@ pub trait EventsModule {
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         amount: BigUint,
-        data_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        data_hash: Hash<Self::Api>,
     ) {
         let data = InterchainTransferEventData {
             destination_chain,
@@ -159,7 +157,7 @@ pub trait EventsModule {
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
         #[indexed] deployer: &ManagedAddress,
-        data: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        salt: &Hash<Self::Api>,
     );
 
     #[event("token_manager_deployment_started_event")]
@@ -182,7 +180,7 @@ pub trait EventsModule {
         &self,
         #[indexed] token_id: TokenId<Self::Api>,
         #[indexed] source_address: ManagedAddress,
-        #[indexed] data_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] data_hash: Hash<Self::Api>,
         data: InterchainTransferEventData<Self::Api>,
     );
 
@@ -194,7 +192,7 @@ pub trait EventsModule {
         #[indexed] message_id: &ManagedBuffer,
         #[indexed] source_address: &ManagedBuffer,
         #[indexed] destination_address: &ManagedAddress,
-        #[indexed] data_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        #[indexed] data_hash: Hash<Self::Api>,
         amount: &BigUint,
     );
 

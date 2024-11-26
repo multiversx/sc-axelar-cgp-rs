@@ -1,14 +1,9 @@
 use core::convert::TryFrom;
 use core::ops::Deref;
 
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
-use crate::constants::{
-    MetadataVersion, TokenId, TransferAndGasTokens, ITS_HUB_ROUTING_IDENTIFIER,
-    PREFIX_INTERCHAIN_TOKEN_ID,
-};
+use crate::constants::{Hash, MetadataVersion, TokenId, TransferAndGasTokens, ITS_HUB_ROUTING_IDENTIFIER, PREFIX_INTERCHAIN_TOKEN_ID};
 use crate::{address_tracker, events, executable, proxy_gmp, proxy_its, remote};
 
 multiversx_sc::imports!();
@@ -28,11 +23,13 @@ pub trait UserFunctionsModule:
     #[endpoint(deployTokenManager)]
     fn deploy_token_manager(
         &self,
-        salt: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
     ) -> TokenId<Self::Api> {
+        self.require_not_paused();
+
         require!(!params.is_empty(), "Empty params");
 
         // Custom token managers can't be deployed with Interchain token mint burn type, which is reserved for interchain tokens
@@ -40,8 +37,6 @@ pub trait UserFunctionsModule:
             token_manager_type != TokenManagerType::NativeInterchainToken,
             "Can not deploy"
         );
-
-        self.require_not_paused();
 
         let mut deployer = self.blockchain().get_caller();
 
@@ -94,7 +89,7 @@ pub trait UserFunctionsModule:
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
         &self,
-        salt: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
@@ -107,6 +102,9 @@ pub trait UserFunctionsModule:
 
         if deployer == self.interchain_token_factory().get() {
             deployer = ManagedAddress::zero();
+        } else {
+            // Currently, deployments directly on ITS contract (instead of ITS Factory) are restricted for ITS contracts deployed on Amplifier, i.e registered with the Hub
+            sc_panic!("Not supported");
         }
 
         let token_id = self.interchain_token_id(&deployer, &salt);
@@ -306,7 +304,7 @@ pub trait UserFunctionsModule:
     fn interchain_token_id(
         &self,
         sender: &ManagedAddress,
-        salt: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        salt: &Hash<Self::Api>,
     ) -> TokenId<Self::Api> {
         let prefix_interchain_token_id = self
             .crypto()

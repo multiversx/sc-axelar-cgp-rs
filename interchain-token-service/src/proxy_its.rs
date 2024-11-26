@@ -1,15 +1,13 @@
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 use token_manager::flow_limit::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
-use crate::constants::{TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS, KEEP_EXTRA_GAS};
+use crate::constants::{Hash, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS, KEEP_EXTRA_GAS};
 use crate::{address_tracker, events, proxy_gmp};
 
 multiversx_sc::imports!();
 
 pub mod executable_contract_proxy {
-    use multiversx_sc::api::KECCAK256_RESULT_LEN;
+    use crate::constants::TokenId;
 
     multiversx_sc::imports!();
 
@@ -24,16 +22,14 @@ pub mod executable_contract_proxy {
             message_id: &ManagedBuffer,
             source_address: ManagedBuffer,
             data: ManagedBuffer,
-            token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+            token_id: TokenId<Self::Api>,
         );
     }
 }
 
 #[multiversx_sc::module]
 pub trait ProxyItsModule:
-    events::EventsModule
-    + proxy_gmp::ProxyGmpModule
-    + address_tracker::AddressTracker
+    events::EventsModule + proxy_gmp::ProxyGmpModule + address_tracker::AddressTracker
 {
     fn token_manager_take_token(
         &self,
@@ -91,7 +87,7 @@ pub trait ProxyItsModule:
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
         source_address: ManagedBuffer,
-        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        payload_hash: Hash<Self::Api>,
         original_source_address: ManagedBuffer,
         data: ManagedBuffer,
         token_id: TokenId<Self::Api>,
@@ -108,7 +104,8 @@ pub trait ProxyItsModule:
         let gas_limit = gas_left - EXECUTE_WITH_TOKEN_CALLBACK_GAS - KEEP_EXTRA_GAS;
 
         require!(
-            self.transfer_with_data_lock(&source_chain, &message_id).is_empty(),
+            self.transfer_with_data_lock(&source_chain, &message_id)
+                .is_empty(),
             "Async call in progress"
         );
 
@@ -214,7 +211,7 @@ pub trait ProxyItsModule:
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
         source_address: ManagedBuffer,
-        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        payload_hash: Hash<Self::Api>,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
