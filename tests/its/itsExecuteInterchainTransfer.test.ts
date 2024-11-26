@@ -95,15 +95,15 @@ const mockGatewayCall = async (interchainTokenId: string, payload: string | null
     ).substring(2);
   }
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 test('Transfer mint burn', async () => {
   const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(world, user);
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId);
+  const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
   await user.callContract({
     callee: its,
@@ -138,7 +138,7 @@ test('Transfer mint burn', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 });
@@ -150,7 +150,7 @@ test('Transfer lock unlock', async () => {
     true,
   );
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId);
+  const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
   await user.callContract({
     callee: its,
@@ -189,7 +189,7 @@ test('Transfer lock unlock', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 });
@@ -281,7 +281,7 @@ test('Express executor', async () => {
     user,
   );
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId);
+  const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
   const expressExecuteHash = computeExpressExecuteHash(payload);
 
@@ -330,7 +330,7 @@ test('Express executor', async () => {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 

@@ -640,6 +640,25 @@ test('Collect fees too much asked', async () => {
     funcArgs: [
       e.Addr(deployer.toString()),
 
+      e.U32(3),
+      e.Str(TOKEN_ID),
+      e.Str(TOKEN_ID),
+      e.Str('EGLD'),
+
+      e.U32(3),
+      e.U(750),
+      e.U(750), // Higher than remaining balance, will be ignored
+      e.U(20_000),
+    ],
+  });
+
+  await collector.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'collectFees',
+    funcArgs: [
+      e.Addr(deployer.toString()),
+
       e.U32(2),
       e.Str(TOKEN_ID),
       e.Str('EGLD'),
@@ -659,7 +678,7 @@ test('Collect fees too much asked', async () => {
       e.kvs.Esdts([
         {
           id: TOKEN_ID,
-          amount: 1_000,
+          amount: 250,
         },
       ]),
     ],
@@ -799,18 +818,38 @@ test('Refund esdt', async () => {
 test('Set gas collector not collector', async () => {
   await deployContract();
 
-  await deployer.callContract({
+  let user = await world.createWallet();
+
+  await user.callContract({
     callee: contract,
     gasLimit: 10_000_000,
     funcName: 'setGasCollector',
     funcArgs: [
       deployer,
     ],
-  }).assertFail({ code: 4, message: 'Not collector' });
+  }).assertFail({ code: 4, message: 'Not collector or owner' });
 });
 
 test('Set gas collector', async () => {
   await deployContract();
+
+  // Deployer can also set collector
+  await deployer.callContract({
+    callee: contract,
+    gasLimit: 10_000_000,
+    funcName: 'setGasCollector',
+    funcArgs: [
+      collector,
+    ],
+  });
+
+  let pairs = await contract.getAccountWithKvs();
+  assertAccount(pairs, {
+    balance: 0n,
+    kvs: [
+      e.kvs.Mapper('gas_collector').Value(collector),
+    ],
+  });
 
   await collector.callContract({
     callee: contract,
@@ -821,7 +860,7 @@ test('Set gas collector', async () => {
     ],
   });
 
-  const pairs = await contract.getAccountWithKvs();
+  pairs = await contract.getAccountWithKvs();
   assertAccount(pairs, {
     balance: 0n,
     kvs: [

@@ -6,7 +6,7 @@ import {
   CHAIN_NAME,
   CHAIN_NAME_HASH,
   DOMAIN_SEPARATOR,
-  getKeccak256Hash,
+  getKeccak256Hash, getMessageHash,
   getSignersHash,
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
@@ -530,16 +530,9 @@ export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory
 export async function mockGatewayMessageApproved(payload: string, operator: SWallet) {
   const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
 
-  const messageData = Buffer.concat([
-    Buffer.from(OTHER_CHAIN_NAME),
-    Buffer.from(MESSAGE_ID),
-    Buffer.from(OTHER_CHAIN_ADDRESS),
-    its.toTopU8A(),
-    Buffer.from(payloadHash, 'hex'),
-  ]);
-  const messageHash = getKeccak256Hash(messageData);
+  const messageHash = getMessageHash(OTHER_CHAIN_NAME, MESSAGE_ID, OTHER_CHAIN_ADDRESS, its, payloadHash);
 
-  const commandId = getKeccak256Hash(OTHER_CHAIN_NAME + '_' + MESSAGE_ID);
+  const crossChainId = e.Tuple(e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID));
 
   // Mock call approved by gateway
   await gateway.setAccount({
@@ -549,9 +542,9 @@ export async function mockGatewayMessageApproved(payload: string, operator: SWal
       ...baseGatewayKvs(operator),
 
       // Manually approve message
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
 
-  return { commandId, messageHash };
+  return { crossChainId, messageHash };
 }
