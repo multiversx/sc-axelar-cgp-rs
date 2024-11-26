@@ -3,7 +3,10 @@ use core::ops::Deref;
 
 use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
-use crate::constants::{Hash, MetadataVersion, TokenId, TransferAndGasTokens, ITS_HUB_ROUTING_IDENTIFIER, PREFIX_INTERCHAIN_TOKEN_ID};
+use crate::constants::{
+    Hash, MetadataVersion, TokenId, TransferAndGasTokens, ESDT_EGLD_IDENTIFIER,
+    ITS_HUB_ROUTING_IDENTIFIER, PREFIX_INTERCHAIN_TOKEN_ID,
+};
 use crate::{address_tracker, events, executable, proxy_gmp, proxy_its, remote};
 
 multiversx_sc::imports!();
@@ -290,10 +293,18 @@ pub trait UserFunctionsModule:
                 );
                 require!(second_payment.amount == gas_amount, "Invalid gas value");
 
+                let gas_token = if second_payment.token_identifier.as_managed_buffer()
+                    == &ManagedBuffer::from(ESDT_EGLD_IDENTIFIER)
+                {
+                    EgldOrEsdtTokenIdentifier::egld()
+                } else {
+                    EgldOrEsdtTokenIdentifier::esdt(second_payment.token_identifier)
+                };
+
                 return TransferAndGasTokens {
                     transfer_token: token_identifier,
                     transfer_amount: amount,
-                    gas_token: EgldOrEsdtTokenIdentifier::esdt(second_payment.token_identifier),
+                    gas_token,
                     gas_amount,
                 };
             }

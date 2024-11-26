@@ -532,6 +532,8 @@ describe('Interchain transfer', () => {
       ],
     });
   });
+
+  // TODO: Add test with EGLD in MultiESDT after xSuite supports it
 });
 
 describe('Call contract with interchain token', () => {
@@ -889,4 +891,6 @@ describe('Call contract with interchain token', () => {
       ],
     });
   });
+
+  // TODO: Add test with EGLD in MultiESDT after xSuite supports it
 });

@@ -48,6 +48,8 @@ pub const LATEST_METADATA_VERSION: u32 = 0;
 pub type Hash<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 
+pub const ESDT_EGLD_IDENTIFIER: &str = "EGLD-000000";
+
 #[derive(TypeAbi)]
 pub struct Metadata<M: ManagedTypeApi> {
     pub version: u32,
