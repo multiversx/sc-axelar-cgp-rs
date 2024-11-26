@@ -92,13 +92,13 @@ const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID, type = TOKEN_MANAG
     ],
   ).substring(2);
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 test('Execute', async () => {
-  const { payload, commandId} = await mockGatewayCall();
+  const { payload, crossChainId } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
@@ -112,7 +112,7 @@ test('Execute', async () => {
     ],
   });
 
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -121,7 +121,7 @@ test('Execute', async () => {
   });
 
   const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [
@@ -134,11 +134,11 @@ test('Execute', async () => {
   });
 
   // Gateway message was marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
     ],
   });
 });
@@ -176,7 +176,7 @@ test('Errors', async () => {
     ],
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
-  const { computedTokenId, } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId } = await itsDeployTokenManagerLockUnlock(
     world,
     user,
   );

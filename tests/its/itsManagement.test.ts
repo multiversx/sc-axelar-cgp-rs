@@ -201,7 +201,7 @@ test('Set interchain token factory', async () => {
     gasLimit: 10_000_000,
   });
 
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
@@ -231,7 +231,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -271,7 +271,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -301,7 +301,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    kvs = await its.getAccountWithKvs();
+    kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -362,7 +362,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -402,7 +402,7 @@ describe('Pause unpause', () => {
       funcArgs: [],
     });
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -486,7 +486,7 @@ describe('Pause unpause', () => {
 
     // mock paused
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -508,7 +508,7 @@ describe('Pause unpause', () => {
       funcArgs: [],
     });
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -574,7 +574,7 @@ describe('Address tracker', () => {
     });
     const someChainAddressHash = createKeccakHash('keccak256').update(someChainAddress).digest('hex');
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -615,7 +615,7 @@ describe('Address tracker', () => {
       ],
     });
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -706,7 +706,7 @@ describe('Set flow limits', () => {
     });
 
     let tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -722,7 +722,7 @@ describe('Set flow limits', () => {
     });
 
     tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS_2);
-    tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [

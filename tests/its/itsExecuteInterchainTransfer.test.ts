@@ -94,15 +94,15 @@ const mockGatewayCall = async (interchainTokenId: string, payload: string | null
     ).substring(2);
   }
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 test('Transfer mint burn', async () => {
   const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(world, user);
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId);
+  const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
   await user.callContract({
     callee: its,
@@ -129,7 +129,7 @@ test('Transfer mint burn', async () => {
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
   // Tokens should be minted for otherUser
-  const otherUserKvs = await otherUser.getAccountWithKvs();
+  const otherUserKvs = await otherUser.getAccount();
   assertAccount(otherUserKvs, {
     balance: BigInt('10000000000000000'),
     kvs: [
@@ -138,18 +138,18 @@ test('Transfer mint burn', async () => {
   });
 
   // Nothing changed for token manager
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: baseTokenManagerKvs,
   });
 
   // Gateway message was marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 });
@@ -161,7 +161,7 @@ test('Transfer lock unlock', async () => {
     true,
   );
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId);
+  const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
   await user.callContract({
     callee: its,
@@ -176,7 +176,7 @@ test('Transfer lock unlock', async () => {
   });
 
   // Tokens should be transfered to otherUser
-  const otherUserKvs = await otherUser.getAccountWithKvs();
+  const otherUserKvs = await otherUser.getAccount();
   assertAccount(otherUserKvs, {
     balance: BigInt('10000000000000000'),
     kvs: [
@@ -185,7 +185,7 @@ test('Transfer lock unlock', async () => {
   });
 
   // Token manager transfered tokens
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [
@@ -196,11 +196,11 @@ test('Transfer lock unlock', async () => {
   });
 
   // Gateway message was marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 });
@@ -226,7 +226,7 @@ test('Flow limit', async () => {
     ],
   });
 
-  let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  let tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [
@@ -274,7 +274,7 @@ test('Flow limit', async () => {
     ],
   });
 
-  tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [

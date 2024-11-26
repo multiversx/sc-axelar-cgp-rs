@@ -99,7 +99,7 @@ describe('Deploy token manager', () => {
 
     assert(result.returnData[0] === computedTokenId);
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -110,7 +110,7 @@ describe('Deploy token manager', () => {
     });
 
     const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -148,7 +148,7 @@ describe('Deploy token manager', () => {
       ],
     });
 
-    kvs = await its.getAccountWithKvs();
+    kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -242,7 +242,7 @@ describe('Deploy token manager', () => {
   test('Interchain token factory', async () => {
     // Mock user as the interchain token factory
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, user),
       ],
@@ -268,7 +268,7 @@ describe('Deploy token manager', () => {
 
     assert(result.returnData[0] === computedTokenId);
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -284,7 +284,7 @@ describe('Deploy token manager remote', () => {
   test('Remote', async () => {
     // Mock token manager exists on source chain
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -319,7 +319,7 @@ describe('Deploy token manager remote', () => {
     assert(result.returnData[0] === computeInterchainTokenId(user));
 
     // Nothing changes for its keys
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -333,7 +333,7 @@ describe('Deploy token manager remote', () => {
     });
 
     // Assert gas was paid for cross chain call
-    kvs = await gasService.getAccountWithKvs();
+    kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 100_000,
       kvs: [
@@ -364,7 +364,7 @@ describe('Deploy token manager remote', () => {
       ],
     });
 
-    kvs = await its.getAccountWithKvs();
+    kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -401,7 +401,7 @@ describe('Deploy token manager remote', () => {
 
     // Mock token manager exists on source chain
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -477,7 +477,7 @@ describe('Deploy interchain token', () => {
 
     const computedTokenId = computeInterchainTokenId(user);
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -486,7 +486,7 @@ describe('Deploy interchain token', () => {
     });
 
     const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -516,7 +516,7 @@ describe('Deploy interchain token', () => {
 
     const computedTokenId = computeInterchainTokenId(user);
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -525,7 +525,7 @@ describe('Deploy interchain token', () => {
     });
 
     const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -544,7 +544,7 @@ describe('Deploy interchain token', () => {
 
     // Mock token manager already deployed as not being canonical so contract deployment is not tried again
     await its.setAccount({
-      ...(await its.getAccountWithKvs()),
+      ...(await its.getAccount()),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -583,7 +583,7 @@ describe('Deploy interchain token', () => {
       ],
     });
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       hasKvs: [
@@ -594,7 +594,7 @@ describe('Deploy interchain token', () => {
     });
 
     // Assert endpoint to deploy ESDT was called
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       hasKvs: [
@@ -619,7 +619,7 @@ describe('Deploy interchain token', () => {
 
     // Mock token manager already deployed as not being canonical so contract deployment is not tried again
     await its.setAccount({
-      ...(await its.getAccountWithKvs()),
+      ...(await its.getAccount()),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -642,7 +642,7 @@ describe('Deploy interchain token', () => {
       ],
     });
 
-    assertAccount(await its.getAccountWithKvs(), {
+    assertAccount(await its.getAccount(), {
       balance: 0n,
       hasKvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
@@ -651,7 +651,7 @@ describe('Deploy interchain token', () => {
       ],
     });
     // Assert endpoint to deploy ESDT was called
-    assertAccount(await tokenManager.getAccountWithKvs(), {
+    assertAccount(await tokenManager.getAccount(), {
       balance: 0n,
       hasKvs: [
         ...baseTokenManagerKvs,
@@ -667,7 +667,7 @@ describe('Deploy interchain token', () => {
         )),
       ],
     });
-    assertAccount(await user.getAccountWithKvs(), {
+    assertAccount(await user.getAccount(), {
       balance: BigInt('50000000000000000'), // balance was changed
     });
   });
@@ -675,7 +675,7 @@ describe('Deploy interchain token', () => {
   test('Interchain token factory', async () => {
     // Mock user as the interchain token factory
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, user),
       ],
@@ -699,7 +699,7 @@ describe('Deploy interchain token', () => {
     // Token id is instead computed for the zero adress
     const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO));
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -717,7 +717,7 @@ describe('Deploy interchain token remote', () => {
 
     // Mock token manager exists on source chain
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -774,7 +774,7 @@ describe('Deploy interchain token remote', () => {
     });
 
     // Nothing changes for its keys
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -788,7 +788,7 @@ describe('Deploy interchain token remote', () => {
     });
 
     // Assert gas was paid for cross chain call
-    kvs = await gasService.getAccountWithKvs();
+    kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 100_000,
       kvs: [
@@ -813,7 +813,7 @@ describe('Deploy interchain token remote', () => {
       ],
     });
 
-    kvs = await its.getAccountWithKvs();
+    kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -826,7 +826,7 @@ describe('Deploy interchain token remote', () => {
       ],
     });
 
-    kvs = await gasService.getAccountWithKvs();
+    kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 100_000,
       kvs: [
@@ -853,7 +853,7 @@ describe('Deploy interchain token remote', () => {
 
     // Mock token manager exists on source chain
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 

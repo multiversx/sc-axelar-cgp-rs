@@ -9,17 +9,16 @@ import {
   generateMessageSignature,
   generateProof,
   generateRotateSignersSignature,
-  getKeccak256Hash,
-  getSignersHash, MESSAGE_ID,
-  MULTISIG_PROVER_PUB_KEY_1,
-  MULTISIG_PROVER_PUB_KEY_2, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME,
+  getKeccak256Hash, getMessageHash,
+  getSignersHash,
+  MESSAGE_ID,
+  OTHER_CHAIN_ADDRESS,
+  OTHER_CHAIN_NAME,
   PAYLOAD_HASH,
   TOKEN_ID,
   TOKEN_ID2,
 } from '../helpers';
-import createKeccakHash from 'keccak';
-import { deployPingPongInterchain, gateway, its, mockGatewayMessageApproved, pingPong } from '../itsHelpers';
-import { Buffer } from 'buffer';
+import { deployPingPongInterchain, pingPong } from '../itsHelpers';
 
 let world: LSWorld;
 let deployer: LSWallet;
@@ -79,6 +78,17 @@ const defaultWeightedSigners = e.Tuple(
   e.TopBuffer(getKeccak256Hash('nonce1')),
 );
 
+// Signers hash used in Ampd to verify that the computation there is correct. Uncomment and log to display
+// const ampdSignersHash = getSignersHash(
+//   [
+//     { signer: '45e67eaf446e6c26eb3a2b55b64339ecf3a4d1d03180bee20eb5afdd23fa644f', weight: 1 },
+//     { signer: 'c387253d29085a8036d6ae2cafb1b14699751417c0ce302cfe03da279e6b5c04', weight: 1 },
+//     { signer: 'dd9822c7fa239dda9913ebee813ecbe69e35d88ff651548d5cc42c033a8a667b', weight: 1 },
+//   ],
+//   2,
+//   '0000000000000000000000000000000000000000000000000000000000000005',
+// );
+
 const defaultSignersHash = getSignersHash(
   [
     { signer: ALICE_PUB_KEY, weight: 5 },
@@ -103,7 +113,7 @@ const deployContract = async () => {
     ],
   }));
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: baseKvs(),
   });
@@ -123,7 +133,7 @@ test('Init', async () => {
     ],
   }));
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: [
       e.kvs.Mapper('previous_signers_retention').Value(e.U(16)),
@@ -147,7 +157,7 @@ test('Upgrade', async () => {
     ],
   });
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: baseKvs(),
   });
@@ -203,7 +213,7 @@ test('Upgrade', async () => {
     getKeccak256Hash('nonce2'),
   );
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: [
       ...baseKvs(),
@@ -350,7 +360,7 @@ describe('Approve messages', () => {
     );
     const messageHash = getKeccak256Hash('mock');
 
-    const commandId = getKeccak256Hash('ethereum_messageId');
+    const crossChainId = e.Tuple(e.Str('ethereum'), e.Str('messageId'));
 
     // Mock message approved
     await contract.setAccount({
@@ -360,7 +370,7 @@ describe('Approve messages', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', crossChainId).Value(messageHash),
       ],
     });
 
@@ -382,13 +392,13 @@ describe('Approve messages', () => {
     });
 
     // Nothing was actually changed
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: [
         ...baseKvs(),
 
-        // Message was executed
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+        // Message was approved
+        e.kvs.Mapper('messages', crossChainId).Value(e.TopBuffer(messageHash)),
       ],
     });
   });
@@ -404,7 +414,7 @@ describe('Approve messages', () => {
       e.TopBuffer(PAYLOAD_HASH),
     );
 
-    const commandId = getKeccak256Hash('ethereum_messageId');
+    const crossChainId = e.Tuple(e.Str('ethereum'), e.Str('messageId'));
 
     // Mock message executed
     await contract.setAccount({
@@ -414,7 +424,7 @@ describe('Approve messages', () => {
         ...baseKvs(),
 
         // Manually execute message
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
       ],
     });
 
@@ -436,13 +446,13 @@ describe('Approve messages', () => {
     });
 
     // Nothing was actually changed
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: [
         ...baseKvs(),
 
         // Message was executed
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
       ],
     });
   });
@@ -457,16 +467,9 @@ describe('Approve messages', () => {
       deployer,
       e.TopBuffer(PAYLOAD_HASH),
     );
-    const messageData = Buffer.concat([
-      Buffer.from('ethereum'),
-      Buffer.from('messageId'),
-      Buffer.from('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-      deployer.toTopU8A(),
-      Buffer.from(PAYLOAD_HASH, 'hex'),
-    ]);
-    const messageHash = getKeccak256Hash(messageData);
+    const messageHash = getMessageHash('ethereum', 'messageId', '0x4976da71bF84D750b5451B053051158EC0A4E876', deployer);
 
-    const commandId = getKeccak256Hash('ethereum_messageId');
+    const crossChainId = e.Tuple(e.Str('ethereum'), e.Str('messageId'));
 
     await deployer.callContract({
       callee: contract,
@@ -484,13 +487,13 @@ describe('Approve messages', () => {
       ],
     });
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: [
         ...baseKvs(),
 
-        // Message was executed
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+        // Message was approved
+        e.kvs.Mapper('messages', crossChainId).Value(messageHash),
       ],
     });
   });
@@ -857,7 +860,7 @@ describe('Rotate signers', () => {
       getKeccak256Hash('nonce2'),
     );
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
@@ -977,7 +980,7 @@ describe('Rotate signers', () => {
       getKeccak256Hash('nonce3'),
     );
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
@@ -1009,7 +1012,7 @@ test('Call contract', async () => {
   });
 
   // This only emits an event, and there is no way to test those currently...
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0,
     kvs: baseKvs(),
   });
@@ -1032,7 +1035,7 @@ describe('Validate message', () => {
     });
     assert(result.returnData[0] === '');
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: baseKvs(),
     });
@@ -1041,16 +1044,9 @@ describe('Validate message', () => {
   test('Validate message valid', async () => {
     await deployContract();
 
-    const messageData = Buffer.concat([
-      Buffer.from('ethereum'),
-      Buffer.from('messageId'),
-      Buffer.from('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-      deployer.toTopU8A(),
-      Buffer.from(PAYLOAD_HASH, 'hex'),
-    ]);
-    const messageHash = getKeccak256Hash(messageData);
+    const messageHash = getMessageHash('ethereum', 'messageId', '0x4976da71bF84D750b5451B053051158EC0A4E876', deployer);
 
-    const commandId = getKeccak256Hash('ethereum_messageId');
+    const crossChainId = e.Tuple(e.Str('ethereum'), e.Str('messageId'));
 
     await contract.setAccount({
       ...await contract.getAccount(),
@@ -1059,7 +1055,7 @@ describe('Validate message', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', crossChainId).Value(messageHash),
       ],
     });
 
@@ -1076,13 +1072,13 @@ describe('Validate message', () => {
     });
     assert(result.returnData[0] === '01');
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: [
         ...baseKvs(),
 
         // Message was executed
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
       ],
     });
   });
@@ -1122,7 +1118,7 @@ describe('Operator', () => {
       ],
     });
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       kvs: [
         ...baseKvs(),
 
@@ -1140,26 +1136,19 @@ describe('Operator', () => {
       ],
     });
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       kvs: baseKvs(),
     });
   });
 });
 
 describe('View functions', () => {
-  const commandId = getKeccak256Hash('ethereum_messageId');
+  const crossChainId = e.Tuple(e.Str('ethereum'), e.Str('messageId'));
 
   test('Message approved', async () => {
     await deployContract();
 
-    const messageData = Buffer.concat([
-      Buffer.from('ethereum'),
-      Buffer.from('messageId'),
-      Buffer.from('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-      deployer.toTopU8A(),
-      Buffer.from(PAYLOAD_HASH, 'hex'),
-    ]);
-    const messageHash = getKeccak256Hash(messageData);
+    const messageHash = getMessageHash('ethereum', 'messageId', '0x4976da71bF84D750b5451B053051158EC0A4E876', deployer);
 
     // Mock message approved
     await contract.setAccount({
@@ -1169,7 +1158,7 @@ describe('View functions', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', crossChainId).Value(messageHash),
       ],
     });
 
@@ -1208,7 +1197,7 @@ describe('View functions', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
       ],
     });
 
@@ -1374,6 +1363,69 @@ describe('View functions', () => {
       ],
     }).assertFail({ code: 4, message: 'Invalid signers' });
   });
+
+  test('Validate proof manipulate signers hash ', async () => {
+    await deployContract();
+
+    const data = e.List();
+    const dataHash = getKeccak256Hash(Buffer.concat([
+      Buffer.from('00', 'hex'), // ApproveMessages command type,
+      data.toTopU8A(),
+    ]));
+
+    // Spoof by top encoding Carol pub key in the weight of bob, without actually having the carol pub key
+    // in the signer set
+    const spoofedWeight = Buffer.concat([
+      Buffer.from('06', 'hex'), // weight of bob
+      Buffer.from(CAROL_PUB_KEY, 'hex'), // carol pub key
+      Buffer.from('07', 'hex'), // weight of carol
+    ]).toString('hex');
+
+    // Omit carol from defaultWeightedSigners since we are trying to spoof it using the weight of bob
+    const signers = [
+      { signer: ALICE_PUB_KEY, weight: '05' },
+      {
+        signer: BOB_PUB_KEY,
+        weight: spoofedWeight,
+      },
+    ];
+    let dataForSignersHashToSpoof = Buffer.concat([
+      ...signers.map(signer => {
+        return Buffer.concat([
+          Buffer.from(signer.signer, 'hex'),
+          Buffer.from(signer.weight, 'hex'),
+        ]);
+      }),
+      Buffer.from('0a', 'hex'), // threshold
+      Buffer.from(getKeccak256Hash('nonce1'), 'hex'),
+    ]);
+    const spoofedWeightedSigners = e.Tuple(
+      e.List(
+        e.Tuple(e.TopBuffer(ALICE_PUB_KEY), e.U(5)),
+        e.Tuple(e.TopBuffer(BOB_PUB_KEY), e.Buffer(spoofedWeight)), // use custom spoofed top encoded hex instead of weight
+      ),
+      e.U(10),
+      e.TopBuffer(getKeccak256Hash('nonce1')),
+    );
+
+    // Hash can not be the same
+    assert(getKeccak256Hash(dataForSignersHashToSpoof) != defaultSignersHash.toString('hex'));
+
+    // Bob spoofed signature, but it will not work since we use nested encoding in contract which can not be spoofed
+    await world.query({
+      callee: contract,
+      funcName: 'validateProof',
+      funcArgs: [
+        e.TopBuffer(dataHash),
+        generateProof(
+          spoofedWeightedSigners, [
+            null,
+            generateMessageSignature(defaultSignersHash, data, './bob.pem'),
+          ],
+        ),
+      ],
+    }).assertFail({ code: 4, message: 'Invalid signers' });
+  });
 });
 
 test('Approve validate execute external contract', async () => {
@@ -1393,16 +1445,9 @@ test('Approve validate execute external contract', async () => {
     pingPong,
     e.TopBuffer(payloadHash),
   );
-  const messageData = Buffer.concat([
-    Buffer.from(OTHER_CHAIN_NAME),
-    Buffer.from(MESSAGE_ID),
-    Buffer.from(OTHER_CHAIN_ADDRESS),
-    pingPong.toTopU8A(),
-    Buffer.from(payloadHash, 'hex'),
-  ]);
-  const messageHash = getKeccak256Hash(messageData);
+  const messageHash = getMessageHash(OTHER_CHAIN_NAME, MESSAGE_ID, OTHER_CHAIN_ADDRESS, pingPong, payloadHash);
 
-  const commandId = getKeccak256Hash(OTHER_CHAIN_NAME + '_' + MESSAGE_ID);
+  const crossChainId = e.Tuple(e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID));
 
   await deployer.callContract({
     callee: contract,
@@ -1420,13 +1465,13 @@ test('Approve validate execute external contract', async () => {
     ],
   });
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0,
     kvs: [
       ...baseKvs(),
 
       // Message was approved
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
 
@@ -1460,7 +1505,7 @@ test('Approve validate execute external contract', async () => {
       e.Str(OTHER_CHAIN_ADDRESS),
       payload,
     ],
-  }).assertFail({ code: 4, message: "can't withdraw before deadline" });
+  }).assertFail({ code: 4, message: 'can\'t withdraw before deadline' });
 
   await world.setCurrentBlockInfo({
     timestamp: 10,
@@ -1478,21 +1523,21 @@ test('Approve validate execute external contract', async () => {
     ],
   });
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0,
     kvs: [
       ...baseKvs(),
 
       // Message was executed
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
     ],
   });
   // Other user received funds
-  assertAccount(await otherUser.getAccountWithKvs(), {
+  assertAccount(await otherUser.getAccount(), {
     balance: 1_000,
   });
   // Ping pong state was modified
-  assertAccount(await pingPong.getAccountWithKvs(), {
+  assertAccount(await pingPong.getAccount(), {
     balance: 0,
     kvs: [
       e.kvs.Mapper('interchain_token_service').Value(contract),
@@ -1511,6 +1556,7 @@ test('Approve validate execute external contract', async () => {
   });
 });
 
+// Signers hash used in CosmWasm to verify that the computation there is correct.
 const multisigSignersHash = getSignersHash(
   [
     { signer: ALICE_PUB_KEY, weight: 1 },
@@ -1524,6 +1570,26 @@ const multisigSignersHash = getSignersHash(
 );
 
 test('Approve messages with multisig prover encoded data', async () => {
+  const message = e.Tuple(
+    e.Str('ganache-1'),
+    e.Str('0xff822c88807859ff226b58e24f24974a70f04b9442501ae38fd665b3c68f3834-0'),
+    e.Str('0x52444f1835Adc02086c37Cb226561605e2E1699b'),
+    e.Addr('erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax'),
+    e.TopBuffer('8c3685dc41c2eca11426f8035742fb97ea9f14931152670a5703f18fe8b392f0'),
+  );
+  const messageHash = getMessageHash(
+    'ganache-1',
+    '0xff822c88807859ff226b58e24f24974a70f04b9442501ae38fd665b3c68f3834-0',
+    '0x52444f1835Adc02086c37Cb226561605e2E1699b',
+    e.Addr('erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax'),
+    '8c3685dc41c2eca11426f8035742fb97ea9f14931152670a5703f18fe8b392f0',
+  );
+
+  // We need real signatures here
+  const aliceSignature = generateMessageSignature(multisigSignersHash, e.List(message)).toString('hex');
+  const bobSignature = generateMessageSignature(multisigSignersHash, e.List(message), './bob.pem').toString('hex');
+  const carolSignature = generateMessageSignature(multisigSignersHash, e.List(message), './carol.pem').toString('hex');
+
   await deployContract();
 
   // Mock multisig signers in contract
@@ -1534,7 +1600,7 @@ test('Approve messages with multisig prover encoded data', async () => {
 
       e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
       e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
-    ]
+    ],
   });
 
   // 00000009 67616e616368652d31 - length of `ganache-1` source chain string followed by it as hex
@@ -1556,15 +1622,15 @@ test('Approve messages with multisig prover encoded data', async () => {
   // 00000001 03 - length of biguint threshold followed by 3 as hex
   // 290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563 - the nonce (keccak256 hash of Uin256 number 0, created_at date)
   // 00000005 - length of signatures
-  // 01 9543286a58ded1c031fcf8e5fcdc7c5b48b6304c539bdf7a30a0b780451a64318420fe654a13be7a33cae4f221cd26e1e033d01da144901453474c73b520450d - first signature encoded as a Some option
-  // 01 199b7e0f25ff4c24637bbdfdc18d338f422793f492a81140afd080019061088ddf667f018d88928a28dcb77a2c253c66ee5a83be2d4134ff3ab3141f0fdb170d - second signature encoded as a Some option
-  // 01 4f883c316682c6e000bf4c92536a138f78c6af265f4f13d7210110e40350bb4d99e049677db13e7c12f8a4e617a5cb9bf32f5142cd58f7146505078e2d675703 - third signature encoded as a Some option
+  // 01 ${aliceSignature} - first signature encoded as a Some option
+  // 01 ${bobSignature} - second signature encoded as a Some option
+  // 01 ${carolSignature} - third signature encoded as a Some option
   // 00 - fourth signature encoded as a None option (the fourth signer didn't specify any signature)
   // 00 - fifth signature encoded as a None option (the fifth signer didn't specify any signature)
   const proof = Buffer.from(
-    '000000050139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba0000000101ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b60000000101ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56300000005019543286a58ded1c031fcf8e5fcdc7c5b48b6304c539bdf7a30a0b780451a64318420fe654a13be7a33cae4f221cd26e1e033d01da144901453474c73b520450d01199b7e0f25ff4c24637bbdfdc18d338f422793f492a81140afd080019061088ddf667f018d88928a28dcb77a2c253c66ee5a83be2d4134ff3ab3141f0fdb170d014f883c316682c6e000bf4c92536a138f78c6af265f4f13d7210110e40350bb4d99e049677db13e7c12f8a4e617a5cb9bf32f5142cd58f7146505078e2d6757030000',
-    'hex'
-  )
+    `000000050139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba0000000101ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b60000000101ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e5630000000501${aliceSignature}01${bobSignature}01${carolSignature}0000`,
+    'hex',
+  );
 
   await deployer.callContract({
     callee: contract,
@@ -1576,9 +1642,12 @@ test('Approve messages with multisig prover encoded data', async () => {
     ],
   });
 
-  const commandId = getKeccak256Hash('ganache-1_0xff822c88807859ff226b58e24f24974a70f04b9442501ae38fd665b3c68f3834-0');
+  const crossChainId = e.Tuple(
+    e.Str('ganache-1'),
+    e.Str('0xff822c88807859ff226b58e24f24974a70f04b9442501ae38fd665b3c68f3834-0'),
+  );
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0,
     kvs: [
       ...baseKvs(),
@@ -1586,13 +1655,37 @@ test('Approve messages with multisig prover encoded data', async () => {
       e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
       e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
 
-      // Message was executed
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer('b8fe5d23fe5954fa900ec37278b8661a98d061dfa34e7ebdd2e3ae98fbee5d8d')),
+      // Message was approved
+      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
 });
 
 test('Rotate signers with multisig prover encoded data', async () => {
+  const newWeightedSigners = e.Tuple(
+    e.List(
+      e.Tuple(e.TopBuffer(ALICE_PUB_KEY), e.U(1)),
+      e.Tuple(e.TopBuffer(BOB_PUB_KEY), e.U(1)),
+      e.Tuple(e.TopBuffer(CAROL_PUB_KEY), e.U(1)),
+    ),
+    e.U(3),
+    e.TopBuffer('290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563'),
+  );
+  const newSignersHash = getSignersHash(
+    [
+      { signer: ALICE_PUB_KEY, weight: 1 },
+      { signer: BOB_PUB_KEY, weight: 1 },
+      { signer: CAROL_PUB_KEY, weight: 1 },
+    ],
+    3,
+    '290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563',
+  );
+
+  // We need real signatures here
+  const aliceSignature = generateRotateSignersSignature(multisigSignersHash, newWeightedSigners).toString('hex');
+  const bobSignature = generateRotateSignersSignature(multisigSignersHash, newWeightedSigners, './bob.pem').toString('hex');
+  const carolSignature = generateRotateSignersSignature(multisigSignersHash, newWeightedSigners, './carol.pem').toString('hex');
+
   await deployContract();
 
   // Mock multisig signers in contract
@@ -1603,7 +1696,7 @@ test('Rotate signers with multisig prover encoded data', async () => {
 
       e.kvs.Mapper('signer_hash_by_epoch', e.U(1)).Value(e.TopBuffer(multisigSignersHash)),
       e.kvs.Mapper('epoch_by_signer_hash', e.TopBuffer(multisigSignersHash)).Value(e.U(1)),
-    ]
+    ],
   });
 
   // 00000003 - length of new signers
@@ -1614,7 +1707,7 @@ test('Rotate signers with multisig prover encoded data', async () => {
   // b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba - third new signer
   // 00000001 01 - length of biguint weight followed by 1 as hex
   // 00000001 03 - length of biguint threshold followed by 3 as hex
-  // 290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563 - the nonce (keccak256 hash of Uin256 number 0, created_at date)
+  // 290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563 - the nonce (mock created at number as uint256)
   const newSigners = Buffer.from(
     '000000030139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba00000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563',
     'hex',
@@ -1627,16 +1720,16 @@ test('Rotate signers with multisig prover encoded data', async () => {
   // ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6 00000001 01 - fourth signer with weight
   // ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449 00000001 01 - fifth signer with weight
   // 00000001 03 - length of biguint threshold followed by 3 as hex
-  // 290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563 - the nonce (keccak256 hash of Uin256 number 0, created_at date)
+  // 290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563 - the nonce (mock created at number as uint256)
   // 00000005 - length of signatures
-  // 01 5c98a98d1e47adecf83a10d4fdc542aae1cb13ab8e6d3f5e237ad75ccb6608631c0d3f8735e3f5f481e82f088fe5215d431ae8c6abf68b96797df4bbe610cd05 - first signature encoded as a Some option
-  // 01 ca0999eac93ee855ea88680b8094660635a06743e9acdb8d1987a9c48a60e9f794bd22a10748bb9c3c961ddc3068a96abfae00a9c38252a4b3ad99caeb060805 - second signature encoded as a Some option
-  // 01 deca8b224a38ad99ec4cb4f3d8e86778544c55ab0c4513ce8af834b81b3e934eef29727cc76c364f316a44c2eea82fa655f209f0c5205a209461d8a7fbbacf03 - third signature encoded as a Some option
+  // 01 ${aliceSignature} - first signature encoded as a Some option
+  // 01 ${bobSignature} - second signature encoded as a Some option
+  // 01 ${carolSignature} - third signature encoded as a Some option
   // 00 - fourth signature encoded as a None option (the fourth signer didn't specify any signature)
   // 00 - fifth signature encoded as a None option (the fifth signer didn't specify any signature)
   const proof = Buffer.from(
-    '000000050139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba0000000101ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b60000000101ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56300000005015c98a98d1e47adecf83a10d4fdc542aae1cb13ab8e6d3f5e237ad75ccb6608631c0d3f8735e3f5f481e82f088fe5215d431ae8c6abf68b96797df4bbe610cd0501ca0999eac93ee855ea88680b8094660635a06743e9acdb8d1987a9c48a60e9f794bd22a10748bb9c3c961ddc3068a96abfae00a9c38252a4b3ad99caeb06080501deca8b224a38ad99ec4cb4f3d8e86778544c55ab0c4513ce8af834b81b3e934eef29727cc76c364f316a44c2eea82fa655f209f0c5205a209461d8a7fbbacf030000',
-    'hex'
+    `000000050139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e100000001018049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f80000000101b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba0000000101ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b60000000101ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a444900000001010000000103290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e5630000000501${aliceSignature}01${bobSignature}01${carolSignature}0000`,
+    'hex',
   );
 
   await world.setCurrentBlockInfo({
@@ -1653,17 +1746,7 @@ test('Rotate signers with multisig prover encoded data', async () => {
     ],
   });
 
-  const newSignersHash = getSignersHash(
-    [
-      { signer: ALICE_PUB_KEY, weight: 1 },
-      { signer: BOB_PUB_KEY, weight: 1 },
-      { signer: CAROL_PUB_KEY, weight: 1 },
-    ],
-    3,
-    '290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563',
-  );
-
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: [
       ...baseKvs(),

@@ -86,9 +86,9 @@ const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
     ],
   ).substring(2);
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 test('Transfer with data', async () => {
@@ -101,7 +101,7 @@ test('Transfer with data', async () => {
     'EGLD',
   );
 
-  const { payload, commandId } = await mockGatewayCall(computedTokenId);
+  const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
   await user.callContract({
     callee: its,
@@ -128,7 +128,7 @@ test('Transfer with data', async () => {
   }).assertFail({ code: 4, message: 'Not approved by gateway' });
 
   // Assert no tokens left in its contract & lock removed
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -137,7 +137,7 @@ test('Transfer with data', async () => {
   });
 
   // Assert ping pong was successfully called with tokens
-  const pingPongKvs = await pingPong.getAccountWithKvs();
+  const pingPongKvs = await pingPong.getAccount();
   assertAccount(pingPongKvs, {
     balance: 1_000,
     kvs: [
@@ -157,7 +157,7 @@ test('Transfer with data', async () => {
   });
 
   // Assert token manager balance decreased
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 99_000,
     kvs: [
@@ -166,11 +166,11 @@ test('Transfer with data', async () => {
   });
 
   // Gateway message was marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     ],
   });
 });
@@ -185,7 +185,7 @@ test('Transfer with data contract error', async () => {
     'EGLD',
   );
 
-  const { payload, commandId, messageHash } = await mockGatewayCall(computedTokenId, 'wrong');
+  const { payload, crossChainId, messageHash } = await mockGatewayCall(computedTokenId, 'wrong');
 
   await user.callContract({
     callee: its,
@@ -200,14 +200,14 @@ test('Transfer with data contract error', async () => {
   });
 
   // Assert its doesn't have balance & lock removed
-  assertAccount(await its.getAccountWithKvs(), {
+  assertAccount(await its.getAccount(), {
     balance: 0n,
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
     ],
   });
   // Assert ping pong was NOT called
-  assertAccount(await pingPong.getAccountWithKvs(), {
+  assertAccount(await pingPong.getAccount(), {
     balance: 0,
     kvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
@@ -218,7 +218,7 @@ test('Transfer with data contract error', async () => {
     ],
   });
   // Assert token manager still has tokens
-  assertAccount(await tokenManager.getAccountWithKvs(), {
+  assertAccount(await tokenManager.getAccount(), {
     balance: 100_000,
     kvs: [
       ...baseTokenManagerKvs,
@@ -226,11 +226,11 @@ test('Transfer with data contract error', async () => {
   });
 
   // Gateway message was NOT marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
 });

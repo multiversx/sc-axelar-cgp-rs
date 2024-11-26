@@ -6,7 +6,7 @@ import {
   CHAIN_NAME,
   CHAIN_NAME_HASH,
   DOMAIN_SEPARATOR,
-  getKeccak256Hash,
+  getKeccak256Hash, getMessageHash,
   getSignersHash,
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
@@ -98,7 +98,7 @@ export const deployGatewayContract = async (deployer: LSWallet) => {
     ],
   }));
 
-  const kvs = await gateway.getAccountWithKvs();
+  const kvs = await gateway.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseGatewayKvs(deployer),
@@ -115,7 +115,7 @@ export const deployGasService = async (deployer: LSWallet, collector: LSWallet) 
     ],
   }));
 
-  const kvs = await gasService.getAccountWithKvs();
+  const kvs = await gasService.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -156,7 +156,7 @@ export const deployTokenManagerInterchainToken = async (
     ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
   ];
 
-  const kvs = await tokenManager.getAccountWithKvs();
+  const kvs = await tokenManager.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseKvs,
@@ -229,7 +229,7 @@ export const deployTokenManagerMintBurn = async (
     ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
   ];
 
-  const kvs = await tokenManager.getAccountWithKvs();
+  const kvs = await tokenManager.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseKvs,
@@ -281,7 +281,7 @@ export const deployTokenManagerLockUnlock = async (
     ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
   ];
 
-  const kvs = await tokenManager.getAccountWithKvs();
+  const kvs = await tokenManager.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseKvs,
@@ -311,7 +311,7 @@ export const deployIts = async (deployer: LSWallet) => {
     ],
   }));
 
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -330,7 +330,7 @@ export const deployInterchainTokenFactory = async (deployer: LSWallet, callIts: 
     ],
   }));
 
-  const kvs = await interchainTokenFactory.getAccountWithKvs();
+  const kvs = await interchainTokenFactory.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -408,7 +408,7 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: LSWallet, add
   if (addTokens) {
     if (tokenIdentifier === 'EGLD') {
       await tokenManager.setAccount({
-        ...(await tokenManager.getAccountWithKvs()),
+        ...(await tokenManager.getAccount()),
         balance: 100_000,
         kvs: [
           ...baseTokenManagerKvs,
@@ -416,7 +416,7 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: LSWallet, add
       });
     } else {
       await tokenManager.setAccount({
-        ...(await tokenManager.getAccountWithKvs()),
+        ...(await tokenManager.getAccount()),
         kvs: [
           ...baseTokenManagerKvs,
 
@@ -462,7 +462,7 @@ export const itsDeployTokenManagerMintBurn = async (world, user: LSWallet, flowL
 
   // Set mint/burn role for token
   await tokenManager.setAccount({
-    ...(await tokenManager.getAccountWithKvs()),
+    ...(await tokenManager.getAccount()),
     kvs: baseTokenManagerKvs,
   });
 
@@ -530,16 +530,9 @@ export async function mockGatewayMessageApproved(
 ) {
   const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
 
-  const messageData = Buffer.concat([
-    Buffer.from(sourceChain),
-    Buffer.from(MESSAGE_ID),
-    Buffer.from(sourceAddress),
-    its.toTopU8A(),
-    Buffer.from(payloadHash, 'hex'),
-  ]);
-  const messageHash = getKeccak256Hash(messageData);
+  const messageHash = getMessageHash(sourceChain, MESSAGE_ID, sourceAddress, its, payloadHash);
 
-  const commandId = getKeccak256Hash(sourceChain + '_' + MESSAGE_ID);
+  const crossChainId = e.Tuple(e.Str(sourceChain), e.Str(MESSAGE_ID));
 
   // Mock call approved by gateway
   await gateway.setAccount({
@@ -549,9 +542,9 @@ export async function mockGatewayMessageApproved(
       ...baseGatewayKvs(operator),
 
       // Manually approve message
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
 
-  return { commandId, messageHash };
+  return { crossChainId, messageHash };
 }

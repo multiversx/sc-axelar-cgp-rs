@@ -140,9 +140,9 @@ const mockTransferGatewayCall = async (interchainTokenId: string, payload: strin
     ).substring(2);
   }
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer, ITS_HUB_CHAIN_NAME, ITS_CHAIN_ADDRESS);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer, ITS_HUB_CHAIN_NAME, ITS_CHAIN_ADDRESS);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 const mockTransferWithDataGatewayCall = async (tokenId: string, fnc = 'ping') => {
@@ -167,9 +167,9 @@ const mockTransferWithDataGatewayCall = async (tokenId: string, fnc = 'ping') =>
     ]
   ).substring(2);
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer, ITS_HUB_CHAIN_NAME, ITS_CHAIN_ADDRESS);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer, ITS_HUB_CHAIN_NAME, ITS_CHAIN_ADDRESS);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 const mockDeployInterchainTokenGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
@@ -194,9 +194,9 @@ const mockDeployInterchainTokenGatewayCall = async (tokenId = INTERCHAIN_TOKEN_I
     ]
   ).substring(2);
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer, ITS_HUB_CHAIN_NAME, ITS_CHAIN_ADDRESS);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer, ITS_HUB_CHAIN_NAME, ITS_CHAIN_ADDRESS);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 const mockDeployTokenManagerGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID, type = TOKEN_MANAGER_TYPE_MINT_BURN) => {
@@ -224,16 +224,16 @@ const mockDeployTokenManagerGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID, 
     ]
   ).substring(2);
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer, ITS_HUB_CHAIN_NAME, ITS_CHAIN_ADDRESS);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer, ITS_HUB_CHAIN_NAME, ITS_CHAIN_ADDRESS);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 describe('Execute', () => {
   test('Transfer', async () => {
     const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(world, user);
 
-    const { payload, commandId } = await mockTransferGatewayCall(computedTokenId);
+    const { payload, crossChainId } = await mockTransferGatewayCall(computedTokenId);
 
     await user.callContract({
       callee: its,
@@ -248,7 +248,7 @@ describe('Execute', () => {
     });
 
     // Tokens should be minted for otherUser
-    const otherUserKvs = await otherUser.getAccountWithKvs();
+    const otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       balance: BigInt('10000000000000000'),
       kvs: [
@@ -257,18 +257,18 @@ describe('Execute', () => {
     });
 
     // Nothing changed for token manager
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0,
       kvs: baseTokenManagerKvs,
     });
 
     // Gateway message was marked as executed
-    assertAccount(await gateway.getAccountWithKvs(), {
+    assertAccount(await gateway.getAccount(), {
       kvs: [
         ...baseGatewayKvs(deployer),
 
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str('1')),
+        e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
       ],
     });
   });
@@ -283,7 +283,7 @@ describe('Execute', () => {
       'EGLD',
     );
 
-    const { payload, commandId } = await mockTransferWithDataGatewayCall(computedTokenId);
+    const { payload, crossChainId } = await mockTransferWithDataGatewayCall(computedTokenId);
 
     await user.callContract({
       callee: its,
@@ -298,7 +298,7 @@ describe('Execute', () => {
     });
 
     // Assert ping pong was successfully called with tokens
-    const pingPongKvs = await pingPong.getAccountWithKvs();
+    const pingPongKvs = await pingPong.getAccount();
     assertAccount(pingPongKvs, {
       balance: 1_000,
       kvs: [
@@ -318,7 +318,7 @@ describe('Execute', () => {
     });
 
     // Assert token manager balance decreased
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 99_000,
       kvs: [
@@ -327,17 +327,17 @@ describe('Execute', () => {
     });
 
     // Gateway message was marked as executed
-    assertAccount(await gateway.getAccountWithKvs(), {
+    assertAccount(await gateway.getAccount(), {
       kvs: [
         ...baseGatewayKvs(deployer),
 
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+        e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
       ],
     });
   });
 
   test('Deploy interchain token only deploy token manager', async () => {
-    const { payload, commandId, messageHash } = await mockDeployInterchainTokenGatewayCall();
+    const { payload, crossChainId, messageHash } = await mockDeployInterchainTokenGatewayCall();
 
     await user.callContract({
       callee: its,
@@ -352,7 +352,7 @@ describe('Execute', () => {
     });
 
     const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0,
       kvs: [
@@ -364,17 +364,17 @@ describe('Execute', () => {
     });
 
     // Gateway message approved key was NOT removed
-    assertAccount(await gateway.getAccountWithKvs(), {
+    assertAccount(await gateway.getAccount(), {
       kvs: [
         ...baseGatewayKvs(deployer),
 
-        e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+        e.kvs.Mapper('messages', crossChainId).Value(messageHash),
       ],
     });
   });
 
   test('Deploy token manager', async () => {
-    const { payload, commandId } = await mockDeployTokenManagerGatewayCall();
+    const { payload, crossChainId } = await mockDeployTokenManagerGatewayCall();
 
     await user.callContract({
       callee: its,
@@ -390,7 +390,7 @@ describe('Execute', () => {
 
     // For now ITS Hub does not support deploy token manager
     // const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-    // const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    // const tokenManagerKvs = await tokenManager.getAccount();
     // assertAccount(tokenManagerKvs, {
     //   balance: 0,
     //   kvs: [
@@ -403,11 +403,11 @@ describe('Execute', () => {
     // });
     //
     // // Gateway message was marked as executed
-    // assertAccount(await gateway.getAccountWithKvs(), {
+    // assertAccount(await gateway.getAccount(), {
     //   kvs: [
     //     ...baseGatewayKvs(deployer),
     //
-    //     e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+    //     e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
     //   ],
     // });
   });
@@ -506,7 +506,7 @@ describe('Transfers', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -514,7 +514,7 @@ describe('Transfers', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -545,7 +545,7 @@ describe('Transfers', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -553,7 +553,7 @@ describe('Transfers', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -631,7 +631,7 @@ describe('Deploy', () => {
   test('Remote token manager', async () => {
     // Mock token manager exists on source chain
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -711,7 +711,7 @@ describe('Deploy', () => {
     // assert(result.returnData[0] === computeInterchainTokenId(user));
     //
     // // Nothing changes for its keys
-    // let kvs = await its.getAccountWithKvs();
+    // let kvs = await its.getAccount();
     // assertAccount(kvs, {
     //   balance: 0n,
     //   kvs: [
@@ -728,7 +728,7 @@ describe('Deploy', () => {
     // });
     //
     // // Assert gas was paid for cross chain call
-    // kvs = await gasService.getAccountWithKvs();
+    // kvs = await gasService.getAccount();
     // assertAccount(kvs, {
     //   balance: 100_000,
     //   kvs: [
@@ -745,7 +745,7 @@ describe('Deploy', () => {
 
     // Mock token manager exists on source chain
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -794,7 +794,7 @@ describe('Deploy', () => {
     });
 
     // Nothing changes for its keys
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -811,7 +811,7 @@ describe('Deploy', () => {
     });
 
     // Assert gas was paid for cross chain call
-    kvs = await gasService.getAccountWithKvs();
+    kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 100_000,
       kvs: [

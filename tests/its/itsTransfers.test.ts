@@ -83,7 +83,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -91,7 +91,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -126,7 +126,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    const kvs = await gasService.getAccountWithKvs();
+    const kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -134,7 +134,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -166,7 +166,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    const kvs = await gasService.getAccountWithKvs();
+    const kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -174,7 +174,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -429,7 +429,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert EGLD gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 20,
       kvs: [
@@ -437,7 +437,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 980,
       kvs: [
@@ -466,7 +466,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert ESDT gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -478,7 +478,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -510,7 +510,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert 2nd ESDT gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -522,7 +522,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -553,7 +553,7 @@ describe('Call contract with interchain token', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -561,7 +561,7 @@ describe('Call contract with interchain token', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -786,7 +786,7 @@ describe('Call contract with interchain token', () => {
     });
 
     // Assert EGLD gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 20,
       kvs: [
@@ -794,7 +794,7 @@ describe('Call contract with interchain token', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 980,
       kvs: [
@@ -823,7 +823,7 @@ describe('Call contract with interchain token', () => {
     });
 
     // Assert ESDT gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -835,7 +835,7 @@ describe('Call contract with interchain token', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -867,7 +867,7 @@ describe('Call contract with interchain token', () => {
     });
 
     // Assert 2nd ESDT gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -879,7 +879,7 @@ describe('Call contract with interchain token', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [

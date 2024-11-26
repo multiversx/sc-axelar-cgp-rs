@@ -13,8 +13,8 @@ import { Buffer } from 'buffer';
 import {
   baseGatewayKvs,
   baseItsKvs,
-  deployContracts, deployTokenManagerInterchainToken,
-  deployTokenManagerMintBurn,
+  deployContracts,
+  deployTokenManagerInterchainToken,
   gateway,
   interchainTokenFactory,
   its,
@@ -89,13 +89,13 @@ const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
     ],
   ).substring(2);
 
-  const { commandId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
+  const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
-  return { payload, commandId, messageHash };
+  return { payload, crossChainId, messageHash };
 };
 
 test('Only deploy token manager', async () => {
-  const { payload, commandId, messageHash } = await mockGatewayCall();
+  const { payload, crossChainId, messageHash } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
@@ -109,7 +109,7 @@ test('Only deploy token manager', async () => {
     ],
   });
 
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -118,7 +118,7 @@ test('Only deploy token manager', async () => {
   });
 
   const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [
@@ -130,11 +130,11 @@ test('Only deploy token manager', async () => {
   });
 
   // Gateway message approved key was NOT removed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.TopBuffer(messageHash)),
+      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
     ],
   });
 });
@@ -144,7 +144,7 @@ test('Only issue esdt', async () => {
 
   // Mock token manager already deployed
   await its.setAccount({
-    ...(await its.getAccountWithKvs()),
+    ...(await its.getAccount()),
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -152,7 +152,7 @@ test('Only issue esdt', async () => {
     ],
   });
 
-  const { payload, commandId } = await mockGatewayCall();
+  const { payload, crossChainId } = await mockGatewayCall();
 
   await user.callContract({
     callee: its,
@@ -168,7 +168,7 @@ test('Only issue esdt', async () => {
   });
 
   // Nothing was changed for its
-  assertAccount(await its.getAccountWithKvs(), {
+  assertAccount(await its.getAccount(), {
     balance: 0n,
     hasKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
@@ -176,7 +176,7 @@ test('Only issue esdt', async () => {
       e.kvs.Mapper('token_manager_address', e.TopBuffer(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
   });
-  assertAccount(await tokenManager.getAccountWithKvs(), {
+  assertAccount(await tokenManager.getAccount(), {
     balance: 0,
     hasKvs: [
       ...baseTokenManagerKvs,
@@ -191,16 +191,16 @@ test('Only issue esdt', async () => {
       )),
     ],
   });
-  assertAccount(await user.getAccountWithKvs(), {
+  assertAccount(await user.getAccount(), {
     balance: BigInt('50000000000000000'), // balance was changed
   });
 
   // Gateway message was marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
-      e.kvs.Mapper('messages', e.TopBuffer(commandId)).Value(e.Str("1")),
+      e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
     ],
   });
 });
@@ -265,7 +265,7 @@ test('Errors', async () => {
 
   // Mock token manager already deployed, test that gateway is check in this case also
   await its.setAccount({
-    ...(await its.getAccountWithKvs()),
+    ...(await its.getAccount()),
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 

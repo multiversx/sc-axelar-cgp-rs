@@ -181,7 +181,7 @@ describe('Init', () => {
       ],
     });
 
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -209,7 +209,7 @@ describe('Init', () => {
       ],
     });
 
-    kvs = await contract2.getAccountWithKvs();
+    kvs = await contract2.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -239,7 +239,7 @@ describe('Init', () => {
       ],
     });
 
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -267,7 +267,7 @@ describe('Init', () => {
       ],
     });
 
-    kvs = await contract2.getAccountWithKvs();
+    kvs = await contract2.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -297,7 +297,7 @@ describe('Init', () => {
       ],
     });
 
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -324,7 +324,7 @@ describe('Init', () => {
       ],
     });
 
-    kvs = await contract2.getAccountWithKvs();
+    kvs = await contract2.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -360,7 +360,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -401,7 +401,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -421,7 +421,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -475,7 +475,7 @@ describe('Flow limit', () => {
       ],
     })
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -517,7 +517,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -538,7 +538,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -558,7 +558,7 @@ describe('Give token lock unlock', () => {
 
     // Ensure token manager has tokens
     await tokenManager.setAccount({
-      ...await tokenManager.getAccountWithKvs(),
+      ...await tokenManager.getAccount(),
       kvs: [
         ...baseKvs,
 
@@ -577,7 +577,7 @@ describe('Give token lock unlock', () => {
     });
 
     // Tokens were sent from contract to otherUser
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -587,7 +587,7 @@ describe('Give token lock unlock', () => {
       ],
     });
 
-    const otherUserKvs = await otherUser.getAccountWithKvs();
+    const otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -600,7 +600,7 @@ describe('Give token lock unlock', () => {
 
     // Ensure token manager has tokens
     await tokenManager.setAccount({
-      ...await tokenManager.getAccountWithKvs(),
+      ...await tokenManager.getAccount(),
       kvs: [
         ...baseKvs,
 
@@ -629,7 +629,7 @@ describe('Give token lock unlock', () => {
     });
 
     // Tokens were sent from contract to otherUser
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -642,7 +642,7 @@ describe('Give token lock unlock', () => {
       ],
     });
 
-    let otherUserKvs = await otherUser.getAccountWithKvs();
+    let otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
@@ -677,7 +677,7 @@ describe('Give token lock unlock', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -691,7 +691,7 @@ describe('Give token lock unlock', () => {
       ],
     });
 
-    otherUserKvs = await otherUser.getAccountWithKvs();
+    otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -758,7 +758,7 @@ describe('Take token lock unlock', () => {
     });
 
     // Tokens remain in contract
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -791,7 +791,7 @@ describe('Take token lock unlock', () => {
     });
 
     // Tokens remain in contract
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -828,7 +828,7 @@ describe('Take token lock unlock', () => {
       esdts: [{ id: TOKEN_ID, amount: 500 }],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -904,7 +904,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -947,7 +947,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -977,7 +977,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -1038,7 +1038,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
