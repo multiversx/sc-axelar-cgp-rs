@@ -13,8 +13,8 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 pub enum ServiceGovernanceCommand {
     ScheduleTimeLockProposal,
     CancelTimeLockProposal,
-    ApproveMultisigProposal,
-    CancelMultisigApproval,
+    ApproveOperatorProposal,
+    CancelOperatorApproval,
 }
 
 #[derive(TypeAbi, TopDecode)]
@@ -53,13 +53,13 @@ pub trait Governance: events::Events {
         governance_chain: ManagedBuffer,
         governance_address: ManagedBuffer,
         minimum_time_delay: u64,
-        multisig: ManagedAddress,
+        operator: ManagedAddress,
     ) {
         require!(
             !gateway.is_zero()
                 && !governance_chain.is_empty()
                 && !governance_address.is_empty()
-                && !multisig.is_zero(),
+                && !operator.is_zero(),
             "Invalid address"
         );
 
@@ -69,7 +69,7 @@ pub trait Governance: events::Events {
         self.governance_chain().set(&governance_chain);
         self.governance_address().set(&governance_address);
 
-        self.multisig().set(multisig);
+        self.operator().set(operator);
     }
 
     #[upgrade]
@@ -139,27 +139,26 @@ pub trait Governance: events::Events {
             .register_promise();
     }
 
-    #[payable("EGLD")]
-    #[endpoint(executeMultisigProposal)]
-    fn execute_multisig_proposal(
+    #[payable("*")]
+    #[endpoint(executeOperatorProposal)]
+    fn execute_operator_proposal(
         &self,
         target: ManagedAddress,
         call_data: ManagedBuffer,
         native_value: BigUint,
     ) {
-        require!(
-            self.blockchain().get_caller() == self.multisig().get(),
-            "Not authorized"
-        );
+        let operator = self.operator().get();
+
+        require!(self.blockchain().get_caller() == operator, "Not authorized");
 
         let proposal_hash = self.get_proposal_hash(&target, &call_data, &native_value);
 
         require!(
-            self.multisig_approvals(&proposal_hash).take(),
+            self.operator_approvals(&proposal_hash).take(),
             "Not approved"
         );
 
-        self.multisig_proposal_executed_event(
+        self.operator_proposal_executed_event(
             &proposal_hash,
             &target,
             ProposalEventData {
@@ -172,14 +171,26 @@ pub trait Governance: events::Events {
             DecodedCallData::<Self::Api>::top_decode(call_data)
                 .unwrap_or_else(|_| sc_panic!("Could not decode call data"));
 
+        let mut extra_gas_for_callback = EXECUTE_PROPOSAL_CALLBACK_GAS;
+
+        let payments = self.call_value().any_payment();
+
+        if let EgldOrMultiEsdtPaymentRefs::MultiEsdt(payments) = payments.as_refs() {
+            // Reserve extra gas for callback to make sure we can send back the tokens instead of async call error
+            let gas_for_payments =
+                EXECUTE_PROPOSAL_CALLBACK_GAS_PER_PAYMENT * payments.len() as u64;
+
+            extra_gas_for_callback += gas_for_payments;
+        }
+
         let gas_left = self.blockchain().get_gas_left();
 
         require!(
-            gas_left > EXECUTE_PROPOSAL_CALLBACK_GAS + KEEP_EXTRA_GAS,
-            "Not enough gas left for async call"
+            gas_left > extra_gas_for_callback + KEEP_EXTRA_GAS + decoded_call_data.min_gas_limit,
+            "Insufficient gas for execution"
         );
 
-        let gas_limit = gas_left - EXECUTE_PROPOSAL_CALLBACK_GAS - KEEP_EXTRA_GAS;
+        let gas_limit = gas_left - extra_gas_for_callback - KEEP_EXTRA_GAS;
 
         self.send()
             .contract_call::<()>(target, decoded_call_data.endpoint_name)
@@ -187,10 +198,11 @@ pub trait Governance: events::Events {
             .with_raw_arguments(decoded_call_data.arguments.into())
             .with_gas_limit(gas_limit)
             .async_call_promise()
-            .with_callback(
-                self.callbacks()
-                    .execute_multisig_proposal_callback(&proposal_hash),
-            )
+            .with_callback(self.callbacks().execute_operator_proposal_callback(
+                &proposal_hash,
+                operator,
+                payments,
+            ))
             .with_extra_gas_for_callback(EXECUTE_PROPOSAL_CALLBACK_GAS)
             .register_promise();
     }
@@ -206,20 +218,20 @@ pub trait Governance: events::Events {
         self.send().direct_egld(&recipient, &amount);
     }
 
-    #[endpoint(transferMultisig)]
-    fn transfer_multisig(&self, new_multisig: ManagedAddress) {
+    #[endpoint(transferOperatorship)]
+    fn transfer_operatorship(&self, new_operator: ManagedAddress) {
         let caller = self.blockchain().get_caller();
 
         require!(
-            caller == self.multisig().get() || caller == self.blockchain().get_sc_address(),
+            caller == self.operator().get() || caller == self.blockchain().get_sc_address(),
             "Not authorized"
         );
 
-        require!(!new_multisig.is_zero(), "Invalid multisig address");
+        require!(!new_operator.is_zero(), "Invalid operator address");
 
-        self.multisig_transferred_event(&self.multisig().get(), &new_multisig);
+        self.operatorship_transferred_event(&self.operator().get(), &new_operator);
 
-        self.multisig().set(new_multisig);
+        self.operator().set(new_operator);
     }
 
     #[endpoint]
@@ -259,7 +271,8 @@ pub trait Governance: events::Events {
         let caller = self.blockchain().get_caller();
         let value = self.refund_token(&caller, token.clone()).take();
 
-        self.send().direct_non_zero(&caller, &token.token_identifier, token.token_nonce, &value);
+        self.send()
+            .direct_non_zero(&caller, &token.token_identifier, token.token_nonce, &value);
     }
 
     fn process_command(&self, execute_payload: ExecutePayload<Self::Api>) {
@@ -296,10 +309,10 @@ pub trait Governance: events::Events {
                     },
                 );
             }
-            ServiceGovernanceCommand::ApproveMultisigProposal => {
-                self.multisig_approvals(&proposal_hash).set(true);
+            ServiceGovernanceCommand::ApproveOperatorProposal => {
+                self.operator_approvals(&proposal_hash).set(true);
 
-                self.multisig_approved_event(
+                self.operator_approved_event(
                     &proposal_hash,
                     &execute_payload.target,
                     ProposalEventData {
@@ -308,10 +321,10 @@ pub trait Governance: events::Events {
                     },
                 );
             }
-            ServiceGovernanceCommand::CancelMultisigApproval => {
-                self.multisig_approvals(&proposal_hash).clear();
+            ServiceGovernanceCommand::CancelOperatorApproval => {
+                self.operator_approvals(&proposal_hash).clear();
 
-                self.multisig_cancelled_event(
+                self.operator_cancelled_event(
                     &proposal_hash,
                     &execute_payload.target,
                     ProposalEventData {
@@ -402,32 +415,7 @@ pub trait Governance: events::Events {
                 self.execute_proposal_success_event(hash, results);
             }
             ManagedAsyncCallResult::Err(err) => {
-                match payments {
-                    EgldOrMultiEsdtPayment::Egld(egld_value) => {
-                        self.refund_token(
-                            &caller,
-                            EgldOrEsdtToken {
-                                token_identifier: EgldOrEsdtTokenIdentifier::egld(),
-                                token_nonce: 0,
-                            },
-                        )
-                        .update(|old| *old += &egld_value);
-                    }
-                    EgldOrMultiEsdtPayment::MultiEsdt(esdts) => {
-                        for esdt in esdts.iter() {
-                            self.refund_token(
-                                &caller,
-                                EgldOrEsdtToken {
-                                    token_identifier: EgldOrEsdtTokenIdentifier::esdt(
-                                        esdt.token_identifier,
-                                    ),
-                                    token_nonce: esdt.token_nonce,
-                                },
-                            )
-                            .update(|old| *old += &esdt.amount);
-                        }
-                    }
-                }
+                self.handle_callback_failure(caller, payments);
 
                 // Let call be retried in case of failure, mostly because async call
                 // can fail with out of gas since it can be triggered by anyone
@@ -439,21 +427,58 @@ pub trait Governance: events::Events {
     }
 
     #[promises_callback]
-    fn execute_multisig_proposal_callback(
+    fn execute_operator_proposal_callback(
         &self,
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        operator: ManagedAddress,
+        payments: EgldOrMultiEsdtPayment<Self::Api>,
         #[call_result] call_result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
     ) {
         match call_result {
             ManagedAsyncCallResult::Ok(results) => {
-                self.multisig_execute_proposal_success_event(hash, results);
+                self.operator_execute_proposal_success_event(hash, results);
             }
             ManagedAsyncCallResult::Err(err) => {
+                self.handle_callback_failure(operator, payments);
+
                 // Let call be retried in case of failure, mostly because async call
                 // can fail with out of gas
-                self.multisig_approvals(hash).set(true);
+                self.operator_approvals(hash).set(true);
 
-                self.multisig_execute_proposal_error_event(hash, err.err_code, err.err_msg);
+                self.operator_execute_proposal_error_event(hash, err.err_code, err.err_msg);
+            }
+        }
+    }
+
+    fn handle_callback_failure(
+        &self,
+        caller: ManagedAddress,
+        payments: EgldOrMultiEsdtPayment<Self::Api>,
+    ) {
+        match payments {
+            EgldOrMultiEsdtPayment::Egld(egld_value) => {
+                self.refund_token(
+                    &caller,
+                    EgldOrEsdtToken {
+                        token_identifier: EgldOrEsdtTokenIdentifier::egld(),
+                        token_nonce: 0,
+                    },
+                )
+                .update(|old| *old += &egld_value);
+            }
+            EgldOrMultiEsdtPayment::MultiEsdt(esdts) => {
+                for esdt in esdts.iter() {
+                    self.refund_token(
+                        &caller,
+                        EgldOrEsdtToken {
+                            token_identifier: EgldOrEsdtTokenIdentifier::esdt(
+                                esdt.token_identifier,
+                            ),
+                            token_nonce: esdt.token_nonce,
+                        },
+                    )
+                    .update(|old| *old += &esdt.amount);
+                }
             }
         }
     }
@@ -469,14 +494,14 @@ pub trait Governance: events::Events {
             .get()
     }
 
-    #[view(isMultisigProposalApproved)]
-    fn is_multisig_proposal_approved(
+    #[view(isOperatorProposalApproved)]
+    fn is_operator_proposal_approved(
         &self,
         target: ManagedAddress,
         call_data: ManagedBuffer,
         native_value: BigUint,
     ) -> bool {
-        self.multisig_approvals(&self.get_proposal_hash(&target, &call_data, &native_value))
+        self.operator_approvals(&self.get_proposal_hash(&target, &call_data, &native_value))
             .get()
     }
 
@@ -496,9 +521,9 @@ pub trait Governance: events::Events {
     #[storage_mapper("governance_address")]
     fn governance_address(&self) -> SingleValueMapper<ManagedBuffer>;
 
-    #[view(getMultisig)]
-    #[storage_mapper("multisig")]
-    fn multisig(&self) -> SingleValueMapper<ManagedAddress>;
+    #[view(getOperator)]
+    #[storage_mapper("operator")]
+    fn operator(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[view(getTimeLockEta)]
     #[storage_mapper("time_lock_eta")]
@@ -507,6 +532,13 @@ pub trait Governance: events::Events {
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> SingleValueMapper<u64>;
 
+    #[view(getOperatorApprovals)]
+    #[storage_mapper("operator_approvals")]
+    fn operator_approvals(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> SingleValueMapper<bool>;
+
     #[view(getRefundToken)]
     #[storage_mapper("refund_token")]
     fn refund_token(
@@ -514,13 +546,6 @@ pub trait Governance: events::Events {
         user: &ManagedAddress,
         token: EgldOrEsdtToken<Self::Api>,
     ) -> SingleValueMapper<BigUint>;
-
-    #[view(getMultisigApprovals)]
-    #[storage_mapper("multisig_approvals")]
-    fn multisig_approvals(
-        &self,
-        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) -> SingleValueMapper<bool>;
 
     #[proxy]
     fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway::Proxy<Self::Api>;

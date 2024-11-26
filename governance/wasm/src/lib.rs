@@ -22,23 +22,23 @@ multiversx_sc_wasm_adapter::endpoints! {
         init => init
         upgrade => upgrade
         executeProposal => execute_proposal
-        executeMultisigProposal => execute_multisig_proposal
+        executeOperatorProposal => execute_operator_proposal
         withdraw => withdraw
-        transferMultisig => transfer_multisig
+        transferOperatorship => transfer_operatorship
         execute => execute
         withdrawRefundToken => withdraw_refund_token
         getProposalEta => get_proposal_eta
-        isMultisigProposalApproved => is_multisig_proposal_approved
+        isOperatorProposalApproved => is_operator_proposal_approved
         gateway => gateway
         getMinimumTimeLockDelay => minimum_time_lock_delay
         getGovernanceChain => governance_chain
         getGovernanceAddress => governance_address
-        getMultisig => multisig
+        getOperator => operator
         getTimeLockEta => time_lock_eta
+        getOperatorApprovals => operator_approvals
         getRefundToken => refund_token
-        getMultisigApprovals => multisig_approvals
         execute_proposal_callback => execute_proposal_callback
-        execute_multisig_proposal_callback => execute_multisig_proposal_callback
+        execute_operator_proposal_callback => execute_operator_proposal_callback
     )
 }
 

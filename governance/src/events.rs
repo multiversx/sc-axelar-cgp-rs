@@ -52,47 +52,47 @@ pub trait Events {
         err_message: ManagedBuffer,
     );
 
-    #[event("multisig_approved_event")]
-    fn multisig_approved_event(
+    #[event("operator_approved_event")]
+    fn operator_approved_event(
         &self,
         #[indexed] proposal_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] target: &ManagedAddress,
         data: ProposalEventData<Self::Api>,
     );
 
-    #[event("multisig_cancelled_event")]
-    fn multisig_cancelled_event(
+    #[event("operator_cancelled_event")]
+    fn operator_cancelled_event(
         &self,
         #[indexed] proposal_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] target: &ManagedAddress,
         data: ProposalEventData<Self::Api>,
     );
 
-    #[event("multisig_proposal_executed_event")]
-    fn multisig_proposal_executed_event(
+    #[event("operator_proposal_executed_event")]
+    fn operator_proposal_executed_event(
         &self,
         #[indexed] proposal_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] target: &ManagedAddress,
         data: ProposalEventData<Self::Api>,
     );
 
-    #[event("multisig_execute_proposal_success_event")]
-    fn multisig_execute_proposal_success_event(
+    #[event("operator_execute_proposal_success_event")]
+    fn operator_execute_proposal_success_event(
         &self,
         #[indexed] proposal_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] results: MultiValueEncoded<ManagedBuffer>,
     );
 
-    #[event("multisig_execute_proposal_error_event")]
-    fn multisig_execute_proposal_error_event(
+    #[event("operator_execute_proposal_error_event")]
+    fn operator_execute_proposal_error_event(
         &self,
         #[indexed] proposal_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] err_code: u32,
         err_message: ManagedBuffer,
     );
 
-    #[event("multisig_transferred_event")]
-    fn multisig_transferred_event(
+    #[event("operatorship_transferred_event")]
+    fn operatorship_transferred_event(
         &self,
         #[indexed] old_multisig: &ManagedAddress,
         new_multisig: &ManagedAddress,

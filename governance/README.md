@@ -23,11 +23,12 @@ This contract will be used instead of a multisig to manage the Gateway contract.
 
 The most used endpoints are:
 - **executeProposal** (target, call_data, native_value) - can be called by anyone (most likely a Relayer) to execute a proposal after it was approved
+- **executeOperatorProposal** (target, call_data, native_value) - can be called by an operator (most likely a Multisig contract) to execute operator proposals, which can be executed without timelock
 - **execute** (source_chain, message_id, source_address, payload) - can be called only cross-chain from the source chain and source contract configured on deployment
 
 These endpoints look like this:
 ```rust
-    #[payable("EGLD")]
+#[payable("*")]
 #[endpoint(executeProposal)]
 fn execute_proposal(
     &self,
@@ -37,12 +38,24 @@ fn execute_proposal(
 );
 ```
 
-Where **call_data** is of type **GasPaidForContractCallData** as **top encoded bytes**:
+```rust
+#[payable("*")]
+#[endpoint(executeOperatorProposal)]
+fn execute_operator_proposal(
+    &self,
+    target: ManagedAddress,
+    call_data: ManagedBuffer,
+    native_value: BigUint,
+);
+```
+
+Where **call_data** is of type **DecodedCallData** as **top encoded bytes**:
 ```rust
 #[derive(TypeAbi, TopDecode)]
 pub struct DecodedCallData<M: ManagedTypeApi> {
     pub endpoint_name: ManagedBuffer<M>,
     pub arguments: ManagedVec<M, ManagedBuffer<M>>,
+    pub min_gas_limit: u64,
 }
 ```
 This contains all the information needed to Async call the **target** contract on MultiversX.
@@ -72,8 +85,10 @@ pub struct ExecutePayload<M: ManagedTypeApi> {
 And **GovernanceCommand** is an enum currently with 2 types of commands supported:
 ```rust
 #[derive(TypeAbi, TopDecode, NestedDecode)]
-pub enum GovernanceCommand {
+pub enum ServiceGovernanceCommand {
     ScheduleTimeLockProposal,
     CancelTimeLockProposal,
+    ApproveOperatorProposal,
+    CancelOperatorApproval,
 }
 ```

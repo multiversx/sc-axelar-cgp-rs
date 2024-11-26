@@ -39,7 +39,7 @@ const baseKvs = () => {
     e.kvs.Mapper('minimum_time_lock_delay').Value(e.U64(10)),
     e.kvs.Mapper('governance_chain').Value(e.Str(GOVERNANCE_CHAIN)),
     e.kvs.Mapper('governance_address').Value(e.Str(GOVERNANCE_ADDRESS)),
-    e.kvs.Mapper('multisig').Value(deployer),
+    e.kvs.Mapper('operator').Value(deployer),
   ];
 };
 
@@ -223,7 +223,7 @@ describe('Execute proposal', () => {
     }).assertFail({ code: 4, message: 'Could not decode call data' });
   });
 
-  test('Execute proposal esdt', async () => {
+  test('Esdt transfer', async () => {
     await deployContract();
 
     const user = await world.createWallet();
@@ -447,7 +447,7 @@ describe('Execute proposal', () => {
     });
   });
 
-  test('Execute proposal upgrade gateway esdt error', async () => {
+  test('Upgrade gateway esdt error', async () => {
     await deployContract();
 
     const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
@@ -491,6 +491,7 @@ describe('Execute proposal', () => {
       ],
       esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
     }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
+
     await deployer.callContract({
       callee: contract,
       gasLimit: 50_000_000,
@@ -641,7 +642,7 @@ describe('Execute proposal', () => {
   });
 });
 
-describe('Execute multisig proposal', () => {
+describe('Execute operator proposal', () => {
   test('Errors', async () => {
     await deployContract();
 
@@ -654,7 +655,7 @@ describe('Execute multisig proposal', () => {
     await user.callContract({
       callee: contract,
       gasLimit: 100_000_000,
-      funcName: 'executeMultisigProposal',
+      funcName: 'executeOperatorProposal',
       funcArgs: [
         gateway,
         wrongCallData,
@@ -665,7 +666,7 @@ describe('Execute multisig proposal', () => {
     await deployer.callContract({
       callee: contract,
       gasLimit: 100_000_000,
-      funcName: 'executeMultisigProposal',
+      funcName: 'executeOperatorProposal',
       funcArgs: [
         gateway,
         wrongCallData,
@@ -685,20 +686,105 @@ describe('Execute multisig proposal', () => {
       kvs: [
         ...baseKvs(),
 
-        e.kvs.Mapper('multisig_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
       ],
     });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 100_000_000,
-      funcName: 'executeMultisigProposal',
+      funcName: 'executeOperatorProposal',
       funcArgs: [
         gateway,
         wrongCallData,
         e.U(0),
       ],
     }).assertFail({ code: 4, message: 'Could not decode call data' });
+  });
+
+  test('Esdt transfer', async () => {
+    await deployContract();
+
+    const user = await world.createWallet();
+
+    const callData = e.TopBuffer(e.Tuple(
+      e.Str('MultiESDTNFTTransfer'),
+      e.List(
+        e.Buffer(user.toTopU8A()),
+        e.Buffer(e.U32(1).toTopU8A()),
+        e.Str(TOKEN_ID),
+        e.Buffer(e.U64(1).toTopU8A()),
+        e.Buffer(e.U(1_000).toTopU8A()),
+      ), // arguments to MultiESDTNFTTransfer function
+      e.U64(10_000_000), // min gas limit
+    ).toTopU8A());
+
+    const proposalHash = getProposalHash(contract, callData, e.U(0));
+
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    // Async call actually fails
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 50_000_000,
+      funcName: 'executeOperatorProposal',
+      funcArgs: [
+        contract,
+        callData,
+        e.U(0),
+      ],
+    });
+
+    // Operator approval was NOT deleted
+    assertAccount(await contract.getAccountWithKvs(), {
+      balance: 0n,
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    // Assert deployer still has the tokens
+    assertAccount(await deployer.getAccountWithKvs(), {
+      kvs: [
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
+      ],
+    });
+
+    // Deployer needs to send correct tokens
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 200_000_000,
+      funcName: 'executeOperatorProposal',
+      funcArgs: [
+        contract,
+        callData,
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
+    });
+
+    // Operator apporval was deleted
+    assertAccount(await contract.getAccountWithKvs(), {
+      balance: 0n,
+      kvs: baseKvs(),
+    });
+
+    // Assert user received tokens
+    assertAccount(await user.getAccountWithKvs(), {
+      kvs: [
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
+      ],
+    });
   });
 
   test('Upgrade gateway', async () => {
@@ -715,7 +801,7 @@ describe('Execute multisig proposal', () => {
         e.Buffer('0100'), // upgrade metadata (upgradable)
         e.Buffer(newOperator.toTopU8A()), // Arguments to upgrade function fo Gateway
       ),
-      e.U64(0),
+      e.U64(20_000_000), // min gas limit
     ).toTopU8A());
 
     const proposalHash = getProposalHash(gateway, callData, e.U(0));
@@ -726,25 +812,25 @@ describe('Execute multisig proposal', () => {
       kvs: [
         ...baseKvs(),
 
-        e.kvs.Mapper('multisig_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
       ],
     });
 
     await deployer.callContract({
       callee: contract,
-      gasLimit: 30_000_000,
-      funcName: 'executeMultisigProposal',
+      gasLimit: 50_000_000,
+      funcName: 'executeOperatorProposal',
       funcArgs: [
         gateway,
         callData,
         e.U(0),
       ],
-    }).assertFail({ code: 4, message: 'Not enough gas left for async call' });
+    }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 200_000_000,
-      funcName: 'executeMultisigProposal',
+      funcName: 'executeOperatorProposal',
       funcArgs: [
         gateway,
         callData,
@@ -752,7 +838,7 @@ describe('Execute multisig proposal', () => {
       ],
     });
 
-    // Multisig approval was deleted
+    // Operator approval was deleted
     assertAccount(await contract.getAccountWithKvs(), {
       balance: 0n,
       kvs: baseKvs(),
@@ -776,10 +862,10 @@ describe('Execute multisig proposal', () => {
         e.Buffer('0100'), // upgrade metadata (upgradable)
         e.Str('wrongArgs'),
       ),
-      e.U64(0),
+      e.U64(1_000_000), // min gas limit
     ).toTopU8A());
 
-    const proposalHash = getProposalHash(gateway, callData, e.U(0));
+    const proposalHash = getProposalHash(gateway, callData, e.U(1_000));
 
     // Mock hash
     await contract.setAccount({
@@ -787,42 +873,170 @@ describe('Execute multisig proposal', () => {
       kvs: [
         ...baseKvs(),
 
-        e.kvs.Mapper('multisig_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
       ],
     });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 50_000_000,
-      funcName: 'executeMultisigProposal',
+      funcName: 'executeOperatorProposal',
+      value: 1_000,
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(1_000),
+      ],
+    }); // async call actually fails
+
+    // Operator approval NOT deleted and refund token was created
+    let kvs = await contract.getAccountWithKvs();
+    assertAccount(kvs, {
+      balance: 1_000, // EGLD still in contract
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000)),
+      ],
+    });
+
+    // Operator can withdraw his funds in case of failure
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 50_000_000,
+      funcName: 'withdrawRefundToken',
+      funcArgs: [
+        e.Tuple(e.Str('EGLD'), e.U64(0)),
+      ],
+    });
+
+    assertAccount(await deployer.getAccountWithKvs(), {
+      balance: 10_000_000_000n, // got egld back
+    });
+  });
+
+  test('Upgrade gateway esdt error', async () => {
+    await deployContract();
+
+    const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
+
+    const callData = e.TopBuffer(e.Tuple(
+      e.Str('upgradeContract'),
+      e.List(
+        e.Buffer(gatewayCode), // code
+        e.Buffer('0100'), // upgrade metadata (upgradable)
+        e.Str('wrongArgs'),
+      ),
+      e.U64(1_000_000), // min gas limit
+    ).toTopU8A());
+
+    const proposalHash = getProposalHash(
+      gateway,
+      callData,
+      e.U(0),
+    );
+
+    // Mock hash
+    await contract.setAccount({
+      ...await contract.getAccountWithKvs(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 47_000_000,
+      funcName: 'executeOperatorProposal',
       funcArgs: [
         gateway,
         callData,
         e.U(0),
       ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
+    }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 50_000_000,
+      funcName: 'executeOperatorProposal',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ], esdts: [{ id: TOKEN_ID, amount: 500, nonce: 1 }],
     }); // async call actually fails
 
-    // Multisig approval was NOT deleted
+    // Operator approval was NOT deleted and refund token was created
     let kvs = await contract.getAccountWithKvs();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
         ...baseKvs(),
 
-        e.kvs.Mapper('multisig_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(500)),
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 500, nonce: 1 }]), // esdt still in contract
+      ],
+    });
+
+    // Try to execute again
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 50_000_000,
+      funcName: 'executeOperatorProposal',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 500, nonce: 1 }],
+    }); // async call actually fails
+
+    // Amount was added to refund token
+    assertAccount(await contract.getAccountWithKvs(), {
+      balance: 0n,
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(1_000)),
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
+      ],
+    });
+
+    // Operator can withdraw his funds in case of failure
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 50_000_000,
+      funcName: 'withdrawRefundToken',
+      funcArgs: [
+        e.Tuple(e.Str(TOKEN_ID), e.U64(1)),
+      ],
+    });
+
+    assertAccount(await deployer.getAccountWithKvs(), {
+      balance: 10_000_000_000n,
+      kvs: [
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]), // got esdt back
       ],
     });
   });
 
-  test('Transfer multisig', async () => {
+  test('Transfer operatorship', async () => {
     await deployContract();
 
-    const newMultisig = await world.createWallet();
+    const newOperator = await world.createWallet();
 
     const callData = e.TopBuffer(e.Tuple(
-      e.Str('transferMultisig'),
+      e.Str('transferOperatorship'),
       e.List(
-        e.Buffer(newMultisig.toTopU8A()), // Arguments to transferMultisig function
+        e.Buffer(newOperator.toTopU8A()), // Arguments to transferOperator function
       ),
       e.U64(0),
     ).toTopU8A());
@@ -835,14 +1049,14 @@ describe('Execute multisig proposal', () => {
       kvs: [
         ...baseKvs(),
 
-        e.kvs.Mapper('multisig_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
       ],
     });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 200_000_000,
-      funcName: 'executeMultisigProposal',
+      funcName: 'executeOperatorProposal',
       funcArgs: [
         contract,
         callData,
@@ -850,13 +1064,13 @@ describe('Execute multisig proposal', () => {
       ],
     });
 
-    // Multisig approval was deleted and multisig was changed
+    // Operator approval was deleted and operator was changed
     assertAccount(await contract.getAccountWithKvs(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
 
-        e.kvs.Mapper('multisig').Value(newMultisig),
+        e.kvs.Mapper('operator').Value(newOperator),
       ],
     });
   });
@@ -926,14 +1140,14 @@ test('Withdraw', async () => {
   });
 });
 
-test('Transfer multisig', async () => {
+test('Transfer operatorship', async () => {
   await deployContract();
 
   const user = await world.createWallet();
 
   await user.callContract({
     callee: contract,
-    funcName: 'transferMultisig',
+    funcName: 'transferOperatorship',
     gasLimit: 10_000_000,
     funcArgs: [
       user,
@@ -942,25 +1156,25 @@ test('Transfer multisig', async () => {
 
   await deployer.callContract({
     callee: contract,
-    funcName: 'transferMultisig',
+    funcName: 'transferOperatorship',
     gasLimit: 10_000_000,
     funcArgs: [
       user,
     ],
   });
 
-  // Multisig was changed
+  // Operator was changed
   assertAccount(await contract.getAccountWithKvs(), {
     kvs: [
       ...baseKvs(),
 
-      e.kvs.Mapper('multisig').Value(user),
+      e.kvs.Mapper('operator').Value(user),
     ],
   });
 
-  // Need to call transferMultisig through executeProposal
+  // Need to call transferOperatorship through executeProposal
   const callData = e.TopBuffer(e.Tuple(
-    e.Str('transferMultisig'),
+    e.Str('transferOperatorship'),
     e.List(
       e.Buffer(deployer.toNestU8A()),
     ),
@@ -996,7 +1210,7 @@ test('Transfer multisig', async () => {
     ],
   });
 
-  // Time lock eta was deleted and multisig was set back to deployer
+  // Time lock eta was deleted and operator was set back to deployer
   let kvs = await contract.getAccountWithKvs();
   assertAccount(kvs, {
     kvs: [
