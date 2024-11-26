@@ -74,15 +74,15 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
             WeightedSigners::<Self::Api>::top_decode(new_signers)
                 .unwrap_or_else(|_| sc_panic!("Could not decode new signers"));
 
-        let enfore_rotation_delay = self.blockchain().get_caller() != self.operator().get();
+        let enforce_rotation_delay = self.blockchain().get_caller() != self.operator().get();
         let is_latest_signers = self.validate_proof(data_hash, proof);
 
         require!(
-            !enfore_rotation_delay || is_latest_signers,
+            !enforce_rotation_delay || is_latest_signers,
             "Not latest signers"
         );
 
-        self.rotate_signers_raw(new_signers, enfore_rotation_delay);
+        self.rotate_signers_raw(new_signers, enforce_rotation_delay);
     }
 
     /// Public Methods
@@ -107,28 +107,30 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
     #[endpoint(validateMessage)]
     fn validate_message(
         &self,
-        source_chain: &ManagedBuffer,
-        message_id: &ManagedBuffer,
+        source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: &ManagedBuffer,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
-        let command_id = self.message_to_command_id(source_chain, message_id);
-
-        let message_hash = self.message_hash(
+        let cross_chain_id = CrossChainId {
             source_chain,
             message_id,
+        };
+
+        let message_hash = self.message_hash(
+            &cross_chain_id,
             source_address,
             &self.blockchain().get_caller(),
             payload_hash,
         );
 
-        let messages_mapper = self.messages(&command_id);
+        let messages_mapper = self.messages(&cross_chain_id);
         let valid = messages_mapper.get() == MessageState::Approved(message_hash);
 
         if valid {
             messages_mapper.set(MessageState::Executed);
 
-            self.message_executed_event(&command_id, source_chain, message_id);
+            self.message_executed_event(&cross_chain_id.source_chain, &cross_chain_id.message_id);
         }
 
         valid
@@ -137,17 +139,19 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
     // Self Functions
 
     fn approve_message(&self, message: Message<Self::Api>) {
-        let command_id = self.message_to_command_id(&message.source_chain, &message.message_id);
+        let cross_chain_id = CrossChainId {
+            source_chain: message.source_chain,
+            message_id: message.message_id,
+        };
 
-        let messages_mapper = self.messages(&command_id);
+        let messages_mapper = self.messages(&cross_chain_id);
 
         if messages_mapper.get() != MessageState::NonExistent {
             return;
         }
 
         let message_hash = self.message_hash(
-            &message.source_chain,
-            &message.message_id,
+            &cross_chain_id,
             &message.source_address,
             &message.contract_address,
             &message.payload_hash,
@@ -156,9 +160,8 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
         messages_mapper.set(MessageState::Approved(message_hash));
 
         self.message_approved_event(
-            &command_id,
-            message.source_chain,
-            message.message_id,
+            cross_chain_id.source_chain,
+            cross_chain_id.message_id,
             message.source_address,
             message.contract_address,
             message.payload_hash,
@@ -167,19 +170,25 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
 
     fn message_hash(
         &self,
-        source_chain: &ManagedBuffer,
-        message_id: &ManagedBuffer,
+        cross_chain_id: &CrossChainId<Self::Api>,
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
         let mut encoded = ManagedBuffer::new();
 
-        encoded.append(source_chain);
-        encoded.append(message_id);
-        encoded.append(source_address);
-        encoded.append(contract_address.as_managed_buffer());
-        encoded.append(payload_hash.as_managed_buffer());
+        cross_chain_id
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode cross chain id"));
+        source_address
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode source address"));
+        contract_address
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode contract address"));
+        payload_hash
+            .dep_encode(&mut encoded)
+            .unwrap_or_else(|_| sc_panic!("Could not encode payload hash"));
 
         self.crypto().keccak256(encoded)
     }
@@ -199,58 +208,44 @@ pub trait Gateway: auth::AuthModule + operator::OperatorModule + events::Events 
         self.crypto().keccak256(encoded)
     }
 
-    fn message_to_command_id(
-        &self,
-        source_chain: &ManagedBuffer,
-        message_id: &ManagedBuffer,
-    ) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
-        // Axelar doesn't allow `sourceChain` to contain '_', hence this encoding is umambiguous
-        let mut encoded = ManagedBuffer::new();
-
-        encoded.append(source_chain);
-        encoded.append(&ManagedBuffer::from("_"));
-        encoded.append(message_id);
-
-        self.crypto().keccak256(encoded)
-    }
-
     #[view(isMessageApproved)]
     fn is_message_approved(
         &self,
-        source_chain: &ManagedBuffer,
-        message_id: &ManagedBuffer,
+        source_chain: ManagedBuffer,
+        message_id: ManagedBuffer,
         source_address: &ManagedBuffer,
         contract_address: &ManagedAddress,
         payload_hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> bool {
-        let command_id = self.message_to_command_id(source_chain, message_id);
-
-        let message_hash = self.message_hash(
+        let cross_chain_id = CrossChainId {
             source_chain,
             message_id,
+        };
+
+        let message_hash = self.message_hash(
+            &cross_chain_id,
             source_address,
             contract_address,
             payload_hash,
         );
 
-        self.messages(&command_id).get() == MessageState::Approved(message_hash)
+        self.messages(&cross_chain_id).get() == MessageState::Approved(message_hash)
     }
 
     #[view(isMessageExecuted)]
-    fn is_message_executed(
-        &self,
-        source_chain: &ManagedBuffer,
-        message_id: &ManagedBuffer,
-    ) -> bool {
-        self.messages(&self.message_to_command_id(source_chain, message_id))
-            .get()
-            == MessageState::Executed
+    fn is_message_executed(&self, source_chain: ManagedBuffer, message_id: ManagedBuffer) -> bool {
+        let cross_chain_id = CrossChainId {
+            source_chain,
+            message_id,
+        };
+
+        self.messages(&cross_chain_id).get() == MessageState::Executed
     }
 
     #[view(messages)]
     #[storage_mapper("messages")]
     fn messages(
         &self,
-        command_id: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        cross_chain_id: &CrossChainId<Self::Api>,
     ) -> SingleValueMapper<MessageState<Self::Api>>;
 }

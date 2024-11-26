@@ -153,7 +153,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
                 source_chain,
                 message_id,
                 source_address,
-                &self.blockchain().get_sc_address(),
+                self.blockchain().get_sc_address(),
                 payload_hash,
             )
             .execute_on_dest_context::<bool>()

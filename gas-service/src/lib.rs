@@ -236,8 +236,6 @@ pub trait GasService: events::Events {
         let tokens_vec = tokens.into_vec();
         let amounts_vec = amounts.into_vec();
 
-        let mut payments = ManagedVec::new();
-
         for index in 0..tokens_length {
             let token: EgldOrEsdtTokenIdentifier = tokens_vec.get(index);
             let amount = amounts_vec.get(index).clone_value();
@@ -251,12 +249,8 @@ pub trait GasService: events::Events {
                     self.send().direct_egld(receiver, &amount);
                 }
             } else if amount <= balance {
-                payments.push(EsdtTokenPayment::new(token.unwrap_esdt(), 0, amount));
+                self.send().direct_esdt(receiver, &token.unwrap_esdt(), 0, &amount)
             }
-        }
-
-        if !payments.is_empty() {
-            self.send().direct_multi(receiver, &payments);
         }
     }
 
@@ -288,7 +282,11 @@ pub trait GasService: events::Events {
 
     #[endpoint(setGasCollector)]
     fn set_gas_collector(&self, gas_collector: &ManagedAddress) {
-        self.require_only_collector();
+        let caller = self.blockchain().get_caller();
+        let collector = self.gas_collector().get();
+        let owner = self.blockchain().get_owner_address();
+
+        require!(caller == collector || caller == owner, "Not collector or owner");
 
         self.gas_collector().set(gas_collector);
     }

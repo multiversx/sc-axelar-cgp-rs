@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           11
+// Endpoints:                           13
 // Async Callback (empty):               1
 // Promise callbacks:                    1
-// Total number of exported functions:  15
+// Total number of exported functions:  17
 
 #![no_std]
 
@@ -24,6 +24,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         executeProposal => execute_proposal
         withdraw => withdraw
         execute => execute
+        withdrawRefundToken => withdraw_refund_token
         getProposalEta => get_proposal_eta
         gateway => gateway
         getMinimumTimeLockDelay => minimum_time_lock_delay
@@ -32,6 +33,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         getGovernanceChainHash => governance_chain_hash
         getGovernanceAddressHash => governance_address_hash
         getTimeLockEta => time_lock_eta
+        getRefundToken => refund_token
         execute_proposal_callback => execute_proposal_callback
     )
 }
