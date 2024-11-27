@@ -7,96 +7,108 @@
   "codePingPongInterchain": "file:ping-pong-interchain/output/ping-ping-interchain.wasm",
   "codeGovernance": "file:governance/output/governance.wasm",
   "codeHelloWorld": "file:interact/hello-world.wasm",
+  "previousSignersRetention": {
+    "devnet": 16,
+    "mainnet": 16
+  },
   "domainSeparator": {
     "devnet": "209d8e45d084f6d3171d9e862bce4c3b17bf03ab71a687406c111f55b8dceb76",
-    "testnet": "",
+    "mainnet": ""
+  },
+  "minimumRotationDelay": {
+    "devnet": 3600,
+    "mainnet": 7200
+  },
+  "operator": {
+    "devnet": "erd1wavgcxq9tfyrw49k3s3h34085mayu82wqvpd4h6akyh8559pkklsknwhwh",
+    "mainnet": ""
+  },
+  "gasCollector": {
+    "devnet": "erd1medg4x6ft60dmf94kl7zm24ten928mnk5pfkpfny9cakc6n84pxszdgjht",
     "mainnet": ""
   },
   "governance": {
     "chain": {
-      "devnet": "Axelar",
-      "testnet": "",
+      "devnet": "axelar",
       "mainnet": ""
     },
     "address": {
-      "devnet": "axelar1u5jhn5876mjzmgw7j37mdvqh4qp5y6z2gc6rc3",
-      "testnet": "",
+      "devnet": "axelar1zlr7e5qf3sz7yf890rkh9tcnu87234k6k7ytd9",
       "mainnet": ""
     },
     "minimumTimeDelay": {
       "devnet": 7200,
-      "testnet": 7200,
       "mainnet": 172800
     }
   },
-  "gasCollector": {
-    "devnet": "erd1medg4x6ft60dmf94kl7zm24ten928mnk5pfkpfny9cakc6n84pxszdgjht",
-    "testnet": "",
-    "mainnet": ""
+  "axelar": {
+    "devnet": {
+      "rpc": "http://devnet-amplifier.axelar.dev:26657",
+      "chainName": "multiversx",
+      "contracts": {
+        "VotingVerifier": {
+          "codeId": "",
+          "address": "axelar1sejw0v7gmw3fv56wqr2gy00v3t23l0hwa4p084ft66e8leap9cqq9qlw4t"
+        },
+        "Gateway": {
+          "codeId": "",
+          "address": "axelar1gzlxntvtkatgnf3shfcgc8alqqljjtmx75vezqrt97cpw5mpeasqlc0j84"
+        },
+        "MultisigProver": {
+          "codeId": "",
+          "address": "axelar1x3wz8zzretn0dp5qxf0p8qynkpczv6hc2x0r8v2guray3t3573hqflslxd",
+          "initialSignerSetId": "3284c2448e337f5079d8573585359923598c805a81efede05eac510f79c9be0e"
+        }
+      }
+    },
+    "mainnet": {}
   },
   "addressGateway": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqvkhh6ex5m0sl0rgxn5790ljsscye0r48kkls7hrlaw",
-    "testnet": "",
+    "devnet": "erd1qqqqqqqqqqqqqpgqvaj9w3g006wgj7avhen3au27datwgk63kklszcamgw",
     "mainnet": ""
   },
   "addressGasService": {
-    "devnet": "erd1qqqqqqqqqqqqqpgq8fmglw6pngxsczmpa0kr3904shnclzsukklsjeykne",
-    "testnet": "",
+    "devnet": "erd1qqqqqqqqqqqqqpgqvr340nazahl2r0q7dnqvyakuk909yjvukklsuzx4ar",
     "mainnet": ""
   },
   "addressBaseTokenManager": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqqwnfjq9zmyxphd7sql6ud9tk4a0xj33lkklsqnlru6",
-    "testnet": "",
+    "devnet": "",
     "mainnet": ""
   },
   "addressIts": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqcv3rhjjrqpl88es4q25lw03hfhpw6s36kklsn6t9a6",
-    "testnet": "",
+    "devnet": "",
     "mainnet": ""
   },
   "addressInterchainTokenFactory": {
-    "devnet": "erd1qqqqqqqqqqqqqpgq0mhy244pyr9pzdhahvvyze4rw3xl29q4kklszyzq72",
-    "testnet": "",
+    "devnet": "",
     "mainnet": ""
   },
   "addressGovernance": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqspavr3yujrkq3nge27vmkh2kzxj98zzskkls0gjk47",
-    "testnet": "",
+    "devnet": "",
     "mainnet": ""
   },
   "addressPingPongInterchain": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqf66fr098unjekvmn6ezrfe4r82zt50ggkklsgfce63",
-    "testnet": "",
+    "devnet": "",
     "mainnet": ""
   },
   "addressPingPong": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqswka88982f9uk2t4qxw2r60fs20nd7uwkklsemapa9",
-    "testnet": "",
+    "devnet": "",
     "mainnet": ""
   },
   "addressHelloWorld": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqe5p3cgezy9wdvxa2u8wej9dakq5fjr0qkklsrzk3er"
+    "devnet": ""
   },
   "knownTokens": {
     "devnet": {
       "EGLD": {
-        "tokenId": "a5c60f3b87f8bd9ae6d97755143b9842902b228c46beb7abf63f12e0904c19b1",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqzaxt2e4630kpp6uxg5hl6yfefls72us0kklsxhl8fk"
+        "tokenId": "",
+        "tokenManager": ""
       },
-      "ITSTT-56fc4e": {
-        "tokenId": "9beb1db4db80c00d179db0f03a8ed4e0a3f868bc7a3a01ba7773cc157812a729",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqyv58myla28ql7ufg5dlanwzed97jhy40kklsyk4666"
-      },
-      "SYMBOL-9c7411": {
-        "tokenId": "bbee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqlnvua4qchnsfj7xrfd9vmlg9mqeky5erkklsmzqcl4"
-      },
-      "ITSTT-9a9969": {
-        "tokenId": "aaee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqaeu63py0unche3mwl2u8nmm38ff8kf4hkklsrjkh6q"
+      "MEX-a659d0": {
+        "tokenId": "",
+        "tokenManager": ""
       }
     },
-    "testnet": {},
     "mainnet": {}
   }
 }

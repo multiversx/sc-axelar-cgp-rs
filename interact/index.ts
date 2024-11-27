@@ -3,20 +3,11 @@ import { envChain } from 'xsuite/interact';
 import { World } from 'xsuite/world';
 // @ts-ignore
 import data from './data.json';
-import { d, e } from 'xsuite/data';
-import {
-  ALICE_PUB_KEY,
-  BOB_PUB_KEY,
-  CAROL_PUB_KEY,
-  generateMessageSignature,
-  generateProof, generateRotateSignersSignature,
-  getKeccak256Hash,
-  getSignersHashAndEncodable,
-  MOCK_CONTRACT_ADDRESS_2,
-} from '../tests/helpers';
+import { e } from 'xsuite/data';
+import { ADDRESS_ZERO } from '../tests/helpers';
 import { setupITSCommands } from './its';
-import { Buffer } from 'buffer';
 import { setupTestCommands } from './test';
+import { getCurrentWeightedSigners } from './helpers/axelar-utils';
 
 export const world = World.new({
   proxyUrl: envChain.publicProxyUrl(),
@@ -31,25 +22,7 @@ export const program = new Command();
 setupITSCommands(program);
 setupTestCommands(program);
 
-export const [firstSigners, firstSignersHash] = getSignersHashAndEncodable(
-  [
-    { signer: ALICE_PUB_KEY, weight: 10 },
-  ],
-  10,
-  0,
-);
-
-const [latestSigners, latestSignersHash] = getSignersHashAndEncodable(
-  [
-    { signer: ALICE_PUB_KEY, weight: 5 },
-    { signer: BOB_PUB_KEY, weight: 6 },
-    { signer: CAROL_PUB_KEY, weight: 7 },
-  ],
-  10,
-  1,
-);
-
-program.command('deploy').action(async () => {
+program.command('deployInitial').action(async () => {
   const wallet = await loadWallet();
 
   const resultGateway = await wallet.deployContract({
@@ -57,12 +30,10 @@ program.command('deploy').action(async () => {
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
-      e.U(16),
+      e.U(envChain.select(data.previousSignersRetention)),
       e.TopBuffer(envChain.select(data.domainSeparator)),
-      e.U64(3600),
-      wallet,
-      firstSigners,
-      latestSigners,
+      e.U64(envChain.select(data.minimumRotationDelay)),
+      e.Addr(envChain.select(data.operator)),
     ],
   });
   console.log('Result Gateway:', resultGateway);
@@ -80,6 +51,28 @@ program.command('deploy').action(async () => {
 
   console.log('Deployed Gateway Contract:', resultGateway.address);
   console.log('Deployed Gas Service Contract:', resultGasService.address);
+});
+
+program.command('deployGatewaySigners').action(async () => {
+  const wallet = await loadWallet();
+
+  const existingGateway = world.newContract(e.Addr(envChain.select(data.addressGateway)));
+  const existingGatewayAccount = await existingGateway.getAccount();
+
+  const { signers, verifierSetId } = await getCurrentWeightedSigners();
+
+  const result = await wallet.upgradeContract({
+    callee: envChain.select(data.addressGateway),
+    code: existingGatewayAccount.code, // re-use existing gateway code
+    codeMetadata: existingGatewayAccount.codeMetadata,
+    gasLimit: 100_000_000,
+    codeArgs: [
+      e.Addr(ADDRESS_ZERO), // don't change operator
+      signers,
+    ],
+  });
+  console.log('Result Gateway Signers:', result);
+  console.log('Set initial signer set to:', verifierSetId);
 });
 
 program.command('deployGovernance').action(async () => {
@@ -120,149 +113,5 @@ program.command('deployGovernance').action(async () => {
 
   console.log('Deployed Governance Contract:', resultGovernance.address);
 });
-
-program.command('upgrade').action(async () => {
-  const wallet = await loadWallet();
-
-  let result = await wallet.upgradeContract({
-    callee: envChain.select(data.addressGasService),
-    code: data.codeGasService,
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [],
-  });
-  console.log('Result Gas Service:', result);
-
-  result = await wallet.upgradeContract({
-    callee: envChain.select(data.addressGateway),
-    code: data.codeGateway,
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [],
-  });
-  console.log('Result Gateway:', result);
-});
-
-program.command('callContract').action(async () => {
-  const wallet = await loadWallet();
-  const result = await wallet.callContract({
-    callee: envChain.select(data.addressGateway),
-    funcName: 'callContract',
-    gasLimit: 10_000_000,
-    funcArgs: [
-      e.Str('ethereum-2'),
-      e.Str('0xFb7378D0997B0092bE6bBf278Ca9b8058C24752f'),
-      e.TopBuffer(Buffer.from(
-        '095ea7b30000000000000000000000004a24b5268a5d286f1602a965ac72913b997858d50000000000000000000000000000000000000000000000000000000000000000',
-        'hex',
-      )),
-    ],
-  });
-  console.log('Result:', result);
-});
-
-program.command('approveMessages').action(async () => {
-  const wallet = await loadWallet();
-
-  const message = e.Tuple(
-    e.Str('ethereum'),
-    e.Str('messageId'),
-    e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-    e.Addr(MOCK_CONTRACT_ADDRESS_2),
-    e.TopBuffer(getKeccak256Hash('payloadHash')),
-  );
-
-  const result = await wallet.callContract({
-    callee: envChain.select(data.addressGateway),
-    gasLimit: 15_000_000,
-    funcName: 'approveMessages',
-    funcArgs: [
-      e.List(message),
-      generateProof(
-        firstSigners, [
-          generateMessageSignature(firstSignersHash, e.List(message)),
-        ],
-      ),
-    ],
-  });
-  console.log('Result:', result);
-});
-
-program.command('rotateSigners')
-  .argument('[valid]', '', false)
-  .action(async (latest: boolean = false) => {
-    const wallet = await loadWallet();
-
-    const createdAt = 2055833;
-
-    // This should be changed to a new value if we want the transaction to actually succeed
-    const [newSigners, newSignersHash] = getSignersHashAndEncodable(
-      [
-        { signer: '0657816ab49e697cf1573c442eb93ffb470bfff7bbae6fc3151de5ce2373700e', weight: 1 },
-        { signer: '2c61dd97791628ef5570f4eb96c458f8b07604580e99c431fe1ee4f8e3507525', weight: 1 },
-        { signer: '2ea16de592f6c6ca0593c9f0e4f3bb754ccc0d35fe40b56b4edd43bb29abe61d', weight: 1 },
-      ],
-      2,
-      createdAt,
-    );
-
-    let proof;
-    if (latest) {
-      proof = generateProof(
-        latestSigners, [
-          generateRotateSignersSignature(latestSignersHash, newSigners),
-          generateRotateSignersSignature(latestSignersHash, newSigners, './bob.pem'),
-          null,
-        ],
-      );
-    } else {
-      // Operator (wallet) can still rotate signers anyway
-      proof = generateProof(
-        firstSigners, [
-          generateRotateSignersSignature(firstSignersHash, newSigners),
-        ],
-      );
-    }
-
-    const result = await wallet.callContract({
-      callee: envChain.select(data.addressGateway),
-      gasLimit: 20_000_000,
-      funcName: 'rotateSigners',
-      funcArgs: [
-        newSigners,
-        proof,
-      ],
-    });
-    console.log('Result:', result);
-  });
-
-program.command('isMessageApproved')
-  .action(async () => {
-    const result = await world.query({
-      callee: e.Addr(envChain.select(data.addressGateway)),
-      funcName: 'isMessageApproved',
-      funcArgs: [
-        e.Str('ethereum'),
-        e.Str('messageId'),
-        e.Str('0x4976da71bF84D750b5451B053051158EC0A4E876'),
-        e.Addr(MOCK_CONTRACT_ADDRESS_2),
-        e.TopBuffer(getKeccak256Hash('payloadHash')),
-      ],
-    });
-    console.log('Result:', d.Bool().fromTop(result.returnData[0]));
-  });
-
-program.command('isMessageExecuted')
-  .action(async () => {
-    const result = await world.query({
-      callee: e.Addr(envChain.select(data.addressGateway)),
-      funcName: 'isMessageExecuted',
-      funcArgs: [
-        e.Str('ethereum'),
-        e.Str('messageId'),
-      ],
-    });
-    console.log('Result:', d.Bool().topDecode(result.returnData[0]));
-  });
 
 program.parse(process.argv);
