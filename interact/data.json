@@ -47,15 +47,15 @@
       "chainName": "multiversx",
       "contracts": {
         "VotingVerifier": {
-          "codeId": "",
+          "codeId": "866",
           "address": "axelar1sejw0v7gmw3fv56wqr2gy00v3t23l0hwa4p084ft66e8leap9cqq9qlw4t"
         },
         "Gateway": {
-          "codeId": "",
+          "codeId": "616",
           "address": "axelar1gzlxntvtkatgnf3shfcgc8alqqljjtmx75vezqrt97cpw5mpeasqlc0j84"
         },
         "MultisigProver": {
-          "codeId": "",
+          "codeId": "867",
           "address": "axelar1x3wz8zzretn0dp5qxf0p8qynkpczv6hc2x0r8v2guray3t3573hqflslxd",
           "initialSignerSetId": "3284c2448e337f5079d8573585359923598c805a81efede05eac510f79c9be0e"
         }
@@ -96,7 +96,7 @@
     "mainnet": ""
   },
   "addressHelloWorld": {
-    "devnet": ""
+    "devnet": "erd1qqqqqqqqqqqqqpgqr5ytd20lqhqqephlf7pd298yeucy85aakklsrx6yle"
   },
   "knownTokens": {
     "devnet": {

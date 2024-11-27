@@ -36,7 +36,7 @@ export const setupTestCommands = (program: Command) => {
         callee: envChain.select(data.addressHelloWorld),
         funcName: 'setRemoteValue',
         gasLimit: 20_000_000,
-        value: 1000000000000000n, // 0.001 EGLD
+        value: 10000000000000000n, // 0.01 EGLD
         funcArgs: [
           e.Str(destinationChain),
           e.Str(destinationAddress),
