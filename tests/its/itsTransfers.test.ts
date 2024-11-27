@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
-import { INTERCHAIN_TOKEN_ID, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
+import {
+  INTERCHAIN_TOKEN_ID,
+  OTHER_CHAIN_ADDRESS,
+  OTHER_CHAIN_NAME,
+  TOKEN_ID,
+  TOKEN_ID2,
+  TOKEN_ID_EGLD,
+} from '../helpers';
 import {
   deployContracts,
   gasService,
@@ -533,7 +540,45 @@ describe('Interchain transfer', () => {
     });
   });
 
-  // TODO: Add test with EGLD in MultiESDT after xSuite supports it
+  test('Gas token esdt + egld', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(100),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID_EGLD, amount: 100 },
+      ],
+    });
+
+    // Assert EGLD gas was paid for cross chain call
+    let kvs = await gasService.getAccount();
+    assertAccount(kvs, {
+      balance: 100,
+      kvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccount();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      kvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
+  });
 });
 
 describe('Call contract with interchain token', () => {
@@ -892,5 +937,43 @@ describe('Call contract with interchain token', () => {
     });
   });
 
-  // TODO: Add test with EGLD in MultiESDT after xSuite supports it
+  test('Gas token esdt + egld', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(100),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID_EGLD, amount: 100 },
+      ],
+    });
+
+    // Assert EGLD gas was paid for cross chain call
+    let kvs = await gasService.getAccount();
+    assertAccount(kvs, {
+      balance: 100,
+      kvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccount();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      kvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
+  });
 });

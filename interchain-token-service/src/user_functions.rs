@@ -274,6 +274,7 @@ pub trait UserFunctionsModule:
 
                 let second_payment = esdts.try_get(1);
 
+                // If only one ESDT is set, substract gas amount from amount sent
                 if second_payment.is_none() {
                     require!(amount > gas_amount, "Invalid gas value");
 
@@ -293,6 +294,7 @@ pub trait UserFunctionsModule:
                 );
                 require!(second_payment.amount == gas_amount, "Invalid gas value");
 
+                // If two ESDTs were sent, check if EGLD was sent in MultiESDT and convert to EGLD identifier
                 let gas_token = if second_payment.token_identifier.as_managed_buffer()
                     == &ManagedBuffer::from(ESDT_EGLD_IDENTIFIER)
                 {
