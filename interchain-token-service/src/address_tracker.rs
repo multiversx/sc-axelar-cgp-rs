@@ -1,7 +1,5 @@
 multiversx_sc::imports!();
 
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 #[multiversx_sc::module]
 pub trait AddressTracker {
     #[only_owner]
@@ -14,9 +12,6 @@ pub trait AddressTracker {
 
         self.trusted_address(chain).set(address.clone());
 
-        let address_hash = self.crypto().keccak256(address);
-        self.trusted_address_hash(chain).set(address_hash);
-
         self.trusted_address_added_event(chain, address);
     }
 
@@ -26,7 +21,6 @@ pub trait AddressTracker {
         require!(!source_chain.is_empty(), "Zero string length");
 
         self.trusted_address(source_chain).clear();
-        self.trusted_address_hash(source_chain).clear();
 
         self.trusted_address_removed_event(source_chain);
     }
@@ -36,10 +30,7 @@ pub trait AddressTracker {
     }
 
     fn is_trusted_address(&self, chain: &ManagedBuffer, address: &ManagedBuffer) -> bool {
-        let source_address_hash = self.crypto().keccak256(address);
-
-        !self.trusted_address_hash(chain).is_empty()
-            && source_address_hash == self.trusted_address_hash(chain).get()
+        !self.trusted_address(chain).is_empty() && address == &self.trusted_address(chain).get()
     }
 
     #[view(chainName)]
@@ -49,13 +40,6 @@ pub trait AddressTracker {
     #[view(trustedAddress)]
     #[storage_mapper("trusted_address")]
     fn trusted_address(&self, chain_name: &ManagedBuffer) -> SingleValueMapper<ManagedBuffer>;
-
-    #[view(trustedAddressHash)]
-    #[storage_mapper("trusted_address_hash")]
-    fn trusted_address_hash(
-        &self,
-        chain_name: &ManagedBuffer,
-    ) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
 
     #[event("trusted_address_added_event")]
     fn trusted_address_added_event(

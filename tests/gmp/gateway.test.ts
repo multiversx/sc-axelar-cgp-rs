@@ -1,5 +1,5 @@
 import { afterEach, assert, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSContract, LSWallet, LSWorld } from 'xsuite';
 import {
   ADDRESS_ZERO,
   ALICE_PUB_KEY,
@@ -20,14 +20,14 @@ import {
 } from '../helpers';
 import { deployPingPongInterchain, pingPong } from '../itsHelpers';
 
-let world: SWorld;
-let deployer: SWallet;
-let firstUser: SWallet;
-let contract: SContract;
+let world: LSWorld;
+let deployer: LSWallet;
+let firstUser: LSWallet;
+let contract: LSContract;
 let address: string;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -113,7 +113,7 @@ const deployContract = async () => {
     ],
   }));
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: baseKvs(),
   });
@@ -133,7 +133,7 @@ test('Init', async () => {
     ],
   }));
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: [
       e.kvs.Mapper('previous_signers_retention').Value(e.U(16)),
@@ -157,7 +157,7 @@ test('Upgrade', async () => {
     ],
   });
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: baseKvs(),
   });
@@ -213,7 +213,7 @@ test('Upgrade', async () => {
     getKeccak256Hash('nonce2'),
   );
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: [
       ...baseKvs(),
@@ -392,7 +392,7 @@ describe('Approve messages', () => {
     });
 
     // Nothing was actually changed
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: [
         ...baseKvs(),
@@ -446,7 +446,7 @@ describe('Approve messages', () => {
     });
 
     // Nothing was actually changed
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: [
         ...baseKvs(),
@@ -487,7 +487,7 @@ describe('Approve messages', () => {
       ],
     });
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: [
         ...baseKvs(),
@@ -860,7 +860,7 @@ describe('Rotate signers', () => {
       getKeccak256Hash('nonce2'),
     );
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
@@ -980,7 +980,7 @@ describe('Rotate signers', () => {
       getKeccak256Hash('nonce3'),
     );
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
@@ -1012,7 +1012,7 @@ test('Call contract', async () => {
   });
 
   // This only emits an event, and there is no way to test those currently...
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0,
     kvs: baseKvs(),
   });
@@ -1035,7 +1035,7 @@ describe('Validate message', () => {
     });
     assert(result.returnData[0] === '');
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: baseKvs(),
     });
@@ -1072,7 +1072,7 @@ describe('Validate message', () => {
     });
     assert(result.returnData[0] === '01');
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: [
         ...baseKvs(),
@@ -1118,7 +1118,7 @@ describe('Operator', () => {
       ],
     });
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       kvs: [
         ...baseKvs(),
 
@@ -1136,7 +1136,7 @@ describe('Operator', () => {
       ],
     });
 
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       kvs: baseKvs(),
     });
   });
@@ -1465,7 +1465,7 @@ test('Approve validate execute external contract', async () => {
     ],
   });
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0,
     kvs: [
       ...baseKvs(),
@@ -1523,7 +1523,7 @@ test('Approve validate execute external contract', async () => {
     ],
   });
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0,
     kvs: [
       ...baseKvs(),
@@ -1533,11 +1533,11 @@ test('Approve validate execute external contract', async () => {
     ],
   });
   // Other user received funds
-  assertAccount(await otherUser.getAccountWithKvs(), {
+  assertAccount(await otherUser.getAccount(), {
     balance: 1_000,
   });
   // Ping pong state was modified
-  assertAccount(await pingPong.getAccountWithKvs(), {
+  assertAccount(await pingPong.getAccount(), {
     balance: 0,
     kvs: [
       e.kvs.Mapper('interchain_token_service').Value(contract),
@@ -1647,7 +1647,7 @@ test('Approve messages with multisig prover encoded data', async () => {
     e.Str('0xff822c88807859ff226b58e24f24974a70f04b9442501ae38fd665b3c68f3834-0'),
   );
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0,
     kvs: [
       ...baseKvs(),
@@ -1746,7 +1746,7 @@ test('Rotate signers with multisig prover encoded data', async () => {
     ],
   });
 
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     balance: 0n,
     kvs: [
       ...baseKvs(),

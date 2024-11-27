@@ -13,25 +13,42 @@ pub const PREFIX_INTERCHAIN_TOKEN_ID: &[u8] = b"its-interchain-token-id";
 pub const MESSAGE_TYPE_INTERCHAIN_TRANSFER: u64 = 0;
 pub const MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN: u64 = 1;
 pub const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER: u64 = 2;
+pub const MESSAGE_TYPE_SEND_TO_HUB: u64 = 3;
+pub const MESSAGE_TYPE_RECEIVE_FROM_HUB: u64 = 4;
+
+/**
+ * Chain name where ITS Hub exists. This is used for routing ITS calls via ITS hub.
+ * This is set as a constant, since the ITS Hub will exist on Axelar.
+ */
+pub const ITS_HUB_CHAIN_NAME: &[u8] = b"axelar";
+/**
+ * Special identifier that the trusted address for a chain should be set to, which indicates if the ITS call
+ * for that chain should be routed via the ITS hub.
+ */
+pub const ITS_HUB_ROUTING_IDENTIFIER: &[u8] = b"hub";
+
+pub const EXECUTE_WITH_TOKEN_CALLBACK_GAS: u64 = 20_000_000; // This is overkill, but the callback should be prevented from failing at all costs
+pub const KEEP_EXTRA_GAS: u64 = 15_000_000; // Extra gas to keep in contract before registering async promise. This needs to be a somewhat larger value
 
 pub enum MetadataVersion {
     ContractCall,
-    ExpressCall,
 }
 
 impl From<u32> for MetadataVersion {
     fn from(value: u32) -> Self {
         match value {
             0 => MetadataVersion::ContractCall,
-            1 => MetadataVersion::ExpressCall,
             _ => panic!("Unsupported metadata version"),
         }
     }
 }
 
-pub const LATEST_METADATA_VERSION: u32 = 1;
+pub const LATEST_METADATA_VERSION: u32 = 0;
 
+pub type Hash<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
+
+pub const ESDT_EGLD_IDENTIFIER: &str = "EGLD-000000";
 
 #[derive(TypeAbi)]
 pub struct Metadata<M: ManagedTypeApi> {
@@ -59,7 +76,7 @@ impl<M: ManagedTypeApi> TopDecode for Metadata<M> {
 
 pub struct InterchainTransferPayload<M: ManagedTypeApi> {
     pub message_type: BigUint<M>,
-    pub token_id: ManagedByteArray<M, KECCAK256_RESULT_LEN>,
+    pub token_id: TokenId<M>,
     pub source_address: ManagedBuffer<M>,
     pub destination_address: ManagedBuffer<M>,
     pub amount: BigUint<M>,
@@ -210,6 +227,43 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployTokenManagerPayload<M> {
             token_id,
             token_manager_type: TokenManagerType::from(token_manager_type),
             params,
+        }
+    }
+}
+
+pub struct SendToHubPayload<M: ManagedTypeApi> {
+    pub message_type: BigUint<M>,
+    pub destination_chain: ManagedBuffer<M>,
+    pub payload: ManagedBuffer<M>,
+}
+
+impl<M: ManagedTypeApi> AbiEncodeDecode<M> for SendToHubPayload<M> {
+    fn abi_encode(self) -> ManagedBuffer<M> {
+        Self::raw_abi_encode(&[
+            Token::Uint256(self.message_type),
+            Token::String(self.destination_chain),
+            Token::Bytes(self.payload),
+        ])
+    }
+
+    fn abi_decode(payload: ManagedBuffer<M>) -> Self {
+        let mut result = ArrayVec::<Token<M>, 4>::new();
+
+        Self::raw_abi_decode(
+            &[ParamType::Uint256, ParamType::String, ParamType::Bytes],
+            &payload,
+            &mut result,
+            0,
+        );
+
+        let payload = result.pop().unwrap().into_managed_buffer();
+        let destination_chain = result.pop().unwrap().into_managed_buffer();
+        let message_type = result.pop().unwrap().into_biguint();
+
+        SendToHubPayload {
+            message_type,
+            destination_chain,
+            payload,
         }
     }
 }

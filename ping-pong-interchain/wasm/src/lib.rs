@@ -5,7 +5,8 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           14
+// Upgrade:                              1
+// Endpoints:                           13
 // Async Callback (empty):               1
 // Total number of exported functions:  16
 
@@ -18,9 +19,9 @@ multiversx_sc_wasm_adapter::endpoints! {
     ping_ping_interchain
     (
         init => init
+        upgrade => upgrade
         execute => execute
         executeWithInterchainToken => execute_with_interchain_token
-        expressExecuteWithInterchainToken => express_execute_with_interchain_token
         ping => ping
         pong => pong
         pongAll => pong_all

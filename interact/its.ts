@@ -5,26 +5,24 @@ import { firstSigners, firstSignersHash, loadWallet } from './index';
 import { Command } from 'commander';
 import { Wallet } from 'xsuite';
 import { envChain } from 'xsuite/interact';
-import {
-  generateMessageSignature,
-  generateProof,
-  getKeccak256Hash,
-  INTERCHAIN_TOKEN_ID,
-  TOKEN_ID,
-} from '../tests/helpers';
-import createKeccakHash from 'keccak';
+import { generateMessageSignature, generateProof, getKeccak256Hash, INTERCHAIN_TOKEN_ID } from '../tests/helpers';
 import { Buffer } from 'buffer';
 import { AbiCoder } from 'ethers';
 import {
-  its,
-  MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+  MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+  MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
 } from '../tests/itsHelpers';
 
-const chainName = 'MultiversX-D';
-const otherChainName = 'ethereum-2';
-const otherChainAddress = '0xf786e21509a9d50a9afd033b5940a2b7d872c208';
+// TODO: Update these when needed
+const chainName = 'multiversx';
+
+const itsHubChainName = 'axelar';
+const itsHubChainAddress = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
+
+const otherChainName = 'avalanche-fuji';
+const otherChainAddress = 'hub';
 
 const deployBaseTokenManager = async (deployer: Wallet) => {
   // Deploy parameters don't matter since they will be overwritten
@@ -60,10 +58,12 @@ const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
       deployer,
       e.Str(chainName),
 
-      e.U32(1),
+      e.U32(2),
+      e.Str(itsHubChainName),
       e.Str(otherChainName),
 
-      e.U32(1),
+      e.U32(2),
+      e.Str(itsHubChainAddress),
       e.Str(otherChainAddress),
     ],
   });
@@ -145,6 +145,19 @@ export const setupITSCommands = (program: Command) => {
     console.log('Deployed Ping Pong Contract:', result.address);
   });
 
+  program.command('upgradePingPong').action(async () => {
+    const wallet = await loadWallet();
+
+    let result = await wallet.upgradeContract({
+      callee: envChain.select(data.addressPingPongInterchain),
+      code: data.codePingPongInterchain,
+      codeMetadata: ['upgradeable'],
+      gasLimit: 300_000_000,
+      codeArgs: [],
+    });
+    console.log('Result Ping Pong Interchain:', result);
+  });
+
   program.command('upgradeIts').action(async () => {
     const wallet = await loadWallet();
 
@@ -191,8 +204,10 @@ export const setupITSCommands = (program: Command) => {
   program.command('itsInterchainTransfer')
     .argument('tokenIdentifier')
     .argument('amount')
+    .argument('destinationAddress')
     .argument('[gasValue]', '', 1000)
-    .action(async (tokenIdentifier, amount, gasValue = 1000) => {
+    .argument('[gasToken]')
+    .action(async (tokenIdentifier, amount, destinationAddress, gasValue = 1000, gasToken = null) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
@@ -203,18 +218,52 @@ export const setupITSCommands = (program: Command) => {
         funcArgs: [
           e.TopBuffer(envChain.select(data.knownTokens)[tokenIdentifier].tokenId),
           e.Str(otherChainName),
-          e.Str(otherChainAddress),
+          e.TopBuffer(destinationAddress),
           e.TopBuffer(''), // No metadata, uses default
-          e.U(gasValue),
+          e.U(BigInt(gasValue)),
         ],
-        esdts: (tokenIdentifier !== 'EGLD' ? [{ id: tokenIdentifier, amount: BigInt(amount) }] : []),
+        esdts: (tokenIdentifier !== 'EGLD' ? [
+          { id: tokenIdentifier, amount: BigInt(amount) },
+          ...(gasToken ? [{ id: gasToken, amount: BigInt(gasValue) }] : []),
+        ] : []),
+      });
+
+      console.log(`Result`, result);
+    });
+
+  program.command('callContractWithInterchainToken')
+    .argument('tokenIdentifier')
+    .argument('amount')
+    .action(async (tokenIdentifier, amount) => {
+      const wallet = await loadWallet();
+
+      const abiCoded = AbiCoder.defaultAbiCoder().encode(['uint256'], [amount]).slice(2);
+
+      const metadata = Buffer.concat([
+        Buffer.from('fd3282c122c6c14b1eccebcb1743d5c55e15b2b2426c1aca9fda66db269e8cc6', 'hex'),
+        Buffer.from(abiCoded, 'hex'),
+        Buffer.from('F12372616f9c986355414BA06b3Ca954c0a7b0dC', 'hex')
+      ]);
+
+      const result = await wallet.callContract({
+        callee: envChain.select(data.addressIts),
+        funcName: 'callContractWithInterchainToken',
+        gasLimit: 20_000_000,
+        funcArgs: [
+          e.TopBuffer('dfbbd97a4e0c3ec2338d800be851dca6d08d4779398d4070d5cb18d2ebfe62d7'),
+          e.Str(otherChainName),
+          e.TopBuffer('94EC28e6Fceb5B3ce1AFb316520a03487b5dE027'),
+          e.TopBuffer(metadata),
+          e.U(BigInt(0)),
+        ],
+        esdts: [{ id: tokenIdentifier, amount: BigInt(amount) }],
       });
 
       console.log(`Result`, result);
     });
 
   /*******************************
-    ITS Express Execute test flow
+    ITS Execute test flow
   ********************************/
 
   // Update this if wanting to test again
@@ -234,58 +283,6 @@ export const setupITSCommands = (program: Command) => {
       ],
     ).substring(2);
   };
-
-  program.command('itsExpressExecuteWithData').action(async () => {
-    const wallet = await loadWallet();
-
-    const payload = executePingPongPayload(wallet);
-
-    const result = await wallet.callContract({
-      callee: envChain.select(data.addressIts),
-      funcName: 'expressExecute',
-      gasLimit: 100_000_000,
-      value: BigInt('10000000000000000'), // 0.01 EGLD
-      funcArgs: [
-        e.Str(otherChainName),
-        e.Str(executePingPongMessageId),
-        e.Str(otherChainAddress),
-        payload,
-      ],
-    });
-
-    console.log(`Result`, result);
-  });
-
-  program.command('itsApproveExpressExecuteWithData').action(async () => {
-    const wallet = await loadWallet();
-
-    const payload = executePingPongPayload(wallet);
-
-    const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
-
-    const message = e.Tuple(
-      e.Str(otherChainName),
-      e.Str(executePingPongMessageId),
-      e.Str(otherChainAddress),
-      e.Addr(envChain.select(data.addressIts)),
-      e.TopBuffer(payloadHash),
-    );
-
-    const result = await wallet.callContract({
-      callee: envChain.select(data.addressGateway),
-      gasLimit: 15_000_000,
-      funcName: 'approveMessages',
-      funcArgs: [
-        e.List(message),
-        generateProof(
-          firstSigners, [
-            generateMessageSignature(firstSignersHash, e.List(message)),
-          ],
-        ),
-      ],
-    });
-    console.log('Result:', result);
-  });
 
   program.command('itsExecuteInterchainTransferWithData').action(async () => {
     const wallet = await loadWallet();

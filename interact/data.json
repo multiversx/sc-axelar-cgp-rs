@@ -80,20 +80,16 @@
   "knownTokens": {
     "devnet": {
       "EGLD": {
-        "tokenId": "a5c60f3b87f8bd9ae6d97755143b9842902b228c46beb7abf63f12e0904c19b1",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqzaxt2e4630kpp6uxg5hl6yfefls72us0kklsxhl8fk"
+        "tokenId": "2c2a94e0c1200b3432349f28ac617a7c9242bbc9d2c9cb46d7fe9ac555104710",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqfwycmneax8ejkf7pzgcxq7x2apute0m0kkls55aac4"
       },
-      "ITSTT-56fc4e": {
-        "tokenId": "9beb1db4db80c00d179db0f03a8ed4e0a3f868bc7a3a01ba7773cc157812a729",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqyv58myla28ql7ufg5dlanwzed97jhy40kklsyk4666"
+      "ITSTT-18593e": {
+        "tokenId": "81748eb162a0c2c245b3fb7f29e125edf1a95cf01712d21e20a7594add9d82cd",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqr8kmpjy6593twzr73dq52qujjv8x37s5kkls2uutue"
       },
-      "SYMBOL-9c7411": {
-        "tokenId": "bbee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqlnvua4qchnsfj7xrfd9vmlg9mqeky5erkklsmzqcl4"
-      },
-      "ITSTT-9a9969": {
-        "tokenId": "aaee65f504a6951e2cc056ad5285b2b580de05f09bb2531d9bf0a8398e29c2bb",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqaeu63py0unche3mwl2u8nmm38ff8kf4hkklsrjkh6q"
+      "MEX-a659d0": {
+        "tokenId": "5f2a70ee6ef62578e6c13283c84b20edaa76d20ff6744b703b613aa4ec376522",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgql4sgjln055jv25s4vh90rkd6y3f6uk4zkklsgusxjd"
       }
     },
     "testnet": {},

@@ -6,9 +6,9 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           10
+// Endpoints:                           13
 // Async Callback:                       1
-// Total number of exported functions:  13
+// Total number of exported functions:  16
 
 #![no_std]
 
@@ -21,14 +21,17 @@ multiversx_sc_wasm_adapter::endpoints! {
         init => init
         upgrade => upgrade
         deployInterchainToken => deploy_interchain_token
+        approveDeployRemoteInterchainToken => approve_deploy_remote_interchain_token
+        revokeDeployRemoteInterchainToken => revoke_deploy_remote_interchain_token
         deployRemoteInterchainToken => deploy_remote_interchain_token
         registerCanonicalInterchainToken => register_canonical_interchain_token
         deployRemoteCanonicalInterchainToken => deploy_remote_canonical_interchain_token
-        interchainTokenSalt => interchain_token_salt
-        canonicalInterchainTokenSalt => canonical_interchain_token_salt
+        interchainTokenDeploySalt => interchain_token_deploy_salt
+        canonicalInterchainTokenDeploySalt => canonical_interchain_token_deploy_salt
         interchainTokenId => interchain_token_id
         canonicalInterchainTokenId => canonical_interchain_token_id
         chainNameHash => chain_name_hash
+        approvedDestinationMinters => approved_destination_minters
         interchain_token_service => interchain_token_service
     )
 }

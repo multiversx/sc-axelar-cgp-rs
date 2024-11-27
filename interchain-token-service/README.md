@@ -7,7 +7,7 @@ The contract is made to be permissionless, to allow anyone to register an existi
 a new token, as well as register a token remotely for another chain. The [Interchain Token Factory](../interchain-token-factory) contract exists
 to abstract some functionality regarding deployment of tokens.  
 
-This contract is based on the v1.2.4 reference [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v1.2.4/contracts/InterchainTokenService.sol).
+This contract is based on version v2.0.1 of the [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v2.0.1/contracts/InterchainTokenService.sol).
 
 ## User callable endpoints
 - **deployTokenManager** (salt, destination_chain, token_manager_type, params) - deploys a custom token manager on MultiversX or another chain
@@ -18,8 +18,6 @@ This contract is based on the v1.2.4 reference [Interchain Token Service impleme
   - the generated token id depends on the caller and the salt provided
   - it also takes EGLD payment to pay for cross-chain gas costs (if applicable) OR pay for ESDT issue cost
   - if deploying on MultiversX, **it needs to be called twice**, first time it will deploy the Token Manager and the second time it will issue the ESDT through the Token Manager
-- **expressExecute** (source_chain, message_id, source_address, payload) - can be called by anyone to complete a cross-chain call faster, if they provide the required tokens
-  - the caller will get back his tokens after the cross-chain call is fully executed by the Axelar Validators and Relayer services
 - **interchainTransfer** (token_id, destination_chain, destination_address, metadata, gas_value) - initiates a new cross-chain transfer for the received token
   - it will call the appropriate token manager for the token id that will either burn or lock the tokens on MultiversX
   - it will then call the destination chain ITS contract execute receive token command using a cross chain call through the CGP Gateway contract
@@ -40,7 +38,7 @@ The **execute** endpoint will be cross-chain called by other ITS contracts from 
 
 The source address needs to correspond to the ITS contract of the source chain, which will be checked against an internal stored mapping of ITS addresses from other supported chains. 
 
-The Gateway contract is called to validate that this cross-chain contract call was authorized by Axelar Validators and then execute one of 3 commands:
+The Gateway contract is called to validate that this cross-chain contract call was authorized by Axelar Validators and then execute one of 5 commands:
 - **MESSAGE_TYPE_INTERCHAIN_TRANSFER (0)** - received an already registered token from another chain
   - it will get the appropriate Token Manager for the respective id and give the token to the appropriate address
   - the Token Manager will either unlock already locked tokens or mint new tokens
@@ -53,3 +51,6 @@ The Gateway contract is called to validate that this cross-chain contract call w
   - **needs to be called twice**, first time it will deploy the Token Manager and NOT mark the Gateway cross-chain call as executed
   - the second time it will issue the ESDT through the Token Manager and mark the Gateway cross-chain call as executed
 - **MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER (2)** - it will deploy a custom Token Manager with the specified parameters
+- **MESSAGE_TYPE_SEND_TO_HUB (3)** - this message is used to route an ITS message via the ITS Hub. The ITS Hub applies certain security checks, and then routes it to the true destination chain.
+- **MESSAGE_TYPE_RECEIVE_FROM_HUB (4)** - this message is used to receive an ITS message from the ITS Hub. The ITS Hub applies certain security checks, and then routes it to the ITS contract.
+- 
