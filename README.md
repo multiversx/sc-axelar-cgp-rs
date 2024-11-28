@@ -49,14 +49,9 @@ The Axelar Amplifier require multiple CosmWASM contracts to be deployed on Axela
 - **Gateway contract**
 - **Multisig Prover contract**
 
-## Axelar Devnet
-
-- source chain - `multiversx`
-- **Voting Verifier contract** - `axelar1sejw0v7gmw3fv56wqr2gy00v3t23l0hwa4p084ft66e8leap9cqq9qlw4t`
-- **Gateway contract** - `axelar1gzlxntvtkatgnf3shfcgc8alqqljjtmx75vezqrt97cpw5mpeasqlc0j84`
-- **Multisig Prover contract** - `axelar1x3wz8zzretn0dp5qxf0p8qynkpczv6hc2x0r8v2guray3t3573hqflslxd`
-
 ### Testing
 
-**Ethereum Sepolia HelloWorld contract:** - `0x8b77c570ba9edf17d2d24a99602f645adaeb3ff8` ([code](https://github.com/axelarnetwork/axelar-examples/blob/main/examples/multiversx/call-contract/contracts/HelloWorld.sol))
-**Fantom Testnet HelloWorld contract:** - `0xf5f75b97ac847c4e7632ee6ee4a65a63408dfde2` ([code](https://github.com/axelarnetwork/axelar-examples/blob/main/examples/multiversx/call-contract/contracts/HelloWorld.sol))
+**Avalanche Fuji HelloWorld contract:** - `0xC993dBcdC94E2115C7C1526D2Dec78B384Bb826D` ([code](https://github.com/axelarnetwork/axelar-examples/blob/main/examples/multiversx/call-contract/contracts/HelloWorld.sol))
+
+`npm run interact:devnet helloWorldSetRemoteValue avalanche-fuji 0xC993dBcdC94E2115C7C1526D2Dec78B384Bb826D "Hello world!"`
+`npm run interact:devnet helloWorldReceivedValue`
