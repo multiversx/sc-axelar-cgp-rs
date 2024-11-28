@@ -5,21 +5,14 @@ import { loadWallet } from './index';
 import { Command } from 'commander';
 import { Wallet } from 'xsuite';
 import { envChain } from 'xsuite/interact';
-import { getKeccak256Hash, INTERCHAIN_TOKEN_ID } from '../tests/helpers';
+import { ADDRESS_ZERO, getKeccak256Hash, INTERCHAIN_TOKEN_ID } from '../tests/helpers';
 import { Buffer } from 'buffer';
 import { TOKEN_MANAGER_TYPE_LOCK_UNLOCK } from '../tests/itsHelpers';
 import { AbiCoder } from 'ethers';
 
-// TODO: Update these when needed
-const chainName = 'multiversx';
-
-const itsHubChainName = 'axelar';
-const itsHubChainAddress = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
-
-const otherChainName = 'avalanche-fuji';
-const otherChainAddress = 'hub';
-
 const deployBaseTokenManager = async (deployer: Wallet) => {
+  console.log('Deploying base token manager...');
+
   // Deploy parameters don't matter since they will be overwritten
   const result = await deployer.deployContract({
     code: data.codeBaseTokenManager,
@@ -41,6 +34,12 @@ const deployBaseTokenManager = async (deployer: Wallet) => {
 };
 
 const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
+  console.log('Deploying ITS...');
+
+  const itsTrustedAddresses: object = envChain.select(data.itsTrustedAddresses);
+  const trustedChainNames = Object.keys(itsTrustedAddresses).map((name) => e.Str(name));
+  const trustedChainAddresses = Object.values(itsTrustedAddresses).map((address) => e.Str(address));
+
   const result = await deployer.deployContract({
     code: data.codeIts,
     codeMetadata: ['upgradeable'],
@@ -51,15 +50,13 @@ const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
       e.Addr(baseTokenManager),
 
       deployer,
-      e.Str(chainName),
+      e.Str(envChain.select(data.axelar).chainName),
 
-      e.U32(2),
-      e.Str(itsHubChainName),
-      e.Str(otherChainName),
+      e.U32(trustedChainNames.length),
+      ...trustedChainNames,
 
-      e.U32(2),
-      e.Str(itsHubChainAddress),
-      e.Str(otherChainAddress),
+      e.U32(trustedChainAddresses.length),
+      ...trustedChainAddresses,
     ],
   });
   console.log('Result Interchain Token Service:', result);
@@ -68,6 +65,8 @@ const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
 };
 
 const deployInterchainTokenFactory = async (deployer: Wallet, its: string) => {
+  console.log('Deploying ITS Factory...');
+
   const result = await deployer.deployContract({
     code: data.codeInterchainTokenFactory,
     codeMetadata: ['upgradeable'],
@@ -199,10 +198,18 @@ export const setupITSCommands = (program: Command) => {
   program.command('itsInterchainTransfer')
     .argument('tokenIdentifier')
     .argument('amount')
+    .argument('otherChainName')
     .argument('destinationAddress')
-    .argument('[gasValue]', '', 1000)
-    .argument('[gasToken]')
-    .action(async (tokenIdentifier, amount, destinationAddress, gasValue = 1000, gasToken = null) => {
+    .argument('[gasValue]', '', '5000000000000000') // 0.005 EGLD
+    .argument('[gasToken]', '', 'EGLD-000000')
+    .action(async (
+      tokenIdentifier,
+      amount,
+      otherChainName,
+      destinationAddress,
+      gasValue,
+      gasToken,
+    ) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
@@ -211,7 +218,7 @@ export const setupITSCommands = (program: Command) => {
         gasLimit: 20_000_000,
         value: tokenIdentifier === 'EGLD' ? BigInt(amount) : 0,
         funcArgs: [
-          e.TopBuffer(envChain.select(data.knownTokens)[tokenIdentifier].tokenId),
+          e.TopBuffer(envChain.select(data.itsKnownTokens)[tokenIdentifier].tokenId),
           e.Str(otherChainName),
           e.TopBuffer(destinationAddress),
           e.TopBuffer(''), // No metadata, uses default
@@ -219,7 +226,7 @@ export const setupITSCommands = (program: Command) => {
         ],
         esdts: (tokenIdentifier !== 'EGLD' ? [
           { id: tokenIdentifier, amount: BigInt(amount) },
-          ...(gasToken ? [{ id: gasToken, amount: BigInt(gasValue) }] : []),
+          { id: gasToken, amount: BigInt(gasValue) },
         ] : []),
       });
 
@@ -229,7 +236,18 @@ export const setupITSCommands = (program: Command) => {
   program.command('callContractWithInterchainToken')
     .argument('tokenIdentifier')
     .argument('amount')
-    .action(async (tokenIdentifier, amount) => {
+    .argument('otherChainName')
+    .argument('destinationAddress')
+    .argument('[gasValue]', '', '5000000000000000') // 0.005 EGLD
+    .argument('[gasToken]', '', 'EGLD-000000')
+    .action(async (
+      tokenIdentifier,
+      amount,
+      otherChainName,
+      destinationAddress,
+      gasValue,
+      gasToken,
+    ) => {
       const wallet = await loadWallet();
 
       const abiCoded = AbiCoder.defaultAbiCoder().encode(['uint256'], [amount]).slice(2);
@@ -244,14 +262,18 @@ export const setupITSCommands = (program: Command) => {
         callee: envChain.select(data.addressIts),
         funcName: 'callContractWithInterchainToken',
         gasLimit: 20_000_000,
+        value: tokenIdentifier === 'EGLD' ? BigInt(amount) : 0,
         funcArgs: [
-          e.TopBuffer('dfbbd97a4e0c3ec2338d800be851dca6d08d4779398d4070d5cb18d2ebfe62d7'),
+          e.TopBuffer(envChain.select(data.itsKnownTokens)[tokenIdentifier].tokenId),
           e.Str(otherChainName),
           e.TopBuffer('94EC28e6Fceb5B3ce1AFb316520a03487b5dE027'),
           e.TopBuffer(metadata),
           e.U(BigInt(0)),
         ],
-        esdts: [{ id: tokenIdentifier, amount: BigInt(amount) }],
+        esdts: (tokenIdentifier !== 'EGLD' ? [
+          { id: tokenIdentifier, amount: BigInt(amount) },
+          { id: gasToken, amount: BigInt(gasValue) },
+        ] : []),
       });
 
       console.log(`Result`, result);
@@ -261,7 +283,16 @@ export const setupITSCommands = (program: Command) => {
 const setupInterchainTokenFactoryCommands = (program: Command) => {
   // Needs to be called 3 times to fully finish the token deployment!
   program.command('itsDeployInterchainToken')
-    .action(async () => {
+    .argument('[tokenName]')
+    .argument('[tokenSymbol]')
+    .argument('[decimals]')
+    .argument('[supply]')
+    .action(async (
+      tokenName = 'ITSTestToken',
+      tokenSymbol = 'ITSTT',
+      decimals = '18',
+      supply = '1000000000000000000000000' // 1M tokens
+    ) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
@@ -270,12 +301,12 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
         gasLimit: 150_000_000,
         // value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost (only on 2nd transaction)
         funcArgs: [
-          e.TopBuffer(getKeccak256Hash('ITSTT')),
-          e.Str('ITSTestToken'),
-          e.Str('ITSTT'),
-          e.U8(6),
-          e.U(1_000_000_000_000), // 1M tokens
-          wallet,
+          e.TopBuffer(getKeccak256Hash(tokenSymbol)),
+          e.Str(tokenName),
+          e.Str(tokenSymbol),
+          e.U8(BigInt(decimals)),
+          e.U(BigInt(supply)),
+          e.Addr(ADDRESS_ZERO),
         ],
       });
 
@@ -283,18 +314,19 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
     });
 
   program.command('itsDeployRemoteInterchainToken')
-    .action(async () => {
+    .argument('otherChainName')
+    .argument('[tokenSymbol]')
+    .action(async (otherChainName, tokenSymbol = 'ITSTT') => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
         callee: envChain.select(data.addressInterchainTokenFactory),
         funcName: 'deployRemoteInterchainToken',
         gasLimit: 100_000_000,
-        value: BigInt('10000000000000000'), // 0.01 EGLD, to pay for cross chain gas
+        value: BigInt('5000000000000000'), // 0.005 EGLD, to pay for cross chain gas
         funcArgs: [
-          e.Str(chainName),
-          e.TopBuffer(getKeccak256Hash('ITSTT')),
-          wallet,
+          e.TopBuffer(getKeccak256Hash(tokenSymbol)),
+          e.Addr(ADDRESS_ZERO),
           e.Str(otherChainName),
         ],
       });
@@ -323,16 +355,16 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
 
   program.command('itsDeployRemoteCanonicalInterchainToken')
     .argument('tokenIdentifier')
-    .action(async (tokenIdentifier) => {
+    .argument('otherChainName')
+    .action(async (tokenIdentifier, otherChainName) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
         callee: envChain.select(data.addressInterchainTokenFactory),
         funcName: 'deployRemoteCanonicalInterchainToken',
         gasLimit: 100_000_000,
-        value: BigInt('10000000000000000'), // 0.01 EGLD, to pay for cross chain gas
+        value: BigInt('5000000000000000'), // 0.005 EGLD, to pay for cross chain gas
         funcArgs: [
-          e.Str(chainName),
           e.Str(tokenIdentifier),
           e.Str(otherChainName),
         ],
