@@ -2,11 +2,10 @@ multiversx_sc::imports!();
 
 use crate::constants::{Hash, ManagedBufferAscii, TokenId};
 use core::ops::Deref;
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
+use interchain_token_service::address_tracker::ProxyTrait as _;
 use interchain_token_service::proxy_its::ProxyTrait as _;
 use interchain_token_service::user_functions::ProxyTrait as _;
-use interchain_token_service::ProxyTrait as _;
 use operatable::ProxyTrait as _;
 use token_manager::constants::TokenManagerType;
 use token_manager::mintership::ProxyTrait as _;
@@ -14,25 +13,21 @@ use token_manager::ProxyTrait as _;
 
 #[multiversx_sc::module]
 pub trait ProxyModule {
-    fn its_chain_name_hash(&self) -> ManagedByteArray<KECCAK256_RESULT_LEN> {
+    fn its_chain_name(&self) -> ManagedBuffer {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .chain_name_hash()
+            .chain_name()
             .execute_on_dest_context()
     }
 
-    fn its_interchain_token_id(
-        &self,
-        sender: &ManagedAddress,
-        salt: &Hash<Self::Api>,
-    ) -> TokenId<Self::Api> {
+    fn its_interchain_token_id(&self, deploy_salt: &Hash<Self::Api>) -> TokenId<Self::Api> {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .interchain_token_id(sender, salt)
+            .interchain_token_id(ManagedAddress::zero(), deploy_salt)
             .execute_on_dest_context()
     }
 
     fn its_deploy_interchain_token(
         &self,
-        salt: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
@@ -52,15 +47,15 @@ pub trait ProxyModule {
             .execute_on_dest_context()
     }
 
-    fn its_valid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
+    fn its_deployed_token_manager(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .valid_token_manager_address(token_id)
+            .deployed_token_manager(token_id)
             .execute_on_dest_context()
     }
 
     fn its_deploy_token_manager(
         &self,
-        salt: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         token_manager_type: TokenManagerType,
         params: ManagedBuffer,
@@ -69,6 +64,21 @@ pub trait ProxyModule {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
             .deploy_token_manager(salt, destination_chain, token_manager_type, params)
             .with_egld_transfer(gas_value)
+            .execute_on_dest_context()
+    }
+
+    fn its_trusted_address(&self, chain_name: &ManagedBuffer) -> ManagedBuffer {
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
+            .trusted_address(chain_name)
+            .execute_on_dest_context()
+    }
+
+    fn its_registered_token_identifier(
+        &self,
+        token_id: &TokenId<Self::Api>,
+    ) -> EgldOrEsdtTokenIdentifier {
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
+            .registered_token_identifier(token_id)
             .execute_on_dest_context()
     }
 
@@ -198,7 +208,7 @@ pub trait ProxyModule {
                 let decimals_buffer_ref = vec.get(5);
 
                 if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
-                    // Send back payed cross chain gas value to initial caller if token is non fungible
+                    // Send back paid cross chain gas value to initial caller if token is non fungible
                     self.send().direct_non_zero_egld(&caller, &gas_value);
 
                     return;

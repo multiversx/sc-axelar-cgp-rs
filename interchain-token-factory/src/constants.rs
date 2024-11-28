@@ -3,8 +3,9 @@ multiversx_sc::derive_imports!();
 
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
-pub const PREFIX_CANONICAL_TOKEN_SALT : &[u8] = b"canonical-token-salt";
-pub const PREFIX_INTERCHAIN_TOKEN_SALT  : &[u8] = b"interchain-token-salt";
+pub const PREFIX_CANONICAL_TOKEN_SALT: &[u8] = b"canonical-token-salt";
+pub const PREFIX_INTERCHAIN_TOKEN_SALT: &[u8] = b"interchain-token-salt";
+pub const PREFIX_DEPLOY_APPROVAL: &[u8] = b"deploy-approval";
 
 pub type Hash<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
@@ -30,4 +31,11 @@ impl<M: ManagedTypeApi> ManagedBufferAscii<M> for ManagedBuffer<M> {
 
         result
     }
+}
+
+#[derive(TypeAbi, TopEncode, TopDecode, NestedEncode)]
+pub struct DeployApproval<M: ManagedTypeApi> {
+    pub minter: ManagedAddress<M>,
+    pub token_id: TokenId<M>,
+    pub destination_chain: ManagedBuffer<M>,
 }

@@ -6,9 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           36
-// Async Callback:                       1
-// Total number of exported functions:  39
+// Endpoints:                           33
+// Async Callback (empty):               1
+// Promise callbacks:                    1
+// Total number of exported functions:  37
 
 #![no_std]
 
@@ -23,11 +24,8 @@ multiversx_sc_wasm_adapter::endpoints! {
         setInterchainTokenFactory => set_interchain_token_factory
         setFlowLimits => set_flow_limits
         execute => execute
-        contractCallValue => contract_call_value
-        chainNameHash => chain_name_hash
         deployTokenManager => deploy_token_manager
         deployInterchainToken => deploy_interchain_token
-        expressExecute => express_execute_endpoint
         interchainTransfer => interchain_transfer
         callContractWithInterchainToken => call_contract_with_interchain_token
         interchainTokenId => interchain_token_id
@@ -42,21 +40,22 @@ multiversx_sc_wasm_adapter::endpoints! {
         removeTrustedAddress => remove_trusted_address
         chainName => chain_name
         trustedAddress => trusted_address
-        trustedAddressHash => trusted_address_hash
         gateway => gateway
         gasService => gas_service
         flowLimit => flow_limit
         flowOutAmount => flow_out_amount
         flowInAmount => flow_in_amount
-        validTokenManagerAddress => valid_token_manager_address
-        validTokenIdentifier => valid_token_identifier
+        deployedTokenManager => deployed_token_manager
+        registeredTokenIdentifier => registered_token_identifier
         invalidTokenManagerAddress => invalid_token_manager_address
         tokenManagerAddress => token_manager_address
+        transferWithDataLock => transfer_with_data_lock
         tokenManagerImplementation => token_manager
         pause => pause_endpoint
         unpause => unpause_endpoint
         isPaused => paused_status
+        execute_with_token_callback => execute_with_token_callback
     )
 }
 
-multiversx_sc_wasm_adapter::async_callback! { interchain_token_service }
+multiversx_sc_wasm_adapter::async_callback_empty! {}

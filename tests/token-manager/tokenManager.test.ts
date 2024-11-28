@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import createKeccakHash from 'keccak';
 import { ADDRESS_ZERO, INTERCHAIN_TOKEN_ID, TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
@@ -10,13 +10,13 @@ import {
   tokenManager,
 } from '../itsHelpers';
 
-let world: SWorld;
-let deployer: SWallet;
-let user: SWallet;
-let otherUser: SWallet;
+let world: LSWorld;
+let deployer: LSWallet;
+let user: LSWallet;
+let otherUser: LSWallet;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -181,7 +181,7 @@ describe('Init', () => {
       ],
     });
 
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -209,7 +209,7 @@ describe('Init', () => {
       ],
     });
 
-    kvs = await contract2.getAccountWithKvs();
+    kvs = await contract2.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -239,7 +239,7 @@ describe('Init', () => {
       ],
     });
 
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -267,7 +267,7 @@ describe('Init', () => {
       ],
     });
 
-    kvs = await contract2.getAccountWithKvs();
+    kvs = await contract2.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -297,7 +297,7 @@ describe('Init', () => {
       ],
     });
 
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -324,7 +324,7 @@ describe('Init', () => {
       ],
     });
 
-    kvs = await contract2.getAccountWithKvs();
+    kvs = await contract2.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -360,7 +360,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -401,7 +401,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -421,7 +421,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -429,6 +429,60 @@ describe('Flow limit', () => {
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000000)), // flow limit role was removed
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000010)), // operator role remained
+      ],
+    });
+  });
+
+  test('Transfer flow limiter', async () => {
+    const baseKvs = await deployTokenManagerLockUnlock(deployer, user, user);
+
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'transferFlowLimiter',
+      gasLimit: 5_000_000,
+      funcArgs: [
+        deployer,
+        otherUser,
+      ],
+    }).assertFail({ code: 4, message: 'Missing any of roles' });
+
+    await user.callContract({
+      callee: tokenManager,
+      funcName: 'transferFlowLimiter',
+      gasLimit: 5_000_000,
+      funcArgs: [
+        deployer,
+        otherUser,
+      ],
+    }).assertFail({ code: 4, message: 'Missing all roles' });
+
+    await user.callContract({
+      callee: tokenManager,
+      funcName: 'addFlowLimiter',
+      gasLimit: 5_000_000,
+      funcArgs: [
+        deployer,
+      ],
+    });
+
+    await user.callContract({
+      callee: tokenManager,
+      funcName: 'transferFlowLimiter',
+      gasLimit: 5_000_000,
+      funcArgs: [
+        deployer,
+        otherUser,
+      ],
+    })
+
+    let kvs = await tokenManager.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs,
+
+        e.kvs.Mapper('account_roles', deployer).Value(e.U32(0)), // has no role
+        e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000100)), // flow limit role
       ],
     });
   });
@@ -463,7 +517,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -484,7 +538,7 @@ describe('Flow limit', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -504,7 +558,7 @@ describe('Give token lock unlock', () => {
 
     // Ensure token manager has tokens
     await tokenManager.setAccount({
-      ...await tokenManager.getAccountWithKvs(),
+      ...await tokenManager.getAccount(),
       kvs: [
         ...baseKvs,
 
@@ -523,7 +577,7 @@ describe('Give token lock unlock', () => {
     });
 
     // Tokens were sent from contract to otherUser
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -533,7 +587,7 @@ describe('Give token lock unlock', () => {
       ],
     });
 
-    const otherUserKvs = await otherUser.getAccountWithKvs();
+    const otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -546,7 +600,7 @@ describe('Give token lock unlock', () => {
 
     // Ensure token manager has tokens
     await tokenManager.setAccount({
-      ...await tokenManager.getAccountWithKvs(),
+      ...await tokenManager.getAccount(),
       kvs: [
         ...baseKvs,
 
@@ -575,7 +629,7 @@ describe('Give token lock unlock', () => {
     });
 
     // Tokens were sent from contract to otherUser
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -588,7 +642,7 @@ describe('Give token lock unlock', () => {
       ],
     });
 
-    let otherUserKvs = await otherUser.getAccountWithKvs();
+    let otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
@@ -623,7 +677,7 @@ describe('Give token lock unlock', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -637,7 +691,7 @@ describe('Give token lock unlock', () => {
       ],
     });
 
-    otherUserKvs = await otherUser.getAccountWithKvs();
+    otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -704,7 +758,7 @@ describe('Take token lock unlock', () => {
     });
 
     // Tokens remain in contract
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -737,7 +791,7 @@ describe('Take token lock unlock', () => {
     });
 
     // Tokens remain in contract
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -774,7 +828,7 @@ describe('Take token lock unlock', () => {
       esdts: [{ id: TOKEN_ID, amount: 500 }],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -850,7 +904,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -893,7 +947,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -923,7 +977,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -984,7 +1038,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [

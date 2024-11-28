@@ -8,14 +8,13 @@ use crate::constants::{
     MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
     MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
-use crate::{address_tracker, events, express_executor_tracker, proxy_gmp, proxy_its};
+use crate::{address_tracker, events, proxy_gmp, proxy_its};
 
 multiversx_sc::imports!();
 
 #[multiversx_sc::module]
 pub trait RemoteModule:
-    express_executor_tracker::ExpressExecutorTracker
-    + multiversx_sc_modules::pause::PauseModule
+    multiversx_sc_modules::pause::PauseModule
     + events::EventsModule
     + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
@@ -30,10 +29,11 @@ pub trait RemoteModule:
         gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
-        let _ = self.valid_token_manager_address(token_id);
+        self.deployed_token_manager(token_id);
 
+        let message_type = BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER);
         let data = DeployTokenManagerPayload {
-            message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER),
+            message_type: message_type.clone(),
             token_id: token_id.clone(),
             token_manager_type,
             params: params.clone(),
@@ -42,8 +42,9 @@ pub trait RemoteModule:
         let payload = data.abi_encode();
 
         self.call_contract(
-            &destination_chain,
-            &payload,
+            message_type,
+            destination_chain.clone(),
+            payload,
             MetadataVersion::ContractCall,
             gas_token,
             gas_value,
@@ -68,10 +69,14 @@ pub trait RemoteModule:
         gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
-        self.valid_token_manager_address(token_id);
+        require!(!name.is_empty(), "Empty token name");
+        require!(!symbol.is_empty(), "Empty token symbol");
 
+        self.deployed_token_manager(token_id);
+
+        let message_type = BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN);
         let data = DeployInterchainTokenPayload {
-            message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
+            message_type: message_type.clone(),
             token_id: token_id.clone(),
             name: name.clone(),
             symbol: symbol.clone(),
@@ -82,8 +87,9 @@ pub trait RemoteModule:
         let payload = data.abi_encode();
 
         self.call_contract(
-            &destination_chain,
-            &payload,
+            message_type,
+            destination_chain.clone(),
+            payload,
             MetadataVersion::ContractCall,
             gas_token,
             gas_value,
@@ -109,14 +115,18 @@ pub trait RemoteModule:
         metadata_version: MetadataVersion,
         data: ManagedBuffer,
     ) {
+        require!(!destination_address.is_empty(), "Empty destination address");
+        require!(transfer_and_gas_tokens.transfer_amount > 0, "Zero amount");
+
         let data_hash = if data.is_empty() {
             ManagedByteArray::from(&[0; KECCAK256_RESULT_LEN])
         } else {
             self.crypto().keccak256(&data)
         };
 
+        let message_type = BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER);
         let payload = InterchainTransferPayload {
-            message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER),
+            message_type: message_type.clone(),
             token_id: token_id.clone(),
             source_address: source_address.as_managed_buffer().clone(),
             destination_address: destination_address.clone(),
@@ -127,8 +137,9 @@ pub trait RemoteModule:
         let payload = payload.abi_encode();
 
         self.call_contract(
-            &destination_chain,
-            &payload,
+            message_type,
+            destination_chain.clone(),
+            payload,
             metadata_version,
             transfer_and_gas_tokens.gas_token,
             transfer_and_gas_tokens.gas_amount,
@@ -144,6 +155,7 @@ pub trait RemoteModule:
         );
     }
 
+    #[allow(clippy::absurd_extreme_comparisons)]
     fn decode_metadata(&self, raw_metadata: ManagedBuffer) -> (MetadataVersion, ManagedBuffer) {
         let decoded_metadata = Metadata::<Self::Api>::top_decode(raw_metadata);
 

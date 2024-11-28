@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import { TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
   deployTokenManagerInterchainToken,
@@ -8,13 +8,13 @@ import {
   tokenManager,
 } from '../itsHelpers';
 
-let world: SWorld;
-let deployer: SWallet;
-let user: SWallet;
-let otherUser: SWallet;
+let world: LSWorld;
+let deployer: LSWallet;
+let user: LSWallet;
+let otherUser: LSWallet;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -60,13 +60,13 @@ describe('Give token mint burn', () => {
     });
 
     // Tokens were minted and sent from contract to otherUser
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: baseKvs,
     });
 
-    const otherUserKvs = await otherUser.getAccountWithKvs();
+    const otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -98,7 +98,7 @@ describe('Give token mint burn', () => {
     });
 
     // Tokens were minted and sent from contract to otherUser
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -109,7 +109,7 @@ describe('Give token mint burn', () => {
       ],
     });
 
-    let otherUserKvs = await otherUser.getAccountWithKvs();
+    let otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
@@ -144,7 +144,7 @@ describe('Give token mint burn', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -156,7 +156,7 @@ describe('Give token mint burn', () => {
       ],
     });
 
-    otherUserKvs = await otherUser.getAccountWithKvs();
+    otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
@@ -223,13 +223,13 @@ describe('Take token mint burn', () => {
     });
 
     // Tokens were burned by contract
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: baseKvs,
     });
 
-    const userKvs = await user.getAccountWithKvs();
+    const userKvs = await user.getAccount();
     assertAccount(userKvs, {
       balance: 10_000_000_000n,
       kvs: [
@@ -269,7 +269,7 @@ describe('Take token mint burn', () => {
     });
 
     // Tokens were burned by contract
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -304,7 +304,7 @@ describe('Take token mint burn', () => {
       esdts: [{ id: TOKEN_ID, amount: 500 }],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -316,7 +316,7 @@ describe('Take token mint burn', () => {
       ],
     });
 
-    const userKvs = await user.getAccountWithKvs();
+    const userKvs = await user.getAccount();
     assertAccount(userKvs, {
       balance: 10_000_000_000n,
       kvs: [
@@ -403,13 +403,13 @@ describe('Deploy interchain token', () => {
       ],
     });
 
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       hasKvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // minter role was added to user
+        e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // minter role was added to user (ITS)
 
         // ESDT token deployment was tested on Devnet and it works fine
         e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -459,7 +459,7 @@ describe('Deploy interchain token', () => {
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
       ],
-    }).assertFail({ code: 4, message: 'Token name empty' });
+    }).assertFail({ code: 4, message: 'Empty token name' });
 
     await user.callContract({
       callee: tokenManager,
@@ -471,11 +471,11 @@ describe('Deploy interchain token', () => {
         e.Str(''),
         e.U8(18),
       ],
-    }).assertFail({ code: 4, message: 'Token symbol empty' });
+    }).assertFail({ code: 4, message: 'Empty token symbol' });
 
     // Manually set token identifier
     await tokenManager.setAccount({
-      ...(await tokenManager.getAccountWithKvs()),
+      ...(await tokenManager.getAccount()),
       kvs: [
         ...baseKvs,
 
@@ -515,7 +515,7 @@ describe('Deploy interchain token', () => {
 
 describe('Mint burn', () => {
   test('Mint', async () => {
-    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, TOKEN_ID, true, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_ID, true, user);
 
     // Only minter can call this
     await otherUser.callContract({
@@ -538,14 +538,14 @@ describe('Mint burn', () => {
       ],
     });
 
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: baseKvs,
     });
 
     // 1_000 tokens were minted and sent to otherUser
-    const userKvs = await otherUser.getAccountWithKvs();
+    const userKvs = await otherUser.getAccount();
     assertAccount(userKvs, {
       kvs: [
         e.kvs.Esdts([
@@ -559,7 +559,7 @@ describe('Mint burn', () => {
   });
 
   test('Burn', async () => {
-    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, otherUser, TOKEN_ID, true, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_ID, true, user);
 
     // Only minter can call this
     await otherUser.callContract({
@@ -585,14 +585,14 @@ describe('Mint burn', () => {
       esdts: [{ id: TOKEN_ID, amount: 1_000 }],
     });
 
-    const kvs = await tokenManager.getAccountWithKvs();
+    const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: baseKvs,
     });
 
     // 1_000 tokens were burned
-    const userKvs = await user.getAccountWithKvs();
+    const userKvs = await user.getAccount();
     assertAccount(userKvs, {
       balance: 10_000_000_000n,
       kvs: [
@@ -675,7 +675,7 @@ describe('Mintership', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -718,7 +718,7 @@ describe('Mintership', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -748,7 +748,7 @@ describe('Mintership', () => {
       ],
     });
 
-    kvs = await tokenManager.getAccountWithKvs();
+    kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -809,7 +809,7 @@ describe('Mintership', () => {
       ],
     });
 
-    let kvs = await tokenManager.getAccountWithKvs();
+    let kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
