@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           13
+// Endpoints:                           16
 // Async Callback (empty):               1
-// Promise callbacks:                    1
-// Total number of exported functions:  17
+// Promise callbacks:                    2
+// Total number of exported functions:  21
 
 #![no_std]
 
@@ -22,19 +22,23 @@ multiversx_sc_wasm_adapter::endpoints! {
         init => init
         upgrade => upgrade
         executeProposal => execute_proposal
+        executeOperatorProposal => execute_operator_proposal
         withdraw => withdraw
+        transferOperatorship => transfer_operatorship
         execute => execute
         withdrawRefundToken => withdraw_refund_token
         getProposalEta => get_proposal_eta
+        isOperatorProposalApproved => is_operator_proposal_approved
         gateway => gateway
         getMinimumTimeLockDelay => minimum_time_lock_delay
         getGovernanceChain => governance_chain
         getGovernanceAddress => governance_address
-        getGovernanceChainHash => governance_chain_hash
-        getGovernanceAddressHash => governance_address_hash
+        getOperator => operator
         getTimeLockEta => time_lock_eta
+        getOperatorApprovals => operator_approvals
         getRefundToken => refund_token
         execute_proposal_callback => execute_proposal_callback
+        execute_operator_proposal_callback => execute_operator_proposal_callback
     )
 }
 

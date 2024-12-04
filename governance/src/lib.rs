@@ -10,9 +10,11 @@ use gateway::ProxyTrait as _;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 #[derive(TypeAbi, TopDecode, NestedDecode)]
-pub enum GovernanceCommand {
+pub enum ServiceGovernanceCommand {
     ScheduleTimeLockProposal,
     CancelTimeLockProposal,
+    ApproveOperatorProposal,
+    CancelOperatorApproval,
 }
 
 #[derive(TypeAbi, TopDecode)]
@@ -24,7 +26,7 @@ pub struct DecodedCallData<M: ManagedTypeApi> {
 
 #[derive(TypeAbi, TopDecode)]
 pub struct ExecutePayload<M: ManagedTypeApi> {
-    pub command: GovernanceCommand,
+    pub command: ServiceGovernanceCommand,
     pub target: ManagedAddress<M>,
     pub call_data: ManagedBuffer<M>,
     pub native_value: BigUint<M>,
@@ -51,9 +53,13 @@ pub trait Governance: events::Events {
         governance_chain: ManagedBuffer,
         governance_address: ManagedBuffer,
         minimum_time_delay: u64,
+        operator: ManagedAddress,
     ) {
         require!(
-            !gateway.is_zero() && !governance_chain.is_empty() && !governance_address.is_empty(),
+            !gateway.is_zero()
+                && !governance_chain.is_empty()
+                && !governance_address.is_empty()
+                && !operator.is_zero(),
             "Invalid address"
         );
 
@@ -62,10 +68,8 @@ pub trait Governance: events::Events {
 
         self.governance_chain().set(&governance_chain);
         self.governance_address().set(&governance_address);
-        self.governance_chain_hash()
-            .set(self.crypto().keccak256(&governance_chain));
-        self.governance_address_hash()
-            .set(self.crypto().keccak256(&governance_address));
+
+        self.operator().set(operator);
     }
 
     #[upgrade]
@@ -135,6 +139,74 @@ pub trait Governance: events::Events {
             .register_promise();
     }
 
+    #[payable("*")]
+    #[endpoint(executeOperatorProposal)]
+    fn execute_operator_proposal(
+        &self,
+        target: ManagedAddress,
+        call_data: ManagedBuffer,
+        native_value: BigUint,
+    ) {
+        let operator = self.operator().get();
+
+        require!(self.blockchain().get_caller() == operator, "Not authorized");
+
+        let proposal_hash = self.get_proposal_hash(&target, &call_data, &native_value);
+
+        require!(
+            self.operator_approvals(&proposal_hash).take(),
+            "Not approved"
+        );
+
+        self.operator_proposal_executed_event(
+            &proposal_hash,
+            &target,
+            ProposalEventData {
+                call_data: &call_data,
+                value: &native_value,
+            },
+        );
+
+        let decoded_call_data: DecodedCallData<Self::Api> =
+            DecodedCallData::<Self::Api>::top_decode(call_data)
+                .unwrap_or_else(|_| sc_panic!("Could not decode call data"));
+
+        let mut extra_gas_for_callback = EXECUTE_PROPOSAL_CALLBACK_GAS;
+
+        let payments = self.call_value().any_payment();
+
+        if let EgldOrMultiEsdtPaymentRefs::MultiEsdt(payments) = payments.as_refs() {
+            // Reserve extra gas for callback to make sure we can send back the tokens instead of async call error
+            let gas_for_payments =
+                EXECUTE_PROPOSAL_CALLBACK_GAS_PER_PAYMENT * payments.len() as u64;
+
+            extra_gas_for_callback += gas_for_payments;
+        }
+
+        let gas_left = self.blockchain().get_gas_left();
+
+        require!(
+            gas_left > extra_gas_for_callback + KEEP_EXTRA_GAS + decoded_call_data.min_gas_limit,
+            "Insufficient gas for execution"
+        );
+
+        let gas_limit = gas_left - extra_gas_for_callback - KEEP_EXTRA_GAS;
+
+        self.send()
+            .contract_call::<()>(target, decoded_call_data.endpoint_name)
+            .with_egld_transfer(native_value)
+            .with_raw_arguments(decoded_call_data.arguments.into())
+            .with_gas_limit(gas_limit)
+            .async_call_promise()
+            .with_callback(self.callbacks().execute_operator_proposal_callback(
+                &proposal_hash,
+                operator,
+                payments,
+            ))
+            .with_extra_gas_for_callback(EXECUTE_PROPOSAL_CALLBACK_GAS)
+            .register_promise();
+    }
+
     // Can only be called by self (through the execute_proposal endpoint)
     #[endpoint(withdraw)]
     fn withdraw(&self, recipient: ManagedAddress, amount: BigUint) {
@@ -146,6 +218,22 @@ pub trait Governance: events::Events {
         self.send().direct_egld(&recipient, &amount);
     }
 
+    #[endpoint(transferOperatorship)]
+    fn transfer_operatorship(&self, new_operator: ManagedAddress) {
+        let caller = self.blockchain().get_caller();
+
+        require!(
+            caller == self.operator().get() || caller == self.blockchain().get_sc_address(),
+            "Not authorized"
+        );
+
+        require!(!new_operator.is_zero(), "Invalid operator address");
+
+        self.operatorship_transferred_event(&self.operator().get(), &new_operator);
+
+        self.operator().set(new_operator);
+    }
+
     #[endpoint]
     fn execute(
         &self,
@@ -154,7 +242,11 @@ pub trait Governance: events::Events {
         source_address: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
-        self.only_governance(&source_chain, &source_address);
+        require!(
+            source_chain == self.governance_chain().get()
+                && source_address == self.governance_address().get(),
+            "Not governance"
+        );
 
         let payload_hash = self.crypto().keccak256(&payload);
 
@@ -179,7 +271,8 @@ pub trait Governance: events::Events {
         let caller = self.blockchain().get_caller();
         let value = self.refund_token(&caller, token.clone()).take();
 
-        self.send().direct_non_zero(&caller, &token.token_identifier, token.token_nonce, &value);
+        self.send()
+            .direct_non_zero(&caller, &token.token_identifier, token.token_nonce, &value);
     }
 
     fn process_command(&self, execute_payload: ExecutePayload<Self::Api>) {
@@ -190,7 +283,7 @@ pub trait Governance: events::Events {
         );
 
         match execute_payload.command {
-            GovernanceCommand::ScheduleTimeLockProposal => {
+            ServiceGovernanceCommand::ScheduleTimeLockProposal => {
                 let eta = self.schedule_time_lock(&proposal_hash, execute_payload.eta);
 
                 self.proposal_scheduled_event(
@@ -203,13 +296,37 @@ pub trait Governance: events::Events {
                     },
                 );
             }
-            GovernanceCommand::CancelTimeLockProposal => {
+            ServiceGovernanceCommand::CancelTimeLockProposal => {
                 self.cancel_time_lock(&proposal_hash);
 
                 self.proposal_cancelled_event(
                     &proposal_hash,
                     &execute_payload.target,
                     execute_payload.eta,
+                    ProposalEventData {
+                        call_data: &execute_payload.call_data,
+                        value: &execute_payload.native_value,
+                    },
+                );
+            }
+            ServiceGovernanceCommand::ApproveOperatorProposal => {
+                self.operator_approvals(&proposal_hash).set(true);
+
+                self.operator_approved_event(
+                    &proposal_hash,
+                    &execute_payload.target,
+                    ProposalEventData {
+                        call_data: &execute_payload.call_data,
+                        value: &execute_payload.native_value,
+                    },
+                );
+            }
+            ServiceGovernanceCommand::CancelOperatorApproval => {
+                self.operator_approvals(&proposal_hash).clear();
+
+                self.operator_cancelled_event(
+                    &proposal_hash,
+                    &execute_payload.target,
                     ProposalEventData {
                         call_data: &execute_payload.call_data,
                         value: &execute_payload.native_value,
@@ -284,14 +401,6 @@ pub trait Governance: events::Events {
         self.crypto().keccak256(encoded)
     }
 
-    fn only_governance(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
-        require!(
-            self.crypto().keccak256(source_chain) == self.governance_chain_hash().get()
-                && self.crypto().keccak256(source_address) == self.governance_address_hash().get(),
-            "Not governance"
-        );
-    }
-
     #[promises_callback]
     fn execute_proposal_callback(
         &self,
@@ -306,38 +415,70 @@ pub trait Governance: events::Events {
                 self.execute_proposal_success_event(hash, results);
             }
             ManagedAsyncCallResult::Err(err) => {
-                match payments {
-                    EgldOrMultiEsdtPayment::Egld(egld_value) => {
-                        self.refund_token(
-                            &caller,
-                            EgldOrEsdtToken {
-                                token_identifier: EgldOrEsdtTokenIdentifier::egld(),
-                                token_nonce: 0,
-                            },
-                        )
-                        .update(|old| *old += &egld_value);
-                    }
-                    EgldOrMultiEsdtPayment::MultiEsdt(esdts) => {
-                        for esdt in esdts.iter() {
-                            self.refund_token(
-                                &caller,
-                                EgldOrEsdtToken {
-                                    token_identifier: EgldOrEsdtTokenIdentifier::esdt(
-                                        esdt.token_identifier,
-                                    ),
-                                    token_nonce: esdt.token_nonce,
-                                },
-                            )
-                            .update(|old| *old += &esdt.amount);
-                        }
-                    }
-                }
+                self.handle_callback_failure(caller, payments);
 
                 // Let call be retried in case of failure, mostly because async call
                 // can fail with out of gas since it can be triggered by anyone
                 self.time_lock_eta(hash).set(eta);
 
                 self.execute_proposal_error_event(hash, err.err_code, err.err_msg);
+            }
+        }
+    }
+
+    #[promises_callback]
+    fn execute_operator_proposal_callback(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+        operator: ManagedAddress,
+        payments: EgldOrMultiEsdtPayment<Self::Api>,
+        #[call_result] call_result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
+    ) {
+        match call_result {
+            ManagedAsyncCallResult::Ok(results) => {
+                self.operator_execute_proposal_success_event(hash, results);
+            }
+            ManagedAsyncCallResult::Err(err) => {
+                self.handle_callback_failure(operator, payments);
+
+                // Let call be retried in case of failure, mostly because async call
+                // can fail with out of gas
+                self.operator_approvals(hash).set(true);
+
+                self.operator_execute_proposal_error_event(hash, err.err_code, err.err_msg);
+            }
+        }
+    }
+
+    fn handle_callback_failure(
+        &self,
+        caller: ManagedAddress,
+        payments: EgldOrMultiEsdtPayment<Self::Api>,
+    ) {
+        match payments {
+            EgldOrMultiEsdtPayment::Egld(egld_value) => {
+                self.refund_token(
+                    &caller,
+                    EgldOrEsdtToken {
+                        token_identifier: EgldOrEsdtTokenIdentifier::egld(),
+                        token_nonce: 0,
+                    },
+                )
+                .update(|old| *old += &egld_value);
+            }
+            EgldOrMultiEsdtPayment::MultiEsdt(esdts) => {
+                for esdt in esdts.iter() {
+                    self.refund_token(
+                        &caller,
+                        EgldOrEsdtToken {
+                            token_identifier: EgldOrEsdtTokenIdentifier::esdt(
+                                esdt.token_identifier,
+                            ),
+                            token_nonce: esdt.token_nonce,
+                        },
+                    )
+                    .update(|old| *old += &esdt.amount);
+                }
             }
         }
     }
@@ -350,6 +491,17 @@ pub trait Governance: events::Events {
         native_value: BigUint,
     ) -> u64 {
         self.time_lock_eta(&self.get_proposal_hash(&target, &call_data, &native_value))
+            .get()
+    }
+
+    #[view(isOperatorProposalApproved)]
+    fn is_operator_proposal_approved(
+        &self,
+        target: ManagedAddress,
+        call_data: ManagedBuffer,
+        native_value: BigUint,
+    ) -> bool {
+        self.operator_approvals(&self.get_proposal_hash(&target, &call_data, &native_value))
             .get()
     }
 
@@ -369,13 +521,9 @@ pub trait Governance: events::Events {
     #[storage_mapper("governance_address")]
     fn governance_address(&self) -> SingleValueMapper<ManagedBuffer>;
 
-    #[view(getGovernanceChainHash)]
-    #[storage_mapper("governance_chain_hash")]
-    fn governance_chain_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
-
-    #[view(getGovernanceAddressHash)]
-    #[storage_mapper("governance_address_hash")]
-    fn governance_address_hash(&self) -> SingleValueMapper<ManagedByteArray<KECCAK256_RESULT_LEN>>;
+    #[view(getOperator)]
+    #[storage_mapper("operator")]
+    fn operator(&self) -> SingleValueMapper<ManagedAddress>;
 
     #[view(getTimeLockEta)]
     #[storage_mapper("time_lock_eta")]
@@ -383,6 +531,13 @@ pub trait Governance: events::Events {
         &self,
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) -> SingleValueMapper<u64>;
+
+    #[view(getOperatorApprovals)]
+    #[storage_mapper("operator_approvals")]
+    fn operator_approvals(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> SingleValueMapper<bool>;
 
     #[view(getRefundToken)]
     #[storage_mapper("refund_token")]
