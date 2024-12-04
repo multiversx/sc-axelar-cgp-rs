@@ -125,11 +125,6 @@ pub trait PingPong {
             "smart contract not active yet"
         );
 
-        // require!(
-        //     block_timestamp < self.deadline().get(),
-        //     "deadline has passed"
-        // );
-
         if let Some(max_funds) = self.max_funds().get() {
             require!(
                 &self

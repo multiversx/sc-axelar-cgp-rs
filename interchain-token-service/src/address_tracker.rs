@@ -30,7 +30,9 @@ pub trait AddressTracker {
     }
 
     fn is_trusted_address(&self, chain: &ManagedBuffer, address: &ManagedBuffer) -> bool {
-        !self.trusted_address(chain).is_empty() && address == &self.trusted_address(chain).get()
+        let trusted_address = self.trusted_address(chain);
+
+        !trusted_address.is_empty() && address == &trusted_address.get()
     }
 
     #[view(chainName)]

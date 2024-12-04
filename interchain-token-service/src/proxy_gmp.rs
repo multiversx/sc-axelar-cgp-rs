@@ -165,10 +165,10 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
                 "Not supported"
             );
 
-            let destination_address =
+            let new_destination_address_mapper =
                 self.trusted_address(&ManagedBuffer::from(ITS_HUB_CHAIN_NAME));
-            require!(!destination_address.is_empty(), "Untrusted chain");
-            let destination_address = destination_address.get();
+            require!(!new_destination_address_mapper.is_empty(), "Untrusted chain");
+            let new_destination_address = new_destination_address_mapper.get();
 
             let data = SendToHubPayload::<Self::Api> {
                 message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
@@ -179,7 +179,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
             // Send wrapped message to ITS Hub chain and to ITS Hub true address
             return (
                 ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
-                destination_address,
+                new_destination_address,
                 data.abi_encode(),
             );
         }
