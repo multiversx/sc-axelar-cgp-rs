@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, test } from 'vitest';
-import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import {
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
@@ -24,13 +24,13 @@ import {
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
-let world: SWorld;
-let deployer: SWallet;
-let collector: SWallet;
-let user: SWallet;
+let world: LSWorld;
+let deployer: LSWallet;
+let collector: LSWallet;
+let user: LSWallet;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -112,7 +112,7 @@ test('Execute', async () => {
     ],
   });
 
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -121,7 +121,7 @@ test('Execute', async () => {
   });
 
   const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [
@@ -134,7 +134,7 @@ test('Execute', async () => {
   });
 
   // Gateway message was marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 

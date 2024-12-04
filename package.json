@@ -28,7 +28,8 @@
     "tsx": "^3.12.7",
     "typescript": "^5.0.4",
     "vitest": "^0.33.0",
-    "xsuite": "0.0.59",
-    "keccak": "^3.0.3"
+    "xsuite": "0.0.97",
+    "keccak": "^3.0.3",
+    "@cosmjs/cosmwasm-stargate": "^0.32.4"
   }
 }

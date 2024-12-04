@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, test } from 'vitest';
-import { assertAccount, e, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import {
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
@@ -24,13 +24,13 @@ import {
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
-let world: SWorld;
-let deployer: SWallet;
-let collector: SWallet;
-let user: SWallet;
+let world: LSWorld;
+let deployer: LSWallet;
+let collector: LSWallet;
+let user: LSWallet;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -109,7 +109,7 @@ test('Only deploy token manager', async () => {
     ],
   });
 
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -118,7 +118,7 @@ test('Only deploy token manager', async () => {
   });
 
   const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-  const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+  const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
     kvs: [
@@ -130,7 +130,7 @@ test('Only deploy token manager', async () => {
   });
 
   // Gateway message approved key was NOT removed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
@@ -144,7 +144,7 @@ test('Only issue esdt', async () => {
 
   // Mock token manager already deployed
   await its.setAccount({
-    ...(await its.getAccountWithKvs()),
+    ...(await its.getAccount()),
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -168,7 +168,7 @@ test('Only issue esdt', async () => {
   });
 
   // Nothing was changed for its
-  assertAccount(await its.getAccountWithKvs(), {
+  assertAccount(await its.getAccount(), {
     balance: 0n,
     hasKvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
@@ -176,7 +176,7 @@ test('Only issue esdt', async () => {
       e.kvs.Mapper('token_manager_address', e.TopBuffer(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
   });
-  assertAccount(await tokenManager.getAccountWithKvs(), {
+  assertAccount(await tokenManager.getAccount(), {
     balance: 0,
     hasKvs: [
       ...baseTokenManagerKvs,
@@ -191,12 +191,12 @@ test('Only issue esdt', async () => {
       )),
     ],
   });
-  assertAccount(await user.getAccountWithKvs(), {
+  assertAccount(await user.getAccount(), {
     balance: BigInt('50000000000000000'), // balance was changed
   });
 
   // Gateway message was marked as executed
-  assertAccount(await gateway.getAccountWithKvs(), {
+  assertAccount(await gateway.getAccount(), {
     kvs: [
       ...baseGatewayKvs(deployer),
 
@@ -265,7 +265,7 @@ test('Errors', async () => {
 
   // Mock token manager already deployed, test that gateway is check in this case also
   await its.setAccount({
-    ...(await its.getAccountWithKvs()),
+    ...(await its.getAccount()),
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
 

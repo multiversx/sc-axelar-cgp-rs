@@ -5,7 +5,7 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use constants::{DeployTokenManagerParams, TokenManagerType};
 use operatable::roles::Roles;
 
-use crate::constants::DEFAULT_ESDT_ISSUE_COST;
+use crate::constants::{ManagedBufferAscii, DEFAULT_ESDT_ISSUE_COST};
 
 multiversx_sc::imports!();
 
@@ -104,6 +104,13 @@ pub trait TokenManagerLockUnlockContract:
         self.remove_role(flow_limiter, Roles::FLOW_LIMITER);
     }
 
+    #[endpoint(transferFlowLimiter)]
+    fn transfer_flow_limiter(&self, from: ManagedAddress, to: ManagedAddress) {
+        self.only_operator();
+
+        self.transfer_role(from, to, Roles::FLOW_LIMITER);
+    }
+
     #[endpoint(setFlowLimit)]
     fn set_flow_limit(&self, flow_limit: BigUint) {
         self.only_flow_limiter();
@@ -130,7 +137,6 @@ pub trait TokenManagerLockUnlockContract:
             | TokenManagerType::MintBurnFrom => {
                 self.give_token_mint_burn(&token_identifier, destination_address, &amount);
             }
-            // nothing to do for lock/unlock, tokens remain in contract
             TokenManagerType::LockUnlock | TokenManagerType::LockUnlockFee => {
                 self.give_token_lock_unlock(&token_identifier, destination_address, &amount);
             }
@@ -193,8 +199,8 @@ pub trait TokenManagerLockUnlockContract:
             "Not service or minter"
         );
 
-        require!(!name.is_empty(), "Token name empty");
-        require!(!symbol.is_empty(), "Token symbol empty");
+        require!(!name.is_empty(), "Empty token name");
+        require!(!symbol.is_empty(), "Empty token symbol");
 
         /*
          * Set the token service as a minter to allow it to mint and burn tokens.
@@ -214,8 +220,8 @@ pub trait TokenManagerLockUnlockContract:
             .esdt_system_sc_proxy()
             .issue_and_set_all_roles(
                 issue_cost,
-                name,
-                symbol,
+                name.to_normalized_token_name(),
+                symbol.to_normalized_token_ticker(),
                 EsdtTokenType::Fungible,
                 decimals as usize,
             )

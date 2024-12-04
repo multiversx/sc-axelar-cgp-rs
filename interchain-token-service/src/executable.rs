@@ -5,48 +5,82 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
-use crate::abi::AbiEncodeDecode;
+use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::constants::{
-    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, TokenId,
+    DeployInterchainTokenPayload, DeployTokenManagerPayload, Hash, InterchainTransferPayload,
+    SendToHubPayload, TokenId, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
+    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_RECEIVE_FROM_HUB,
 };
-use crate::{address_tracker, events, express_executor_tracker, proxy_gmp, proxy_its};
+use crate::{address_tracker, events, proxy_gmp, proxy_its};
 
 multiversx_sc::imports!();
 
 #[multiversx_sc::module]
 pub trait ExecutableModule:
-    express_executor_tracker::ExpressExecutorTracker
-    + multiversx_sc_modules::pause::PauseModule
+    multiversx_sc_modules::pause::PauseModule
     + events::EventsModule
     + proxy_gmp::ProxyGmpModule
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
+    // Returns (message_type, original_source_chain, payload)
+    fn get_execute_params(
+        &self,
+        source_chain: ManagedBuffer,
+        payload: ManagedBuffer,
+    ) -> (u64, ManagedBuffer, ManagedBuffer) {
+        let message_type = self.get_message_type(&payload);
+
+        // Unwrap ITS message if coming from ITS hub
+        if message_type == MESSAGE_TYPE_RECEIVE_FROM_HUB {
+            require!(source_chain == *ITS_HUB_CHAIN_NAME, "Untrusted chain");
+
+            let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
+
+            // Check whether the original source chain is expected to be routed via the ITS Hub
+            require!(
+                self.is_trusted_address(
+                    &data.destination_chain,
+                    &ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER)
+                ),
+                "Untrusted chain"
+            );
+
+            let message_type = self.get_message_type(&data.payload);
+
+            // Prevent deploy token manager to be usable on ITS hub
+            require!(
+                message_type != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+                "Not supported"
+            );
+
+            // Return original message type, source chain and payload
+            return (message_type, data.destination_chain, data.payload);
+        }
+
+        // Prevent receiving a direct message from the ITS Hub. This is not supported yet.
+        require!(source_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
+
+        (message_type, source_chain, payload)
+    }
+
     fn process_interchain_transfer_payload(
         &self,
-        express_executor: ManagedAddress,
+        original_source_chain: ManagedBuffer,
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
+        source_address: ManagedBuffer,
+        payload_hash: Hash<Self::Api>,
         payload: ManagedBuffer,
     ) {
         let send_token_payload = InterchainTransferPayload::<Self::Api>::abi_decode(payload);
-
-        if !express_executor.is_zero() {
-            self.token_manager_give_token(
-                &send_token_payload.token_id,
-                &express_executor,
-                &send_token_payload.amount,
-            );
-
-            return;
-        }
 
         let destination_address =
             ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
 
         self.interchain_transfer_received_event(
             &send_token_payload.token_id,
-            &source_chain,
+            &original_source_chain,
             &message_id,
             &send_token_payload.source_address,
             &destination_address,
@@ -59,6 +93,15 @@ pub trait ExecutableModule:
         );
 
         if send_token_payload.data.is_empty() {
+            let valid = self.gateway_validate_message(
+                &source_chain,
+                &message_id,
+                &source_address,
+                &payload_hash,
+            );
+
+            require!(valid, "Not approved by gateway");
+
             let _ = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -67,6 +110,16 @@ pub trait ExecutableModule:
 
             return;
         }
+
+        // Only check that the call is valid and only mark it as executed after the async call has finished
+        let valid = self.gateway_is_message_approved(
+            &source_chain,
+            &message_id,
+            &source_address,
+            &payload_hash,
+        );
+
+        require!(valid, "Not approved by gateway");
 
         // Here we give the tokens to this contract and then call the executable contract with the tokens
         // In case of async call error, the token_manager_take_token method is called to revert this
@@ -78,8 +131,11 @@ pub trait ExecutableModule:
 
         self.executable_contract_execute_with_interchain_token(
             destination_address,
+            original_source_chain,
             source_chain,
             message_id,
+            source_address,
+            payload_hash,
             send_token_payload.source_address,
             send_token_payload.data,
             send_token_payload.token_id,
@@ -110,7 +166,7 @@ pub trait ExecutableModule:
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
         source_address: ManagedBuffer,
-        payload_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
+        payload_hash: Hash<Self::Api>,
         payload: ManagedBuffer,
     ) {
         let data = DeployInterchainTokenPayload::<Self::Api>::abi_decode(payload);
@@ -218,6 +274,15 @@ pub trait ExecutableModule:
         token_manager_address_mapper.set(address.clone());
 
         address
+    }
+
+    fn get_message_type(&self, payload: &ManagedBuffer) -> u64 {
+        ParamType::Uint256
+            .abi_decode(payload, 0)
+            .token
+            .into_biguint()
+            .to_u64()
+            .unwrap()
     }
 
     #[view(tokenManagerImplementation)]

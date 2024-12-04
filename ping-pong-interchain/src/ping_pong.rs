@@ -58,6 +58,9 @@ pub trait PingPong {
         self.max_funds().set(max_funds.into_option());
     }
 
+    #[upgrade]
+    fn upgrade(&self) {}
+
     #[endpoint(execute)]
     fn execute(
         &self,
@@ -103,25 +106,6 @@ pub trait PingPong {
         }
     }
 
-    #[payable("*")]
-    #[endpoint(expressExecuteWithInterchainToken)]
-    fn express_execute_with_interchain_token(
-        &self,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        data: Data<Self::Api>,
-        token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) {
-        self.execute_with_interchain_token(
-            source_chain,
-            message_id,
-            source_address,
-            data,
-            token_id,
-        );
-    }
-
     /// User sends some EGLD to be locked in the contract for a period of time.
     /// Optional `_data` argument is ignored.
     #[allow_multiple_var_args]
@@ -139,11 +123,6 @@ pub trait PingPong {
         require!(
             self.activation_timestamp().get() <= block_timestamp,
             "smart contract not active yet"
-        );
-
-        require!(
-            block_timestamp < self.deadline().get(),
-            "deadline has passed"
         );
 
         if let Some(max_funds) = self.max_funds().get() {

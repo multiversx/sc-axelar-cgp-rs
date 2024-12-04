@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, test } from 'vitest';
-import { assertAccount, e, SContract, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, LSContract, LSWallet, LSWorld } from 'xsuite';
 import { TOKEN_ID } from '../helpers';
 
-let world: SWorld;
-let deployer: SWallet;
-let collector: SWallet;
-let contract: SContract;
+let world: LSWorld;
+let deployer: LSWallet;
+let collector: LSWallet;
+let contract: LSContract;
 let address: string;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -44,7 +44,7 @@ const deployContract = async () => {
     ],
   }));
 
-  const pairs = await contract.getAccountWithKvs();
+  const pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0n,
     kvs: [
@@ -69,7 +69,7 @@ test('Pay gas for contract call no esdts', async () => {
     ],
   }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -97,7 +97,7 @@ test('Pay gas for contract call', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -129,7 +129,7 @@ test('Pay native gas for contract call no value', async () => {
     ],
   }).assertFail({ code: 4, message: 'Nothing received' });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -155,7 +155,7 @@ test('Pay native gas for contract call', async () => {
     value: 1_000,
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 1_000,
     kvs: [
@@ -180,7 +180,7 @@ test('Pay gas for express contract call no esdts', async () => {
     ],
   }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -208,7 +208,7 @@ test('Pay gas for express contract call', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -240,7 +240,7 @@ test('Pay native gas for express contract call no value', async () => {
     ],
   }).assertFail({ code: 4, message: 'Nothing received' });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -266,7 +266,7 @@ test('Pay native gas for express contract call', async () => {
     value: 1_000,
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 1_000,
     kvs: [
@@ -289,7 +289,7 @@ test('Add gas no esdts', async () => {
     ],
   }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -315,7 +315,7 @@ test('Add gas', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -345,7 +345,7 @@ test('Add native gas no value', async () => {
     ],
   }).assertFail({ code: 4, message: 'Nothing received' });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -369,7 +369,7 @@ test('Add native gas', async () => {
     value: 1_000,
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 1_000,
     kvs: [
@@ -392,7 +392,7 @@ test('Add express gas no esdts', async () => {
     ],
   }).assertFail({ code: 4, message: 'incorrect number of ESDT transfers' });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -418,7 +418,7 @@ test('Add express gas', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -448,7 +448,7 @@ test('Add native express gas no value', async () => {
     ],
   }).assertFail({ code: 4, message: 'Nothing received' });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -472,7 +472,7 @@ test('Add native express gas', async () => {
     value: 1_000,
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 1_000,
     kvs: [
@@ -593,7 +593,7 @@ test('Collect fees', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0,
     kvs: [
@@ -601,7 +601,7 @@ test('Collect fees', async () => {
     ],
   });
 
-  let pairsDeployer = await deployer.getAccountWithKvs();
+  let pairsDeployer = await deployer.getAccount();
   assertAccount(pairsDeployer, {
     balance: 10_000_002_000n,
     kvs: [
@@ -669,7 +669,7 @@ test('Collect fees too much asked', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 2_000,
     kvs: [
@@ -743,7 +743,7 @@ test('Refund egld', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 1_500,
     kvs: [
@@ -751,7 +751,7 @@ test('Refund egld', async () => {
     ],
   });
 
-  let pairsDeployer = await deployer.getAccountWithKvs();
+  let pairsDeployer = await deployer.getAccount();
   assertAccount(pairsDeployer, {
     balance: 10_000_000_500,
   });
@@ -787,7 +787,7 @@ test('Refund esdt', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     kvs: [
       e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
@@ -801,7 +801,7 @@ test('Refund esdt', async () => {
     ],
   });
 
-  let pairsDeployer = await deployer.getAccountWithKvs();
+  let pairsDeployer = await deployer.getAccount();
   assertAccount(pairsDeployer, {
     balance: 10_000_000_000,
     kvs: [
@@ -843,7 +843,7 @@ test('Set gas collector', async () => {
     ],
   });
 
-  let pairs = await contract.getAccountWithKvs();
+  let pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0n,
     kvs: [
@@ -860,7 +860,7 @@ test('Set gas collector', async () => {
     ],
   });
 
-  pairs = await contract.getAccountWithKvs();
+  pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0n,
     kvs: [
@@ -890,7 +890,7 @@ test('Upgrade', async () => {
     gasLimit: 100_000_000,
   });
 
-  const pairs = await contract.getAccountWithKvs();
+  const pairs = await contract.getAccount();
   assertAccount(pairs, {
     balance: 0n,
     kvs: [

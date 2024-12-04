@@ -1,24 +1,29 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, SWallet, SWorld } from 'xsuite';
-import { INTERCHAIN_TOKEN_ID, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import {
-  baseItsKvs,
+  INTERCHAIN_TOKEN_ID,
+  OTHER_CHAIN_ADDRESS,
+  OTHER_CHAIN_NAME,
+  TOKEN_ID,
+  TOKEN_ID2,
+  TOKEN_ID_EGLD,
+} from '../helpers';
+import {
   deployContracts,
   gasService,
-  interchainTokenFactory,
   its,
   itsDeployTokenManagerLockUnlock,
   LATEST_METADATA_VERSION,
 } from '../itsHelpers';
 
-let world: SWorld;
-let deployer: SWallet;
-let collector: SWallet;
-let user: SWallet;
-let otherUser: SWallet;
+let world: LSWorld;
+let deployer: LSWallet;
+let collector: LSWallet;
+let user: LSWallet;
+let otherUser: LSWallet;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -85,7 +90,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -93,7 +98,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -128,7 +133,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    const kvs = await gasService.getAccountWithKvs();
+    const kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -136,7 +141,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -168,7 +173,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    const kvs = await gasService.getAccountWithKvs();
+    const kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -176,7 +181,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    const tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -228,7 +233,7 @@ describe('Interchain transfer', () => {
         e.Str(OTHER_CHAIN_NAME),
         e.Str(OTHER_CHAIN_ADDRESS),
         e.Tuple(
-          e.U32(2), // Wrong Metadata version,
+          e.U32(1), // Wrong Metadata version,
           e.Str('sth'),
         ),
         e.U(0),
@@ -266,6 +271,20 @@ describe('Interchain transfer', () => {
       ],
       esdts: [{ id: TOKEN_ID, amount: 1_000 }],
     }).assertFail({ code: 4, message: 'Untrusted chain' });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str('Unsupported-Chain'),
+        e.Buffer(''), // empty destination address
+        e.Buffer(''), // No metadata
+        e.U(0),
+      ],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    }).assertFail({ code: 4, message: 'Empty destination address' });
   });
 
   test('Gas token errors', async () => {
@@ -321,7 +340,7 @@ describe('Interchain transfer', () => {
       esdts: [
         { id: TOKEN_ID, amount: 1_000 },
         { id: TOKEN_ID2, amount: 1_000 },
-        { id: 'TOKEN3-987654', amount: 1_000, }
+        { id: 'TOKEN3-987654', amount: 1_000 },
       ],
     }).assertFail({ code: 4, message: 'A maximum of two esdt payments are supported' });
 
@@ -399,7 +418,7 @@ describe('Interchain transfer', () => {
       world,
       user,
       false,
-      'EGLD'
+      'EGLD',
     );
 
     await user.callContract({
@@ -417,7 +436,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert EGLD gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 20,
       kvs: [
@@ -425,7 +444,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 980,
       kvs: [
@@ -454,7 +473,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert ESDT gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -466,7 +485,7 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -498,7 +517,7 @@ describe('Interchain transfer', () => {
     });
 
     // Assert 2nd ESDT gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -510,7 +529,47 @@ describe('Interchain transfer', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      kvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
+  });
+
+  test('Gas token esdt + egld', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Buffer(''),
+        e.U(100),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID_EGLD, amount: 100 },
+      ],
+    });
+
+    // Assert EGLD gas was paid for cross chain call
+    let kvs = await gasService.getAccount();
+    assertAccount(kvs, {
+      balance: 100,
+      kvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -541,7 +600,7 @@ describe('Call contract with interchain token', () => {
     });
 
     // Assert NO gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -549,7 +608,7 @@ describe('Call contract with interchain token', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -678,7 +737,7 @@ describe('Call contract with interchain token', () => {
       esdts: [
         { id: TOKEN_ID, amount: 1_000 },
         { id: TOKEN_ID2, amount: 1_000 },
-        { id: 'TOKEN3-987654', amount: 1_000, }
+        { id: 'TOKEN3-987654', amount: 1_000 },
       ],
     }).assertFail({ code: 4, message: 'A maximum of two esdt payments are supported' });
 
@@ -756,7 +815,7 @@ describe('Call contract with interchain token', () => {
       world,
       user,
       false,
-      'EGLD'
+      'EGLD',
     );
 
     await user.callContract({
@@ -774,7 +833,7 @@ describe('Call contract with interchain token', () => {
     });
 
     // Assert EGLD gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 20,
       kvs: [
@@ -782,7 +841,7 @@ describe('Call contract with interchain token', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 980,
       kvs: [
@@ -811,7 +870,7 @@ describe('Call contract with interchain token', () => {
     });
 
     // Assert ESDT gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -823,7 +882,7 @@ describe('Call contract with interchain token', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -855,7 +914,7 @@ describe('Call contract with interchain token', () => {
     });
 
     // Assert 2nd ESDT gas was paid for cross chain call
-    let kvs = await gasService.getAccountWithKvs();
+    let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
       kvs: [
@@ -867,7 +926,47 @@ describe('Call contract with interchain token', () => {
       ],
     });
 
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      kvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+      ],
+    });
+  });
+
+  test('Gas token esdt + egld', async () => {
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+
+    await user.callContract({
+      callee: its,
+      funcName: 'callContractWithInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_ADDRESS),
+        e.Str('sth'),
+        e.U(100),
+      ],
+      esdts: [
+        { id: TOKEN_ID, amount: 1_000 },
+        { id: TOKEN_ID_EGLD, amount: 100 },
+      ],
+    });
+
+    // Assert EGLD gas was paid for cross chain call
+    let kvs = await gasService.getAccount();
+    assertAccount(kvs, {
+      balance: 100,
+      kvs: [
+        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
+      ],
+    });
+
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
