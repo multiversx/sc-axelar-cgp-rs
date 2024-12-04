@@ -63,6 +63,34 @@
     },
     "mainnet": {}
   },
+  "itsTrustedAddresses": {
+    "devnet": {
+      "axelar": "axelar157hl7gpuknjmhtac2qnphuazv2yerfagva7lsu9vuj2pgn32z22qa26dk4",
+      "avalanche-fuji": "hub",
+      "eth-sepolia": "hub",
+      "optimism-sepolia": "hub",
+      "sui-test2": "hub",
+      "stacks": "hub"
+    },
+    "mainnet": {}
+  },
+  "itsKnownTokens": {
+    "devnet": {
+      "EGLD": {
+        "tokenId": "2c2a94e0c1200b3432349f28ac617a7c9242bbc9d2c9cb46d7fe9ac555104710",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqlmu50mwf6a8j9ys7txr7u0f6g730th4wkklswp02pc"
+      },
+      "ITSTT-066438": {
+        "tokenId": "81748eb162a0c2c245b3fb7f29e125edf1a95cf01712d21e20a7594add9d82cd",
+        "tokenManager": "erd1s96gavtz5rpvy3dnldljncf9ahc6jh8szufdy83q5av54hvastxs9ren2p"
+      },
+      "MEX-a659d0": {
+        "tokenId": "5f2a70ee6ef62578e6c13283c84b20edaa76d20ff6744b703b613aa4ec376522",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqyud9dhd7d4al34l5xvaz4g6hm6nypqawkklszy7e88"
+      }
+    },
+    "mainnet": {}
+  },
   "addressGateway": {
     "devnet": "erd1qqqqqqqqqqqqqpgqvaj9w3g006wgj7avhen3au27datwgk63kklszcamgw",
     "mainnet": ""
@@ -72,15 +100,15 @@
     "mainnet": ""
   },
   "addressBaseTokenManager": {
-    "devnet": "",
+    "devnet": "erd1qqqqqqqqqqqqqpgq0nzpwdfpt3drhv6zamw67kp635xlg0qykklskzls7v",
     "mainnet": ""
   },
   "addressIts": {
-    "devnet": "",
+    "devnet": "erd1qqqqqqqqqqqqqpgqc5ypvy2d6z52fwscsfnrwcdkdh2fnthfkkls7kcn9j",
     "mainnet": ""
   },
   "addressInterchainTokenFactory": {
-    "devnet": "",
+    "devnet": "erd1qqqqqqqqqqqqqpgqtunku9ve7wet2cw57l3fqjyw7dnqel0vkkls7zz82t",
     "mainnet": ""
   },
   "addressGovernance": {
@@ -97,18 +125,5 @@
   },
   "addressHelloWorld": {
     "devnet": "erd1qqqqqqqqqqqqqpgqr5ytd20lqhqqephlf7pd298yeucy85aakklsrx6yle"
-  },
-  "knownTokens": {
-    "devnet": {
-      "EGLD": {
-        "tokenId": "",
-        "tokenManager": ""
-      },
-      "MEX-a659d0": {
-        "tokenId": "",
-        "tokenManager": ""
-      }
-    },
-    "mainnet": {}
   }
 }

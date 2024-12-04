@@ -1,5 +1,6 @@
-import { assertAccount, e, Encodable, SContract, SWallet } from 'xsuite';
+import { assertAccount, e, Encodable, LSContract, LSWallet } from 'xsuite';
 import {
+  ADDRESS_ZERO,
   ALICE_PUB_KEY,
   BOB_PUB_KEY,
   CAROL_PUB_KEY,
@@ -11,7 +12,6 @@ import {
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
   OTHER_CHAIN_ADDRESS,
-  OTHER_CHAIN_ADDRESS_HASH,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
   TOKEN_MANAGER_ADDRESS,
@@ -30,20 +30,27 @@ export const PREFIX_INTERCHAIN_TOKEN_SALT = 'interchain-token-salt';
 export const MESSAGE_TYPE_INTERCHAIN_TRANSFER = 0;
 export const MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN = 1;
 export const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER = 2;
+export const MESSAGE_TYPE_SEND_TO_HUB = 3;
+export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
 
-export const LATEST_METADATA_VERSION = 1;
+export const ITS_HUB_CHAIN_NAME = 'axelar';
+export const ITS_HUB_ROUTING_IDENTIFIER = 'hub';
+
+export const ITS_CHAIN_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
+
+export const LATEST_METADATA_VERSION = 0;
 
 export const TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN = 0;
 export const TOKEN_MANAGER_TYPE_LOCK_UNLOCK = 2;
 export const TOKEN_MANAGER_TYPE_MINT_BURN = 4;
 
 let address: string;
-export let gateway: SContract;
-export let gasService: SContract;
-export let interchainTokenFactory: SContract;
-export let tokenManager: SContract;
-export let its: SContract;
-export let pingPong: SContract;
+export let gateway: LSContract;
+export let gasService: LSContract;
+export let interchainTokenFactory: LSContract;
+export let tokenManager: LSContract;
+export let its: LSContract;
+export let pingPong: LSContract;
 
 export const defaultWeightedSigners = e.Tuple(
   e.List(
@@ -65,7 +72,7 @@ export const defaultSignersHash = getSignersHash(
   getKeccak256Hash('nonce1'),
 );
 
-export const baseGatewayKvs = (operator: SWallet) => {
+export const baseGatewayKvs = (operator: LSWallet) => {
   return [
     e.kvs.Mapper('previous_signers_retention').Value(e.U(16)),
     e.kvs.Mapper('domain_separator').Value(e.TopBuffer(DOMAIN_SEPARATOR)),
@@ -78,7 +85,7 @@ export const baseGatewayKvs = (operator: SWallet) => {
   ];
 };
 
-export const deployGatewayContract = async (deployer: SWallet) => {
+export const deployGatewayContract = async (deployer: LSWallet) => {
   ({ contract: gateway, address } = await deployer.deployContract({
     code: 'file:gateway/output/gateway.wasm',
     codeMetadata: ['upgradeable'],
@@ -92,14 +99,14 @@ export const deployGatewayContract = async (deployer: SWallet) => {
     ],
   }));
 
-  const kvs = await gateway.getAccountWithKvs();
+  const kvs = await gateway.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseGatewayKvs(deployer),
   });
 };
 
-export const deployGasService = async (deployer: SWallet, collector: SWallet) => {
+export const deployGasService = async (deployer: LSWallet, collector: LSWallet) => {
   ({ contract: gasService, address } = await deployer.deployContract({
     code: 'file:gas-service/output/gas-service.wasm',
     codeMetadata: ['upgradeable'],
@@ -109,7 +116,7 @@ export const deployGasService = async (deployer: SWallet, collector: SWallet) =>
     ],
   }));
 
-  const kvs = await gasService.getAccountWithKvs();
+  const kvs = await gasService.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -119,12 +126,12 @@ export const deployGasService = async (deployer: SWallet, collector: SWallet) =>
 };
 
 export const deployTokenManagerInterchainToken = async (
-  deployer: SWallet,
-  operator: SWallet | SContract = deployer,
-  its: SWallet | SContract = operator,
+  deployer: LSWallet,
+  operator: LSWallet | LSContract = deployer,
+  its: LSWallet | LSContract = operator,
   tokenIdentifier: string | null = null,
   burnRole: boolean = true,
-  minter: SWallet | SContract | null = null,
+  minter: LSWallet | LSContract | null = null,
 ): Promise<Kvs> => {
   ({ contract: tokenManager, address } = await deployer.deployContract({
     code: 'file:token-manager/output/token-manager.wasm',
@@ -150,7 +157,7 @@ export const deployTokenManagerInterchainToken = async (
     ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
   ];
 
-  const kvs = await tokenManager.getAccountWithKvs();
+  const kvs = await tokenManager.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseKvs,
@@ -171,7 +178,10 @@ export const deployTokenManagerInterchainToken = async (
           e.kvs.Esdts([{ id: tokenIdentifier, roles: ['ESDTRoleLocalBurn', 'ESDTRoleLocalMint'] }]),
         ] : []),
 
-      ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
+      ...(its !== operator ? [e.kvs.Mapper(
+        'account_roles',
+        its,
+      ).Value(e.U32(tokenIdentifier && burnRole ? 0b00000111 : 0b00000110))] : []), // all roles OR flow limit & operator role
       ...(minter ? [e.kvs.Mapper(
         'account_roles',
         minter,
@@ -189,9 +199,9 @@ export const deployTokenManagerInterchainToken = async (
 };
 
 export const deployTokenManagerMintBurn = async (
-  deployer: SWallet,
-  operator: SWallet | SContract = deployer,
-  its: SWallet | SContract = operator,
+  deployer: LSWallet,
+  operator: LSWallet | LSContract = deployer,
+  its: LSWallet | LSContract = operator,
   tokenIdentifier: string = TOKEN_ID,
   burnRole: boolean = true,
 ): Promise<Kvs> => {
@@ -220,7 +230,7 @@ export const deployTokenManagerMintBurn = async (
     ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
   ];
 
-  const kvs = await tokenManager.getAccountWithKvs();
+  const kvs = await tokenManager.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseKvs,
@@ -241,9 +251,9 @@ export const deployTokenManagerMintBurn = async (
 };
 
 export const deployTokenManagerLockUnlock = async (
-  deployer: SWallet,
-  its: SWallet | SContract = deployer,
-  operator: SWallet = deployer,
+  deployer: LSWallet,
+  its: LSWallet | LSContract = deployer,
+  operator: LSWallet = deployer,
   tokenId: string = TOKEN_ID,
   interchainTokenId: string = INTERCHAIN_TOKEN_ID,
 ): Promise<EncodableKvs> => {
@@ -272,7 +282,7 @@ export const deployTokenManagerLockUnlock = async (
     ...(its !== operator ? [e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110))] : []), // flow limit & operator role
   ];
 
-  const kvs = await tokenManager.getAccountWithKvs();
+  const kvs = await tokenManager.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseKvs,
@@ -281,7 +291,7 @@ export const deployTokenManagerLockUnlock = async (
   return baseKvs;
 };
 
-export const deployIts = async (deployer: SWallet) => {
+export const deployIts = async (deployer: LSWallet) => {
   ({ contract: its, address } = await deployer.deployContract({
     code: 'file:interchain-token-service/output/interchain-token-service.wasm',
     codeMetadata: ['upgradeable'],
@@ -302,7 +312,7 @@ export const deployIts = async (deployer: SWallet) => {
     ],
   }));
 
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -311,7 +321,7 @@ export const deployIts = async (deployer: SWallet) => {
   });
 };
 
-export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: boolean = true) => {
+export const deployInterchainTokenFactory = async (deployer: LSWallet, callIts: boolean = true) => {
   ({ contract: interchainTokenFactory, address } = await deployer.deployContract({
     code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
     codeMetadata: ['upgradeable'],
@@ -321,7 +331,7 @@ export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: b
     ],
   }));
 
-  const kvs = await interchainTokenFactory.getAccountWithKvs();
+  const kvs = await interchainTokenFactory.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -343,13 +353,13 @@ export const deployInterchainTokenFactory = async (deployer: SWallet, callIts: b
   }
 };
 
-export const deployPingPongInterchain = async (deployer: SWallet, amount = 1_000, itsContract = its) => {
+export const deployPingPongInterchain = async (deployer: LSWallet, amount = 1_000, itLSContract = its) => {
   ({ contract: pingPong } = await deployer.deployContract({
     code: 'file:ping-pong-interchain/output/ping-ping-interchain.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
     codeArgs: [
-      itsContract,
+      itLSContract,
       e.U(amount),
       e.U64(10),
       e.Option(null),
@@ -357,7 +367,7 @@ export const deployPingPongInterchain = async (deployer: SWallet, amount = 1_000
   }));
 };
 
-export const deployContracts = async (deployer: SWallet, collector: SWallet, includeIts: boolean = true) => {
+export const deployContracts = async (deployer: LSWallet, collector: LSWallet, includeIts: boolean = true) => {
   await deployGatewayContract(deployer);
   await deployGasService(deployer, collector);
   await deployTokenManagerLockUnlock(deployer);
@@ -368,7 +378,7 @@ export const deployContracts = async (deployer: SWallet, collector: SWallet, inc
   }
 };
 
-export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addTokens: boolean = false, tokenIdentifier: string = TOKEN_ID) => {
+export const itsDeployTokenManagerLockUnlock = async (world, user: LSWallet, addTokens: boolean = false, tokenIdentifier: string = TOKEN_ID) => {
   const computedTokenId = computeInterchainTokenId(user);
 
   await user.callContract({
@@ -399,7 +409,7 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addT
   if (addTokens) {
     if (tokenIdentifier === 'EGLD') {
       await tokenManager.setAccount({
-        ...(await tokenManager.getAccountWithKvs()),
+        ...(await tokenManager.getAccount()),
         balance: 100_000,
         kvs: [
           ...baseTokenManagerKvs,
@@ -407,7 +417,7 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addT
       });
     } else {
       await tokenManager.setAccount({
-        ...(await tokenManager.getAccountWithKvs()),
+        ...(await tokenManager.getAccount()),
         kvs: [
           ...baseTokenManagerKvs,
 
@@ -420,7 +430,7 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: SWallet, addT
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
 };
 
-export const itsDeployTokenManagerMintBurn = async (world, user: SWallet, flowLimit: number = 0) => {
+export const itsDeployTokenManagerMintBurn = async (world, user: LSWallet, flowLimit: number = 0) => {
   const computedTokenId = computeInterchainTokenId(user);
 
   await user.callContract({
@@ -453,39 +463,27 @@ export const itsDeployTokenManagerMintBurn = async (world, user: SWallet, flowLi
 
   // Set mint/burn role for token
   await tokenManager.setAccount({
-    ...(await tokenManager.getAccountWithKvs()),
+    ...(await tokenManager.getAccount()),
     kvs: baseTokenManagerKvs,
   });
 
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
 };
 
-export const computeInterchainTokenId = (user: Encodable, salt = TOKEN_SALT) => {
+export const computeInterchainTokenId = (user: Encodable = e.Addr(ADDRESS_ZERO), deploySalt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_ID).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
     Buffer.from(user.toTopHex(), 'hex'),
-    Buffer.from(salt, 'hex'),
+    Buffer.from(deploySalt, 'hex'),
   ]);
 
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const computeExpressExecuteHash = (payload: string) => {
-  const payloadHash = createKeccakHash('keccak256').update(Buffer.from(payload, 'hex')).digest();
-  const data = Buffer.concat([
-    Buffer.from(OTHER_CHAIN_NAME),
-    Buffer.from(MESSAGE_ID),
-    Buffer.from(OTHER_CHAIN_ADDRESS),
-    payloadHash,
-  ]);
-
-  return createKeccakHash('keccak256').update(data).digest('hex');
-};
-
-export const computeInterchainTokenSalt = (chain_name: string, user: Encodable, salt = TOKEN_SALT) => {
+export const computeInterchainTokenDeploySalt = (user: Encodable, salt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_SALT).digest('hex');
-  const chain_name_hash = createKeccakHash('keccak256').update(chain_name).digest('hex');
+  const chain_name_hash = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
     Buffer.from(chain_name_hash, 'hex'),
@@ -496,9 +494,9 @@ export const computeInterchainTokenSalt = (chain_name: string, user: Encodable, 
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const computeCanonicalInterchainTokenSalt = (chain_name: string, tokenIdentifier: string = TOKEN_ID) => {
+export const computeCanonicalInterchainTokenDeploySalt = (tokenIdentifier: string = TOKEN_ID) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_CANONICAL_TOKEN_SALT).digest('hex');
-  const chain_name_hash = createKeccakHash('keccak256').update(chain_name).digest('hex');
+  const chain_name_hash = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
     Buffer.from(chain_name_hash, 'hex'),
@@ -508,17 +506,19 @@ export const computeCanonicalInterchainTokenSalt = (chain_name: string, tokenIde
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory: SContract | null = null, computedTokenId: string | null = null) => {
+export const baseItsKvs = (
+  operator: LSWallet | LSContract,
+  interchainTokenFactory: LSContract | LSWallet | null = null,
+  computedTokenId: string | null = null
+) => {
   return [
     e.kvs.Mapper('gateway').Value(gateway),
     e.kvs.Mapper('gas_service').Value(gasService),
     e.kvs.Mapper('token_manager').Value(tokenManager),
     e.kvs.Mapper('account_roles', operator).Value(e.U32(0b00000010)), // operator role
 
-    e.kvs.Mapper('chain_name_hash').Value(e.TopBuffer(CHAIN_NAME_HASH)),
     e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
 
-    e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.TopBuffer(OTHER_CHAIN_ADDRESS_HASH)),
     e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
 
     ...(interchainTokenFactory ? [e.kvs.Mapper('interchain_token_factory').Value(interchainTokenFactory)] : []),
@@ -527,12 +527,17 @@ export const baseItsKvs = (operator: SWallet | SContract, interchainTokenFactory
   ];
 };
 
-export async function mockGatewayMessageApproved(payload: string, operator: SWallet) {
+export async function mockGatewayMessageApproved(
+  payload: string,
+  operator: LSWallet,
+  sourceChain: string = OTHER_CHAIN_NAME,
+  sourceAddress: string = OTHER_CHAIN_ADDRESS,
+) {
   const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
 
-  const messageHash = getMessageHash(OTHER_CHAIN_NAME, MESSAGE_ID, OTHER_CHAIN_ADDRESS, its, payloadHash);
+  const messageHash = getMessageHash(sourceChain, MESSAGE_ID, sourceAddress, its, payloadHash);
 
-  const crossChainId = e.Tuple(e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID));
+  const crossChainId = e.Tuple(e.Str(sourceChain), e.Str(MESSAGE_ID));
 
   // Mock call approved by gateway
   await gateway.setAccount({

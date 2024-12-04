@@ -1,15 +1,13 @@
-use multiversx_sc::api::KECCAK256_RESULT_LEN;
-
 use token_manager::flow_limit::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
-use crate::constants::TokenId;
-use crate::{events, express_executor_tracker};
+use crate::constants::{Hash, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS, KEEP_EXTRA_GAS};
+use crate::{address_tracker, events, proxy_gmp};
 
 multiversx_sc::imports!();
 
 pub mod executable_contract_proxy {
-    use multiversx_sc::api::KECCAK256_RESULT_LEN;
+    use crate::constants::TokenId;
 
     multiversx_sc::imports!();
 
@@ -24,25 +22,14 @@ pub mod executable_contract_proxy {
             message_id: &ManagedBuffer,
             source_address: ManagedBuffer,
             data: ManagedBuffer,
-            token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        );
-
-        #[payable("*")]
-        #[endpoint(expressExecuteWithInterchainToken)]
-        fn express_execute_with_interchain_token(
-            &self,
-            source_chain: &ManagedBuffer,
-            message_id: &ManagedBuffer,
-            source_address: ManagedBuffer,
-            data: ManagedBuffer,
-            token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
+            token_id: TokenId<Self::Api>,
         );
     }
 }
 
 #[multiversx_sc::module]
 pub trait ProxyItsModule:
-    events::EventsModule + express_executor_tracker::ExpressExecutorTracker
+    events::EventsModule + proxy_gmp::ProxyGmpModule + address_tracker::AddressTracker
 {
     fn token_manager_take_token(
         &self,
@@ -50,7 +37,7 @@ pub trait ProxyItsModule:
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
     ) {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .take_token()
             .with_egld_or_single_esdt_transfer(EgldOrEsdtTokenPayment::new(
                 token_identifier,
@@ -61,7 +48,7 @@ pub trait ProxyItsModule:
     }
 
     fn token_manager_set_flow_limit(&self, token_id: &TokenId<Self::Api>, flow_limit: &BigUint) {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .set_flow_limit(flow_limit)
             .execute_on_dest_context::<()>();
     }
@@ -72,7 +59,7 @@ pub trait ProxyItsModule:
         destination_address: &ManagedAddress,
         amount: &BigUint,
     ) -> (EgldOrEsdtTokenIdentifier, BigUint) {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .give_token(destination_address, amount)
             .execute_on_dest_context::<MultiValue2<EgldOrEsdtTokenIdentifier, BigUint>>()
             .into_tuple()
@@ -86,7 +73,7 @@ pub trait ProxyItsModule:
         symbol: ManagedBuffer,
         decimals: u8,
     ) {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .deploy_interchain_token(minter, name, symbol, decimals)
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
@@ -96,89 +83,81 @@ pub trait ProxyItsModule:
     fn executable_contract_execute_with_interchain_token(
         &self,
         destination_address: ManagedAddress,
+        original_source_chain: ManagedBuffer,
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
         source_address: ManagedBuffer,
+        payload_hash: Hash<Self::Api>,
+        original_source_address: ManagedBuffer,
         data: ManagedBuffer,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
     ) {
+        let gas_left = self.blockchain().get_gas_left();
+
+        require!(
+            gas_left > EXECUTE_WITH_TOKEN_CALLBACK_GAS + KEEP_EXTRA_GAS,
+            "Not enough gas left for async call"
+        );
+
+        let gas_limit = gas_left - EXECUTE_WITH_TOKEN_CALLBACK_GAS - KEEP_EXTRA_GAS;
+
+        require!(
+            self.transfer_with_data_lock(&source_chain, &message_id)
+                .is_empty(),
+            "Async call in progress"
+        );
+
+        self.transfer_with_data_lock(&source_chain, &message_id)
+            .set(true);
+
         self.executable_contract_proxy(destination_address)
             .execute_with_interchain_token(
-                &source_chain,
+                &original_source_chain,
                 &message_id,
-                source_address,
+                original_source_address,
                 data,
                 token_id.clone(),
             )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
+            .with_gas_limit(gas_limit)
             .with_callback(self.callbacks().execute_with_token_callback(
                 source_chain,
                 message_id,
-                token_id,
-                token_identifier,
-                amount,
-            ))
-            .async_call_and_exit();
-    }
-
-    fn executable_contract_express_execute_with_interchain_token(
-        &self,
-        destination_address: ManagedAddress,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        data: ManagedBuffer,
-        token_id: TokenId<Self::Api>,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
-        express_executor: ManagedAddress,
-        express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-    ) {
-        self.executable_contract_proxy(destination_address)
-            .express_execute_with_interchain_token(
-                &source_chain,
-                &message_id,
                 source_address,
-                data,
+                payload_hash,
                 token_id,
-            )
-            .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
-            .with_callback(self.callbacks().exp_execute_with_token_callback(
-                express_executor,
-                source_chain,
-                message_id,
                 token_identifier,
                 amount,
-                express_hash,
             ))
-            .async_call_and_exit();
+            .with_extra_gas_for_callback(EXECUTE_WITH_TOKEN_CALLBACK_GAS)
+            .register_promise();
     }
 
     #[view(flowLimit)]
     fn flow_limit(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
+        self.token_manager_proxy(self.deployed_token_manager(&token_id))
             .flow_limit()
             .execute_on_dest_context()
     }
 
     #[view(flowOutAmount)]
     fn flow_out_amount(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
+        self.token_manager_proxy(self.deployed_token_manager(&token_id))
             .get_flow_out_amount()
             .execute_on_dest_context()
     }
 
     #[view(flowInAmount)]
     fn flow_in_amount(&self, token_id: TokenId<Self::Api>) -> BigUint {
-        self.token_manager_proxy(self.valid_token_manager_address(&token_id))
+        self.token_manager_proxy(self.deployed_token_manager(&token_id))
             .get_flow_in_amount()
             .execute_on_dest_context()
     }
 
-    #[view(validTokenManagerAddress)]
-    fn valid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
+    #[view(deployedTokenManager)]
+    fn deployed_token_manager(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
         let token_manager_address_mapper = self.token_manager_address(token_id);
 
         require!(
@@ -189,9 +168,12 @@ pub trait ProxyItsModule:
         token_manager_address_mapper.get()
     }
 
-    #[view(validTokenIdentifier)]
-    fn valid_token_identifier(&self, token_id: &TokenId<Self::Api>) -> EgldOrEsdtTokenIdentifier {
-        self.token_manager_proxy(self.valid_token_manager_address(token_id))
+    #[view(registeredTokenIdentifier)]
+    fn registered_token_identifier(
+        &self,
+        token_id: &TokenId<Self::Api>,
+    ) -> EgldOrEsdtTokenIdentifier {
+        self.token_manager_proxy(self.deployed_token_manager(token_id))
             .token_identifier()
             .execute_on_dest_context()
     }
@@ -223,12 +205,13 @@ pub trait ProxyItsModule:
         sc_address: ManagedAddress,
     ) -> executable_contract_proxy::Proxy<Self::Api>;
 
-    // This seems to work fine on Devnet
-    #[callback]
+    #[promises_callback]
     fn execute_with_token_callback(
         &self,
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
+        source_address: ManagedBuffer,
+        payload_hash: Hash<Self::Api>,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
@@ -236,9 +219,23 @@ pub trait ProxyItsModule:
     ) {
         match result {
             ManagedAsyncCallResult::Ok(_) => {
+                self.transfer_with_data_lock(&source_chain, &message_id)
+                    .clear();
+
+                // This will always be true
+                let _ = self.gateway_validate_message(
+                    &source_chain,
+                    &message_id,
+                    &source_address,
+                    &payload_hash,
+                );
+
                 self.execute_with_interchain_token_success_event(source_chain, message_id);
             }
             ManagedAsyncCallResult::Err(_) => {
+                self.transfer_with_data_lock(&source_chain, &message_id)
+                    .clear();
+
                 self.token_manager_take_token(&token_id, token_identifier, amount);
 
                 self.execute_with_interchain_token_failed_event(source_chain, message_id);
@@ -246,38 +243,11 @@ pub trait ProxyItsModule:
         }
     }
 
-    // This seems to work fine on Devnet
-    #[callback]
-    fn exp_execute_with_token_callback(
+    #[view(transferWithDataLock)]
+    #[storage_mapper("transfer_with_data_lock")]
+    fn transfer_with_data_lock(
         &self,
-        express_executor: ManagedAddress,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
-        express_hash: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
-    ) {
-        match result {
-            ManagedAsyncCallResult::Ok(_) => {
-                self.express_execute_with_interchain_token_success_event(
-                    source_chain,
-                    message_id,
-                    express_executor,
-                );
-            }
-            ManagedAsyncCallResult::Err(_) => {
-                self.send()
-                    .direct(&express_executor, &token_identifier, 0, &amount);
-
-                self.express_execute(&express_hash).clear();
-
-                self.express_execute_with_interchain_token_failed_event(
-                    source_chain,
-                    message_id,
-                    express_executor,
-                );
-            }
-        }
-    }
+        source_chain: &ManagedBuffer,
+        message_id: &ManagedBuffer,
+    ) -> SingleValueMapper<bool>;
 }

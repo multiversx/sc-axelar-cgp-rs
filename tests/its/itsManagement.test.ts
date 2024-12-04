@@ -1,5 +1,5 @@
 import { afterEach, assert, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, Encodable, SWallet, SWorld } from 'xsuite';
+import { assertAccount, e, Encodable, LSWallet, LSWorld } from 'xsuite';
 import {
   ADDRESS_ZERO,
   CHAIN_NAME,
@@ -28,14 +28,14 @@ import {
 } from '../itsHelpers';
 import createKeccakHash from 'keccak';
 
-let world: SWorld;
-let deployer: SWallet;
-let collector: SWallet;
-let user: SWallet;
-let otherUser: SWallet;
+let world: LSWorld;
+let deployer: LSWallet;
+let collector: LSWallet;
+let user: LSWallet;
+let otherUser: LSWallet;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -166,7 +166,7 @@ test('Init errors', async () => {
       e.Str(OTHER_CHAIN_ADDRESS),
     ],
   }).assertFail({ code: 4, message: 'Zero string length' });
-});
+}, { timeout: 30_000 });
 
 test('Set interchain token factory', async () => {
   await deployContracts(deployer, collector, false);
@@ -201,7 +201,7 @@ test('Set interchain token factory', async () => {
     gasLimit: 10_000_000,
   });
 
-  const kvs = await its.getAccountWithKvs();
+  const kvs = await its.getAccount();
   assertAccount(kvs, {
     kvs: [
       ...baseItsKvs(deployer, interchainTokenFactory),
@@ -231,7 +231,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -271,7 +271,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -301,7 +301,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    kvs = await its.getAccountWithKvs();
+    kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -362,7 +362,7 @@ describe('Operatorship', () => {
       ],
     });
 
-    let kvs = await its.getAccountWithKvs();
+    let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -402,7 +402,7 @@ describe('Pause unpause', () => {
       funcArgs: [],
     });
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -439,28 +439,6 @@ describe('Pause unpause', () => {
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
         e.TopBuffer(user.toTopU8A()), // minter
-      ],
-    }).assertFail({ code: 4, message: 'Contract is paused' });
-
-    await world.query({
-      callee: its,
-      funcName: 'contractCallValue',
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(OTHER_CHAIN_ADDRESS),
-        e.Buffer(''),
-      ],
-    }).assertFail({ code: 4, message: 'Contract is paused' });
-
-    await user.callContract({
-      callee: its,
-      funcName: 'expressExecute',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(OTHER_CHAIN_ADDRESS),
-        e.Buffer(''),
       ],
     }).assertFail({ code: 4, message: 'Contract is paused' });
 
@@ -508,7 +486,7 @@ describe('Pause unpause', () => {
 
     // mock paused
     await its.setAccount({
-      ...await its.getAccountWithKvs(),
+      ...await its.getAccount(),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
@@ -530,7 +508,7 @@ describe('Pause unpause', () => {
       funcArgs: [],
     });
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -596,13 +574,12 @@ describe('Address tracker', () => {
     });
     const someChainAddressHash = createKeccakHash('keccak256').update(someChainAddress).digest('hex');
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
-        e.kvs.Mapper('trusted_address_hash', e.Str(someChainName)).Value(e.TopBuffer(someChainAddressHash)),
         e.kvs.Mapper('trusted_address', e.Str(someChainName)).Value(e.Str(someChainAddress)),
       ],
     });
@@ -638,7 +615,7 @@ describe('Address tracker', () => {
       ],
     });
 
-    const kvs = await its.getAccountWithKvs();
+    const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -647,7 +624,6 @@ describe('Address tracker', () => {
         e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
 
         // OTHER_CHAIN_NAME was deleted
-        e.kvs.Mapper('trusted_address_hash', e.Str(OTHER_CHAIN_NAME)).Value(e.Buffer('')),
         e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Buffer('')),
       ],
     });
@@ -673,18 +649,6 @@ describe('Address tracker', () => {
     });
 
     assert(result.returnData[0] === e.Str(OTHER_CHAIN_ADDRESS).toTopHex());
-
-    result = await world.query({
-      callee: its,
-      funcName: 'trustedAddressHash',
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-      ],
-    });
-
-    const otherChainAddressHash = createKeccakHash('keccak256').update(OTHER_CHAIN_ADDRESS).digest('hex');
-
-    assert(result.returnData[0] === otherChainAddressHash);
   });
 });
 
@@ -742,7 +706,7 @@ describe('Set flow limits', () => {
     });
 
     let tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
-    let tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [
@@ -758,7 +722,7 @@ describe('Set flow limits', () => {
     });
 
     tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS_2);
-    tokenManagerKvs = await tokenManager.getAccountWithKvs();
+    tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
       kvs: [

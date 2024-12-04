@@ -1,7 +1,6 @@
 import { afterEach, assert, beforeEach, describe, test } from 'vitest';
-import { assertAccount, d, e, Encodable, SContract, SWallet, SWorld } from 'xsuite';
+import { assertAccount, d, e, Encodable, LSContract, LSWallet, LSWorld } from 'xsuite';
 import { ADDRESS_ZERO, getKeccak256Hash, getMessageHash, MESSAGE_ID, PAYLOAD_HASH, TOKEN_ID } from './helpers';
-import createKeccakHash from 'keccak';
 import fs from 'fs';
 import { baseGatewayKvs, deployGatewayContract, gateway } from './itsHelpers';
 import { Buffer } from 'buffer';
@@ -9,13 +8,13 @@ import { Buffer } from 'buffer';
 const GOVERNANCE_CHAIN = 'Axelar';
 const GOVERNANCE_ADDRESS = 'axelar1u5jhn5876mjzmgw7j37mdvqh4qp5y6z2gc6rc3';
 
-let world: SWorld;
-let deployer: SWallet;
-let contract: SContract;
+let world: LSWorld;
+let deployer: LSWallet;
+let contract: LSContract;
 let address: string;
 
 beforeEach(async () => {
-  world = await SWorld.start();
+  world = await LSWorld.start();
   await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
@@ -59,7 +58,7 @@ const deployContract = async () => {
     ],
   }));
 
-  let kvs = await contract.getAccountWithKvs();
+  let kvs = await contract.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseKvs(),
@@ -67,7 +66,7 @@ const deployContract = async () => {
 
   // Change owner of gateway to governance contract so it can upgrade
   await gateway.setAccount({
-    ...await gateway.getAccountWithKvs(),
+    ...await gateway.getAccount(),
     owner: contract,
   });
 };
@@ -189,7 +188,7 @@ describe('Execute proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
@@ -244,7 +243,7 @@ describe('Execute proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
@@ -267,7 +266,7 @@ describe('Execute proposal', () => {
     });
 
     // Time lock eta was NOT deleted
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
@@ -277,7 +276,7 @@ describe('Execute proposal', () => {
     });
 
     // Assert deployer still has the tokens
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
       ],
@@ -297,13 +296,13 @@ describe('Execute proposal', () => {
     });
 
     // Time lock eta was deleted
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: baseKvs(),
     });
 
     // Assert user received tokens
-    assertAccount(await user.getAccountWithKvs(), {
+    assertAccount(await user.getAccount(), {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
       ],
@@ -335,7 +334,7 @@ describe('Execute proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
@@ -368,13 +367,13 @@ describe('Execute proposal', () => {
     });
 
     // Time lock eta was deleted
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: baseKvs(),
     });
 
     // Assert Gateway was successfully upgraded (operator was changed)
-    assertAccount(await gateway.getAccountWithKvs(), {
+    assertAccount(await gateway.getAccount(), {
       kvs: baseGatewayKvs(newOperator),
     });
   });
@@ -398,7 +397,7 @@ describe('Execute proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
@@ -421,7 +420,7 @@ describe('Execute proposal', () => {
     }); // async call actually fails
 
     // Time lock eta was NOT deleted and refund token was created
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 1_000, // EGLD still in contract
       kvs: [
@@ -442,7 +441,7 @@ describe('Execute proposal', () => {
       ],
     });
 
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n, // got egld back
     });
   });
@@ -470,7 +469,7 @@ describe('Execute proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
@@ -504,7 +503,7 @@ describe('Execute proposal', () => {
     }); // async call actually fails
 
     // Time lock eta was NOT deleted and refund token was created
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
@@ -531,7 +530,7 @@ describe('Execute proposal', () => {
     }); // async call actually fails
 
     // Amount was added to refund token
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
@@ -553,7 +552,7 @@ describe('Execute proposal', () => {
       ],
     });
 
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n,
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]), // got esdt back
@@ -575,17 +574,17 @@ describe('Execute proposal', () => {
     });
 
     // Nothing has changed
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n,
     });
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: baseKvs(),
     });
 
     // Mock refund tokens
     await contract.setAccount({
-      ...(await contract.getAccountWithKvs()),
+      ...(await contract.getAccount()),
       balance: 1_000n,
       kvs: [
         ...baseKvs(),
@@ -606,13 +605,13 @@ describe('Execute proposal', () => {
       ],
     });
 
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n,
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 2_000, nonce: 1 }]), // got esdt back
       ],
     });
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 1_000n,
       kvs: [
         ...baseKvs(),
@@ -629,13 +628,13 @@ describe('Execute proposal', () => {
         e.Tuple(e.Str('EGLD'), e.U64(0))],
     });
 
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       balance: 10_000_001_000n, // got egld back
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 2_000, nonce: 1 }]),
       ],
     });
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0,
       kvs: baseKvs(),
     });
@@ -1103,7 +1102,7 @@ test('Withdraw', async () => {
 
   // Mock hash & balance
   await contract.setAccount({
-    ...await contract.getAccountWithKvs(),
+    ...await contract.getAccount(),
     balance: 100,
     kvs: [
       ...baseKvs(),
@@ -1126,7 +1125,7 @@ test('Withdraw', async () => {
   });
 
   // Time lock eta was deleted and amount was sent to deployer
-  let kvs = await contract.getAccountWithKvs();
+  let kvs = await contract.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -1134,7 +1133,7 @@ test('Withdraw', async () => {
     ],
   });
 
-  kvs = await deployer.getAccountWithKvs();
+  kvs = await deployer.getAccount();
   assertAccount(kvs, {
     balance: 10_000_000_100n,
   });
@@ -1322,7 +1321,7 @@ test('Execute schedule time lock proposal min eta', async () => {
 
   const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
-  let kvs = await contract.getAccountWithKvs();
+  let kvs = await contract.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -1360,7 +1359,7 @@ test('Execute schedule time lock proposal eta', async () => {
 
   const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
-  let kvs = await contract.getAccountWithKvs();
+  let kvs = await contract.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: [
@@ -1412,7 +1411,7 @@ test('Execute cancel time lock proposal', async () => {
   const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
   await contract.setAccount({
-    ...await contract.getAccountWithKvs(),
+    ...await contract.getAccount(),
     kvs: [
       ...baseKvs(),
 
@@ -1433,7 +1432,7 @@ test('Execute cancel time lock proposal', async () => {
   });
 
   // Time lock eta was removed
-  const kvs = await contract.getAccountWithKvs();
+  const kvs = await contract.getAccount();
   assertAccount(kvs, {
     balance: 0n,
     kvs: baseKvs(),

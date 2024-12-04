@@ -4,9 +4,7 @@ use multiversx_sc_scenario::api::StaticApi;
 
 use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::Token;
-use interchain_token_service::constants::{
-    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload,
-};
+use interchain_token_service::constants::{DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, SendToHubPayload, ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB};
 use token_manager::constants::TokenManagerType;
 
 #[test]
@@ -261,6 +259,55 @@ fn encode_deploy_interchain_token_payload() {
             53796d626f6c0000000000000000000000000000000000000000000000000000
             0000000000000000000000000000000000000000000000000000000000000014
             f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
+        "
+    );
+    assert_eq!(encoded, ManagedBuffer::from(&expected));
+}
+
+#[test]
+fn encode_send_to_hub_payload() {
+    let data = InterchainTransferPayload::<StaticApi> {
+        message_type: BigUint::from(11u64),
+        token_id: ManagedByteArray::from(&hex!(
+            "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
+        )),
+        source_address: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
+        destination_address: ManagedBuffer::from(&hex!(
+            "000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf"
+        )),
+        amount: BigUint::from(23456789u64),
+        data: ManagedBuffer::new(),
+    };
+
+    let encoded = data.abi_encode();
+
+    let data = SendToHubPayload::<StaticApi> {
+        message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
+        destination_chain: ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+        payload: encoded,
+    };
+
+    let encoded = data.abi_encode();
+
+    let expected = hex!(
+        "
+            0000000000000000000000000000000000000000000000000000000000000003
+            0000000000000000000000000000000000000000000000000000000000000060
+            00000000000000000000000000000000000000000000000000000000000000a0
+            0000000000000000000000000000000000000000000000000000000000000006
+            6178656c61720000000000000000000000000000000000000000000000000000
+            0000000000000000000000000000000000000000000000000000000000000160
+            000000000000000000000000000000000000000000000000000000000000000b
+            131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
+            00000000000000000000000000000000000000000000000000000000000000c0
+            0000000000000000000000000000000000000000000000000000000000000100
+            000000000000000000000000000000000000000000000000000000000165ec15
+            0000000000000000000000000000000000000000000000000000000000000140
+            0000000000000000000000000000000000000000000000000000000000000014
+            f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
+            0000000000000000000000000000000000000000000000000000000000000020
+            000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf
+            0000000000000000000000000000000000000000000000000000000000000000
         "
     );
     assert_eq!(encoded, ManagedBuffer::from(&expected));
