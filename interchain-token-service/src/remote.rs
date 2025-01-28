@@ -1,12 +1,10 @@
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use token_manager::constants::TokenManagerType;
 
 use crate::abi::AbiEncodeDecode;
+use crate::abi_types::{DeployInterchainTokenPayload, InterchainTransferPayload};
 use crate::constants::{
-    DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, Metadata,
-    MetadataVersion, TokenId, TransferAndGasTokens, LATEST_METADATA_VERSION,
-    MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
-    MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    Metadata, MetadataVersion, TokenId, TransferAndGasTokens, LATEST_METADATA_VERSION,
+    MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
 use crate::{address_tracker, events, proxy_gmp, proxy_its};
 
@@ -20,44 +18,6 @@ pub trait RemoteModule:
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
-    fn deploy_remote_token_manager(
-        &self,
-        token_id: &TokenId<Self::Api>,
-        destination_chain: ManagedBuffer,
-        token_manager_type: TokenManagerType,
-        params: ManagedBuffer,
-        gas_token: EgldOrEsdtTokenIdentifier,
-        gas_value: BigUint,
-    ) {
-        self.deployed_token_manager(token_id);
-
-        let message_type = BigUint::from(MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER);
-        let data = DeployTokenManagerPayload {
-            message_type: message_type.clone(),
-            token_id: token_id.clone(),
-            token_manager_type,
-            params: params.clone(),
-        };
-
-        let payload = data.abi_encode();
-
-        self.call_contract(
-            message_type,
-            destination_chain.clone(),
-            payload,
-            MetadataVersion::ContractCall,
-            gas_token,
-            gas_value,
-        );
-
-        self.emit_token_manager_deployment_started(
-            token_id,
-            destination_chain,
-            token_manager_type,
-            params,
-        );
-    }
-
     fn deploy_remote_interchain_token(
         &self,
         token_id: &TokenId<Self::Api>,
@@ -74,9 +34,8 @@ pub trait RemoteModule:
 
         self.deployed_token_manager(token_id);
 
-        let message_type = BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN);
         let data = DeployInterchainTokenPayload {
-            message_type: message_type.clone(),
+            message_type: BigUint::from(MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN),
             token_id: token_id.clone(),
             name: name.clone(),
             symbol: symbol.clone(),
@@ -86,8 +45,7 @@ pub trait RemoteModule:
 
         let payload = data.abi_encode();
 
-        self.call_contract(
-            message_type,
+        self.route_message(
             destination_chain.clone(),
             payload,
             MetadataVersion::ContractCall,
@@ -124,9 +82,8 @@ pub trait RemoteModule:
             self.crypto().keccak256(&data)
         };
 
-        let message_type = BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER);
         let payload = InterchainTransferPayload {
-            message_type: message_type.clone(),
+            message_type: BigUint::from(MESSAGE_TYPE_INTERCHAIN_TRANSFER),
             token_id: token_id.clone(),
             source_address: source_address.as_managed_buffer().clone(),
             destination_address: destination_address.clone(),
@@ -136,8 +93,7 @@ pub trait RemoteModule:
 
         let payload = payload.abi_encode();
 
-        self.call_contract(
-            message_type,
+        self.route_message(
             destination_chain.clone(),
             payload,
             metadata_version,

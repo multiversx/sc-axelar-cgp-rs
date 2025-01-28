@@ -27,7 +27,7 @@ pub trait ProxyModule {
 
     fn its_deploy_interchain_token(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
@@ -36,7 +36,7 @@ pub trait ProxyModule {
         gas_value: BigUint,
     ) {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .deploy_interchain_token(salt, destination_chain, name, symbol, decimals, minter)
+            .deploy_interchain_token(deploy_salt, destination_chain, name, symbol, decimals, minter)
             .with_egld_transfer(gas_value)
             .execute_on_dest_context::<()>();
     }
@@ -53,16 +53,40 @@ pub trait ProxyModule {
             .execute_on_dest_context()
     }
 
-    fn its_deploy_token_manager(
+    fn its_register_custom_token(
         &self,
-        salt: Hash<Self::Api>,
-        destination_chain: ManagedBuffer,
+        deploy_salt: Hash<Self::Api>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
         token_manager_type: TokenManagerType,
-        params: ManagedBuffer,
+        link_params: ManagedBuffer,
+    ) -> TokenId<Self::Api> {
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
+            .register_custom_token(
+                deploy_salt,
+                token_identifier,
+                token_manager_type,
+                link_params,
+            )
+            .execute_on_dest_context()
+    }
+
+    fn its_link_token(
+        &self,
+        deploy_salt: Hash<Self::Api>,
+        destination_chain: ManagedBuffer,
+        destination_token_address: ManagedBuffer,
+        token_manager_type: TokenManagerType,
+        link_params: ManagedBuffer,
         gas_value: BigUint,
     ) -> TokenId<Self::Api> {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .deploy_token_manager(salt, destination_chain, token_manager_type, params)
+            .link_token(
+                deploy_salt,
+                destination_chain,
+                destination_token_address,
+                token_manager_type,
+                link_params,
+            )
             .with_egld_transfer(gas_value)
             .execute_on_dest_context()
     }
@@ -191,10 +215,10 @@ pub trait ProxyModule {
     #[callback]
     fn deploy_remote_token_callback(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         token_symbol: ManagedBuffer,
-        minter_raw: &ManagedBuffer,
+        destination_minter: &ManagedBuffer,
         gas_value: BigUint,
         caller: ManagedAddress,
         #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
@@ -223,17 +247,17 @@ pub trait ProxyModule {
                 let token_decimals = token_decimals_buf.ascii_to_u8();
 
                 self.its_deploy_interchain_token(
-                    salt,
+                    deploy_salt,
                     destination_chain,
                     token_name,
                     token_symbol,
                     token_decimals,
-                    minter_raw,
+                    destination_minter,
                     gas_value,
                 );
             }
             ManagedAsyncCallResult::Err(_) => {
-                // Send back payed gas value to initial caller
+                // Send back paid gas value to initial caller
                 self.send().direct_non_zero_egld(&caller, &gas_value);
             }
         }

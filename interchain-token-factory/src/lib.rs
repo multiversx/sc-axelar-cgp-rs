@@ -2,11 +2,11 @@
 
 use core::ops::Deref;
 
-use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
+use token_manager::constants::TokenManagerType;
 
 use crate::constants::{
-    DeployApproval, Hash, TokenId, PREFIX_CANONICAL_TOKEN_SALT, PREFIX_DEPLOY_APPROVAL,
-    PREFIX_INTERCHAIN_TOKEN_SALT,
+    DeployApproval, Hash, TokenId, PREFIX_CANONICAL_TOKEN_SALT, PREFIX_CUSTOM_TOKEN_SALT,
+    PREFIX_DEPLOY_APPROVAL, PREFIX_INTERCHAIN_TOKEN_SALT,
 };
 use crate::proxy::CallbackProxy as _;
 
@@ -55,7 +55,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
 
         let own_address = self.blockchain().get_sc_address();
 
-        let mut minter_bytes = &ManagedBuffer::new();
+        let minter_bytes;
 
         if initial_supply > 0 {
             minter_bytes = own_address.as_managed_buffer()
@@ -66,7 +66,9 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
             );
 
             minter_bytes = minter.as_managed_buffer()
-        };
+        } else {
+            sc_panic!("Zero supply token");
+        }
 
         let token_id = self.its_interchain_token_id(&deploy_salt);
         let token_manager = self.its_invalid_token_manager_address(&token_id);
@@ -189,10 +191,24 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         self.approved_destination_minters(&approval_key).clear();
     }
 
-    // Combines deployRemoteInterchainToken & deployRemoteInterchainTokenWithMinter
     #[payable("EGLD")]
     #[endpoint(deployRemoteInterchainToken)]
     fn deploy_remote_interchain_token(
+        &self,
+        salt: Hash<Self::Api>,
+        destination_chain: ManagedBuffer,
+    ) -> TokenId<Self::Api> {
+        self.deploy_remote_interchain_token_with_minter(
+            salt,
+            ManagedAddress::zero(),
+            destination_chain,
+            OptionalValue::None,
+        )
+    }
+
+    #[payable("EGLD")]
+    #[endpoint(deployRemoteInterchainTokenWithMinter)]
+    fn deploy_remote_interchain_token_with_minter(
         &self,
         salt: Hash<Self::Api>,
         minter: ManagedAddress,
@@ -235,6 +251,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         )
     }
 
+    // TODO: Test this
     #[endpoint(registerCanonicalInterchainToken)]
     fn register_canonical_interchain_token(
         &self,
@@ -242,25 +259,16 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
     ) -> TokenId<Self::Api> {
         require!(token_identifier.is_valid(), "Invalid token identifier");
 
-        let mut params = ManagedBuffer::new();
+        let deploy_salt = self.canonical_interchain_token_deploy_salt(token_identifier.clone());
 
-        DeployTokenManagerParams {
-            operator: None,
-            token_identifier: Some(token_identifier.clone()),
-        }
-        .top_encode(&mut params)
-        .unwrap();
+        // No custom operator is set for canonical token registration
+        let link_params = ManagedBuffer::new();
 
-        let deploy_salt = self.canonical_interchain_token_deploy_salt(token_identifier);
-        let current_chain = ManagedBuffer::new();
-        let gas_value = BigUint::zero();
-
-        self.its_deploy_token_manager(
+        self.its_register_custom_token(
             deploy_salt,
-            current_chain,
+            token_identifier,
             TokenManagerType::LockUnlock,
-            params,
-            gas_value,
+            link_params,
         )
     }
 
@@ -284,6 +292,60 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
             destination_chain,
             minter,
             self.blockchain().get_caller(),
+        )
+    }
+
+    // TODO: Test
+    #[endpoint(registerCustomToken)]
+    fn register_custom_token(
+        &self,
+        salt: Hash<Self::Api>,
+        token_identifier: TokenIdentifier,
+        token_manager_type: TokenManagerType,
+        operator: ManagedAddress,
+    ) -> TokenId<Self::Api> {
+        require!(
+            token_identifier.is_valid_esdt_identifier(),
+            "Invalid token identifier"
+        );
+
+        let deploy_salt = self.linked_token_deploy_salt(&self.blockchain().get_caller(), &salt);
+        let mut link_params = ManagedBuffer::new();
+
+        if !operator.is_zero() {
+            link_params.append(operator.as_managed_buffer());
+        }
+
+        self.its_register_custom_token(
+            deploy_salt,
+            EgldOrEsdtTokenIdentifier::esdt(token_identifier),
+            token_manager_type,
+            link_params,
+        )
+    }
+
+    // TODO: Test
+    #[payable("EGLD")]
+    #[endpoint(linkToken)]
+    fn link_token(
+        &self,
+        salt: Hash<Self::Api>,
+        destination_chain: ManagedBuffer,
+        destination_token_address: ManagedBuffer,
+        token_manager_type: TokenManagerType,
+        link_params: ManagedBuffer,
+    ) -> TokenId<Self::Api> {
+        let deploy_salt = self.linked_token_deploy_salt(&self.blockchain().get_caller(), &salt);
+
+        let gas_value = self.call_value().egld_value().clone_value();
+
+        self.its_link_token(
+            deploy_salt,
+            destination_chain,
+            destination_token_address,
+            token_manager_type,
+            link_params,
+            gas_value,
         )
     }
 
@@ -342,8 +404,8 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         destination_minter: ManagedBuffer,
         sender: ManagedAddress,
     ) -> TokenId<Self::Api> {
+        // Ensure that a token is registered locally for the tokenId before allowing a remote deployment
         let expected_token_id = self.its_interchain_token_id(&deploy_salt);
-        // Ensure that a local token has been registered for the tokenId
         let token_identifier = self.its_registered_token_identifier(&expected_token_id);
 
         let gas_value = self.call_value().egld_value().clone_value();
@@ -422,6 +484,26 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         self.crypto().keccak256(encoded)
     }
 
+    #[view(linkedTokenDeploySalt)]
+    fn linked_token_deploy_salt(
+        &self,
+        deployer: &ManagedAddress,
+        salt: &Hash<Self::Api>,
+    ) -> Hash<Self::Api> {
+        let prefix_custom_token_salt = self
+            .crypto()
+            .keccak256(ManagedBuffer::new_from_bytes(PREFIX_CUSTOM_TOKEN_SALT));
+
+        let mut encoded = ManagedBuffer::new();
+
+        encoded.append(prefix_custom_token_salt.as_managed_buffer());
+        encoded.append(self.chain_name_hash().get().as_managed_buffer());
+        encoded.append(deployer.as_managed_buffer());
+        encoded.append(salt.as_managed_buffer());
+
+        self.crypto().keccak256(encoded)
+    }
+
     #[view(interchainTokenId)]
     fn interchain_token_id(
         &self,
@@ -439,6 +521,17 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         token_identifier: EgldOrEsdtTokenIdentifier,
     ) -> TokenId<Self::Api> {
         let deploy_salt = self.canonical_interchain_token_deploy_salt(token_identifier);
+
+        self.its_interchain_token_id(&deploy_salt)
+    }
+
+    #[view(linkedTokenId)]
+    fn linked_token_id(
+        &self,
+        deployer: &ManagedAddress,
+        salt: &Hash<Self::Api>,
+    ) -> TokenId<Self::Api> {
+        let deploy_salt = self.linked_token_deploy_salt(deployer, salt);
 
         self.its_interchain_token_id(&deploy_salt)
     }

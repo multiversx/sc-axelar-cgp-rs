@@ -3,13 +3,14 @@
 use core::ops::Deref;
 
 use crate::constants::{
-    TokenId, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
-    MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    TokenId, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    MESSAGE_TYPE_LINK_TOKEN,
 };
 
 multiversx_sc::imports!();
 
 pub mod abi;
+pub mod abi_types;
 pub mod address_tracker;
 pub mod constants;
 pub mod events;
@@ -142,7 +143,16 @@ pub trait InterchainTokenServiceContract:
                     payload,
                 );
             }
-            MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER => {
+            MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN => {
+                self.process_deploy_interchain_token_payload(
+                    source_chain,
+                    message_id,
+                    source_address,
+                    payload_hash,
+                    payload,
+                );
+            }
+            MESSAGE_TYPE_LINK_TOKEN => {
                 require!(
                     self.call_value().egld_value().deref() == &BigUint::zero(),
                     "Can not send EGLD payment if not issuing ESDT"
@@ -157,16 +167,7 @@ pub trait InterchainTokenServiceContract:
 
                 require!(valid, "Not approved by gateway");
 
-                self.process_deploy_token_manager_payload(payload);
-            }
-            MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN => {
-                self.process_deploy_interchain_token_payload(
-                    source_chain,
-                    message_id,
-                    source_address,
-                    payload_hash,
-                    payload,
-                );
+                self.process_link_token_payload(payload);
             }
             _ => {
                 sc_panic!("Invalid message type");

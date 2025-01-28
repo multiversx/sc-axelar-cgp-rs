@@ -1,7 +1,13 @@
+use core::ops::Deref;
 use token_manager::flow_limit::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
-use crate::constants::{Hash, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS, KEEP_EXTRA_GAS};
+use crate::abi::AbiEncodeDecode;
+use crate::abi_types::RegisterTokenMetadataPayload;
+use crate::constants::{
+    Hash, ManagedBufferAscii, MetadataVersion, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS,
+    ITS_HUB_CHAIN_NAME, KEEP_EXTRA_GAS, MESSAGE_TYPE_REGISTER_TOKEN_METADATA,
+};
 use crate::{address_tracker, events, proxy_gmp};
 
 multiversx_sc::imports!();
@@ -135,6 +141,27 @@ pub trait ProxyItsModule:
             .register_promise();
     }
 
+    fn register_token_metadata_async_call(
+        &self,
+        token_identifier: TokenIdentifier,
+        gas_value: BigUint,
+    ) {
+        // Get ESDT token properties
+        let mut contract_call = self.send().contract_call::<()>(
+            ESDTSystemSCAddress.to_managed_address(),
+            ManagedBuffer::from("getTokenProperties"),
+        );
+        contract_call.push_raw_argument(token_identifier.into_managed_buffer());
+
+        contract_call
+            .async_call()
+            .with_callback(
+                self.callbacks()
+                    .register_token_metadata_callback(gas_value, self.blockchain().get_caller()),
+            ) // TODO: Is the caller the correct sender here?)
+            .call_and_exit();
+    }
+
     #[view(flowLimit)]
     fn flow_limit(&self, token_id: TokenId<Self::Api>) -> BigUint {
         self.token_manager_proxy(self.deployed_token_manager(&token_id))
@@ -250,4 +277,76 @@ pub trait ProxyItsModule:
         source_chain: &ManagedBuffer,
         message_id: &ManagedBuffer,
     ) -> SingleValueMapper<bool>;
+
+    #[callback]
+    fn register_token_metadata_callback(
+        &self,
+        gas_value: BigUint,
+        caller: ManagedAddress,
+        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(values) => {
+                let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
+
+                let token_name = vec.get(0).clone_value();
+                let token_type = vec.get(1);
+                let decimals_buffer_ref = vec.get(5);
+
+                if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
+                    // Send back paid cross chain gas value to initial caller if token is non fungible
+                    self.send().direct_non_zero_egld(&caller, &gas_value);
+
+                    return;
+                }
+
+                let decimals_buffer = decimals_buffer_ref.deref();
+                // num decimals is in format string NumDecimals-DECIMALS
+                // skip `NumDecimals-` part and convert to number
+                let token_decimals_buf: ManagedBuffer = decimals_buffer
+                    .copy_slice(12, decimals_buffer.len() - 12)
+                    .unwrap();
+                let token_decimals = token_decimals_buf.ascii_to_u8();
+
+                self.register_token_metadata_raw(
+                    TokenIdentifier::from(token_name),
+                    token_decimals,
+                    gas_value,
+                );
+            }
+            ManagedAsyncCallResult::Err(_) => {
+                // Send back paid gas value to initial caller
+                self.send().direct_non_zero_egld(&caller, &gas_value);
+            }
+        }
+    }
+
+    fn register_token_metadata_raw(
+        &self,
+        token_identifier: TokenIdentifier,
+        decimals: u8,
+        gas_value: BigUint,
+    ) {
+        self.token_metadata_registered_event(&token_identifier, decimals);
+
+        let data = RegisterTokenMetadataPayload {
+            message_type: BigUint::from(MESSAGE_TYPE_REGISTER_TOKEN_METADATA),
+            token_identifier: token_identifier.into_managed_buffer(),
+            decimals,
+        };
+
+        let payload = data.abi_encode();
+
+        let its_hub_chain_name = ManagedBuffer::from(ITS_HUB_CHAIN_NAME);
+        let its_hub_address = self.trusted_address(&its_hub_chain_name).get();
+
+        self.call_contract(
+            its_hub_chain_name,
+            its_hub_address,
+            payload,
+            MetadataVersion::ContractCall,
+            EgldOrEsdtTokenIdentifier::egld(),
+            gas_value,
+        );
+    }
 }

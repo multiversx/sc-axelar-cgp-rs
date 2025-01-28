@@ -4,7 +4,8 @@ use multiversx_sc_scenario::api::StaticApi;
 
 use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::Token;
-use interchain_token_service::constants::{DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, SendToHubPayload, ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB};
+use interchain_token_service::abi_types::{DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, SendToHubPayload};
+use interchain_token_service::constants::{ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB};
 use token_manager::constants::TokenManagerType;
 
 #[test]
