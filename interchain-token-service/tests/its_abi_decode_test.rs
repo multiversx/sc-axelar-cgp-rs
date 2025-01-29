@@ -6,7 +6,7 @@ use multiversx_sc_scenario::api::StaticApi;
 use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::ParamType;
 use interchain_token_service::abi::Token;
-use interchain_token_service::abi_types::{DeployInterchainTokenPayload, DeployTokenManagerPayload, InterchainTransferPayload, SendToHubPayload};
+use interchain_token_service::abi_types::{DeployInterchainTokenPayload, InterchainTransferPayload, LinkTokenPayload, RegisterTokenMetadataPayload, SendToHubPayload};
 use interchain_token_service::constants::{
     ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB,
 };
@@ -279,34 +279,6 @@ fn decode_interchain_transfer_payload_with_data() {
 }
 
 #[test]
-fn decode_deploy_token_manager_payload() {
-    let result = DeployTokenManagerPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
-        "
-			0000000000000000000000000000000000000000000000000000000000000021
-            131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
-            0000000000000000000000000000000000000000000000000000000000000001
-            0000000000000000000000000000000000000000000000000000000000000080
-            0000000000000000000000000000000000000000000000000000000000000014
-            f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
-		"
-    )));
-
-    let expected = DeployTokenManagerPayload::<StaticApi> {
-        message_type: BigUint::from(33u64),
-        token_id: ManagedByteArray::from(&hex!(
-            "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
-        )),
-        token_manager_type: TokenManagerType::MintBurnFrom,
-        params: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
-    };
-
-    assert_eq!(result.message_type, expected.message_type);
-    assert_eq!(result.token_id, expected.token_id);
-    assert_eq!(result.token_manager_type, expected.token_manager_type);
-    assert_eq!(result.params, expected.params);
-}
-
-#[test]
 fn decode_deploy_interchain_token_payload() {
     let result = DeployInterchainTokenPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
         "
@@ -391,4 +363,65 @@ fn decode_send_to_hub_payload() {
     assert_eq!(result.message_type, expected.message_type);
     assert_eq!(result.destination_chain, expected.destination_chain);
     assert_eq!(result.payload, expected.payload);
+}
+
+#[test]
+fn decode_register_token_metadata_payload() {
+    let result = RegisterTokenMetadataPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
+        "
+			0000000000000000000000000000000000000000000000000000000000000021
+            0000000000000000000000000000000000000000000000000000000000000060
+            0000000000000000000000000000000000000000000000000000000000000012
+            000000000000000000000000000000000000000000000000000000000000000a
+            4d45582d31323334353600000000000000000000000000000000000000000000
+		"
+    )));
+
+    let expected = RegisterTokenMetadataPayload::<StaticApi> {
+        message_type: BigUint::from(33u64),
+        token_identifier: ManagedBuffer::from(&hex!("4d45582d313233343536")),
+        decimals: 18,
+    };
+
+    assert_eq!(result.message_type, expected.message_type);
+    assert_eq!(result.token_identifier, expected.token_identifier);
+    assert_eq!(result.decimals, expected.decimals);
+}
+
+#[test]
+fn decode_link_token_payload() {
+    let result = LinkTokenPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
+        "
+			0000000000000000000000000000000000000000000000000000000000000021
+            131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
+            0000000000000000000000000000000000000000000000000000000000000001
+            00000000000000000000000000000000000000000000000000000000000000c0
+            0000000000000000000000000000000000000000000000000000000000000100
+            0000000000000000000000000000000000000000000000000000000000000140
+            000000000000000000000000000000000000000000000000000000000000000a
+            4d45582d31323334353600000000000000000000000000000000000000000000
+            0000000000000000000000000000000000000000000000000000000000000014
+            a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000
+            0000000000000000000000000000000000000000000000000000000000000014
+            f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
+		"
+    )));
+
+    let expected = LinkTokenPayload::<StaticApi> {
+        message_type: BigUint::from(33u64),
+        token_id: ManagedByteArray::from(&hex!(
+            "131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b"
+        )),
+        token_manager_type: TokenManagerType::MintBurnFrom,
+        source_token_address: ManagedBuffer::from(&hex!("4d45582d313233343536")),
+        destination_token_address: ManagedBuffer::from(&hex!("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")),
+        link_params: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
+    };
+
+    assert_eq!(result.message_type, expected.message_type);
+    assert_eq!(result.token_id, expected.token_id);
+    assert_eq!(result.token_manager_type, expected.token_manager_type);
+    assert_eq!(result.source_token_address, expected.source_token_address);
+    assert_eq!(result.destination_token_address, expected.destination_token_address);
+    assert_eq!(result.link_params, expected.link_params);
 }

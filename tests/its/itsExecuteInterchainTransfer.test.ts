@@ -16,8 +16,8 @@ import {
   gateway,
   interchainTokenFactory,
   its,
-  itsDeployTokenManagerLockUnlock,
-  itsDeployTokenManagerMintBurn,
+  itsRegisterCustomTokenLockUnlock,
+  itsRegisterCustomTokenMintBurn,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER, MESSAGE_TYPE_RECEIVE_FROM_HUB,
   mockGatewayMessageApproved,
 } from '../itsHelpers';
@@ -31,7 +31,7 @@ let otherUser: LSWallet;
 
 beforeEach(async () => {
   world = await LSWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
     timestamp: 0,
@@ -100,7 +100,7 @@ const mockGatewayCall = async (interchainTokenId: string, payload: string | null
 };
 
 test('Transfer mint burn', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(world, user);
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenMintBurn(world, user);
 
   const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
 
@@ -155,7 +155,7 @@ test('Transfer mint burn', async () => {
 });
 
 test('Transfer lock unlock', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
     world,
     user,
     true,
@@ -206,7 +206,7 @@ test('Transfer lock unlock', async () => {
 });
 
 test('Flow limit', async () => {
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenMintBurn(
     world,
     user,
     1_000,
@@ -310,7 +310,7 @@ test('Errors', async () => {
   payload = AbiCoder.defaultAbiCoder().encode(
     ['uint256'],
     [
-      MESSAGE_TYPE_RECEIVE_FROM_HUB + 1, // message type unknown
+      999, // message type unknown
     ],
   ).substring(2);
 

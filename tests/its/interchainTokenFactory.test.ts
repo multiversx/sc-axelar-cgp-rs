@@ -38,7 +38,7 @@ let otherUser: LSWallet;
 
 beforeEach(async () => {
   world = await LSWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
   });
@@ -318,7 +318,7 @@ describe('Deploy interchain token', () => {
     });
   });
 
-  test('Only deploy token manager no minter no mint', async () => {
+  test('Only deploy token manager no minter no mint error', async () => {
     await deployContracts(deployer, collector);
 
     await user.callContract({
@@ -334,32 +334,7 @@ describe('Deploy interchain token', () => {
         e.U(0),
         e.Addr(ADDRESS_ZERO),
       ],
-    });
-
-    const salt = computeInterchainTokenDeploySalt(user);
-    const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), salt);
-
-    const kvs = await its.getAccount();
-    assertAccount(kvs, {
-      balance: 0n,
-      kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
-      ],
-    });
-
-    // Address zero gets roles over token manager
-    const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-    const tokenManagerKvs = await tokenManager.getAccount();
-    assertAccount(tokenManagerKvs, {
-      balance: 0n,
-      kvs: [
-        e.kvs.Mapper('interchain_token_service').Value(its),
-        e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN)),
-        e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
-        e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit and operator roles
-        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit role
-      ],
-    });
+    }).assertFail({ code: 4, message: 'Zero supply token' });
   });
 
   test('Only issue esdt minter mint', async () => {
@@ -411,7 +386,7 @@ describe('Deploy interchain token', () => {
         ...baseTokenManagerKvs,
 
         e.kvs.Mapper('account_roles', interchainTokenFactory).Value(e.U32(0b00000001)), // minter role
-        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)), // flow limiter & operator & minter roles
+        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limiter & operator roles
 
         // This was tested on Devnet and it works fine
         e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -458,7 +433,7 @@ describe('Deploy interchain token', () => {
         ...baseTokenManagerKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role
-        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)), // flow limiter & operator & minter roles
+        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limiter & operator roles
 
         // This was tested on Devnet and it works fine
         e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -742,7 +717,6 @@ describe('Deploy remote interchain token', () => {
       value: 100_000_000n,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Addr(ADDRESS_ZERO), // minter
         e.Str(OTHER_CHAIN_NAME),
       ],
     });
@@ -751,7 +725,7 @@ describe('Deploy remote interchain token', () => {
       balance: 100_000_000n,
       hasKvs: [
         e.kvs.Mapper('interchain_token_service').Value(its),
-        e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
+        e.kvs.Mapper('chain_name_hash').Value(e.TopBuffer(CHAIN_NAME_HASH)),
 
         // This seems to work fine on devnet
         e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -778,7 +752,6 @@ describe('Deploy remote interchain token', () => {
       value: 100_000_000n,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Addr(ADDRESS_ZERO), // minter
         e.Str(OTHER_CHAIN_NAME),
       ],
     });
@@ -803,12 +776,55 @@ describe('Deploy remote interchain token', () => {
     // There are events emitted for the Gateway contract, but there is no way to test those currently...
   });
 
+  test('Errors', async () => {
+    await deployContracts(deployer, collector);
+
+    // No token manager
+    await user.callContract({
+      callee: interchainTokenFactory,
+      funcName: 'deployRemoteInterchainToken',
+      gasLimit: 150_000_000,
+      value: 100_000_000n,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(OTHER_CHAIN_NAME),
+      ],
+    }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
+
+    await deployAndMockTokenManagerLockUnlock();
+
+    const { baseTokenManagerKvs } = await deployAndMockTokenManagerInterchainToken(true);
+
+    await tokenManager.setAccount({
+      ...await tokenManager.getAccount(),
+      kvs: [
+        ...baseTokenManagerKvs,
+
+        e.kvs.Mapper('token_identifier').Value(e.Str('')),
+      ],
+    });
+
+    // No token identifier
+    await user.callContract({
+      callee: interchainTokenFactory,
+      funcName: 'deployRemoteInterchainToken',
+      gasLimit: 150_000_000,
+      value: 100_000_000n,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(OTHER_CHAIN_NAME),
+      ],
+    }).assertFail({ code: 4, message: 'panic occurred' });
+  });
+});
+
+describe('Deploy remote interchain token with minter', () => {
   test('With destination minter same as minter', async () => {
     await deployAndMockTokenManagerInterchainToken(true);
 
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -845,7 +861,7 @@ describe('Deploy remote interchain token', () => {
     // Destination minter not approved
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -872,7 +888,7 @@ describe('Deploy remote interchain token', () => {
     // Wrong destination minter
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -885,7 +901,7 @@ describe('Deploy remote interchain token', () => {
 
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -923,7 +939,7 @@ describe('Deploy remote interchain token', () => {
     // No token manager
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -938,7 +954,7 @@ describe('Deploy remote interchain token', () => {
     // Lock unlock token manager doesn't have any minter
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -953,7 +969,7 @@ describe('Deploy remote interchain token', () => {
     // Wrong minter
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -966,7 +982,7 @@ describe('Deploy remote interchain token', () => {
     // ITS can not be the minter
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -979,7 +995,7 @@ describe('Deploy remote interchain token', () => {
     // Can not specify destination minter if minter is zero address
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [
@@ -995,14 +1011,14 @@ describe('Deploy remote interchain token', () => {
       kvs: [
         ...baseTokenManagerKvs,
 
-        e.kvs.Mapper('token_identifier').Value(''),
+        e.kvs.Mapper('token_identifier').Value(e.Str('')),
       ],
     });
 
     // No token identifier
     await user.callContract({
       callee: interchainTokenFactory,
-      funcName: 'deployRemoteInterchainToken',
+      funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
       funcArgs: [

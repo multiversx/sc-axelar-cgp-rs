@@ -15,7 +15,7 @@ let otherUser: LSWallet;
 
 beforeEach(async () => {
   world = await LSWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
   });

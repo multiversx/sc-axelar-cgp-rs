@@ -181,8 +181,8 @@ test('Only issue esdt', async () => {
     hasKvs: [
       ...baseTokenManagerKvs,
 
-      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user & its
-      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)),
+      e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
       // ESDT token deployment was tested on Devnet and it works fine
       e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(

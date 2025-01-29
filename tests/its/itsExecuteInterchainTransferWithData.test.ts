@@ -10,7 +10,7 @@ import {
   gateway,
   interchainTokenFactory,
   its,
-  itsDeployTokenManagerLockUnlock,
+  itsRegisterCustomTokenLockUnlock,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   mockGatewayMessageApproved,
   pingPong,
@@ -94,7 +94,7 @@ const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
 test('Transfer with data', async () => {
   await deployPingPongInterchain(deployer);
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
     world,
     user,
     true,
@@ -178,7 +178,7 @@ test('Transfer with data', async () => {
 test('Transfer with data contract error', async () => {
   await deployPingPongInterchain(deployer);
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
     world,
     user,
     true,

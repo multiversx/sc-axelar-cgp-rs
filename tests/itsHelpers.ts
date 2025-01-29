@@ -1,4 +1,4 @@
-import { assertAccount, e, Encodable, LSContract, LSWallet } from 'xsuite';
+import { assertAccount, e, Encodable, LSContract, LSWallet, LSWorld } from 'xsuite';
 import {
   ADDRESS_ZERO,
   ALICE_PUB_KEY,
@@ -7,7 +7,8 @@ import {
   CHAIN_NAME,
   CHAIN_NAME_HASH,
   DOMAIN_SEPARATOR,
-  getKeccak256Hash, getMessageHash,
+  getKeccak256Hash,
+  getMessageHash,
   getSignersHash,
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
@@ -132,7 +133,7 @@ export const deployTokenManagerInterchainToken = async (
   tokenIdentifier: string | null = null,
   burnRole: boolean = true,
   minter: LSWallet | LSContract | null = null,
-): Promise<Kvs> => {
+): Promise<Kvs[]> => {
   ({ contract: tokenManager, address } = await deployer.deployContract({
     code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
@@ -204,7 +205,7 @@ export const deployTokenManagerMintBurn = async (
   its: LSWallet | LSContract = operator,
   tokenIdentifier: string = TOKEN_ID,
   burnRole: boolean = true,
-): Promise<Kvs> => {
+): Promise<Kvs[]> => {
   ({ contract: tokenManager, address } = await deployer.deployContract({
     code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
@@ -336,7 +337,7 @@ export const deployInterchainTokenFactory = async (deployer: LSWallet, callIts: 
     balance: 0n,
     kvs: [
       e.kvs.Mapper('interchain_token_service').Value(its),
-      e.kvs.Mapper('chain_name_hash').Value(CHAIN_NAME_HASH),
+      e.kvs.Mapper('chain_name_hash').Value(e.TopBuffer(CHAIN_NAME_HASH)),
     ],
   });
 
@@ -378,21 +379,29 @@ export const deployContracts = async (deployer: LSWallet, collector: LSWallet, i
   }
 };
 
-export const itsDeployTokenManagerLockUnlock = async (world, user: LSWallet, addTokens: boolean = false, tokenIdentifier: string = TOKEN_ID) => {
-  const computedTokenId = computeInterchainTokenId(user);
+export const itsRegisterCustomTokenLockUnlock = async (world: LSWorld, user: LSWallet, addTokens: boolean = false, tokenIdentifier: string = TOKEN_ID) => {
+  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO));
+
+  let kvs = await its.getAccount();
+  // Mock user as the interchain token factory for below call to work
+  await its.setAccount({
+    ...await its.getAccount(),
+    kvs: [
+      kvs.kvs,
+
+      e.kvs.Mapper('interchain_token_factory').Value(user),
+    ],
+  });
 
   await user.callContract({
     callee: its,
-    funcName: 'deployTokenManager',
+    funcName: 'registerCustomToken',
     gasLimit: 20_000_000,
     funcArgs: [
       e.TopBuffer(TOKEN_SALT),
-      e.Str(''), // destination chain empty
+      e.Str(tokenIdentifier),
       e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
-      e.Buffer(e.Tuple(
-        e.Option(user),
-        e.Option(e.Str(tokenIdentifier)),
-      ).toTopU8A()),
+      e.Buffer(user.toTopU8A()),
     ],
   });
 
@@ -427,24 +436,53 @@ export const itsDeployTokenManagerLockUnlock = async (world, user: LSWallet, add
     }
   }
 
+  kvs = await its.getAccount();
+
+  // Token manager was succesfully deployed
+  assertAccount(kvs, {
+    hasKvs: [
+      e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(
+        e.Addr(TOKEN_MANAGER_ADDRESS)
+      ),
+    ],
+  });
+
+  // Set interchain token factory back
+  await its.setAccount({
+    ...await its.getAccount(),
+    kvs: [
+      kvs.kvs,
+
+      e.kvs.Mapper('interchain_token_factory').Value(interchainTokenFactory),
+    ],
+  });
+
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
 };
 
-export const itsDeployTokenManagerMintBurn = async (world, user: LSWallet, flowLimit: number = 0) => {
-  const computedTokenId = computeInterchainTokenId(user);
+export const itsRegisterCustomTokenMintBurn = async (world: LSWorld, user: LSWallet, flowLimit: number = 0) => {
+  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO));
+
+  let kvs = await its.getAccount();
+  // Mock user as the interchain token factory for below call to work
+  await its.setAccount({
+    ...await its.getAccount(),
+    kvs: [
+      kvs.kvs,
+
+      e.kvs.Mapper('interchain_token_factory').Value(user),
+    ],
+  });
 
   await user.callContract({
     callee: its,
-    funcName: 'deployTokenManager',
+    funcName: 'registerCustomToken',
     gasLimit: 20_000_000,
     funcArgs: [
       e.TopBuffer(TOKEN_SALT),
-      e.Str(''), // destination chain empty
+      e.Str(TOKEN_ID),
       e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
-      e.Buffer(e.Tuple(
-        e.Option(user),
-        e.Option(e.Str(TOKEN_ID)),
-      ).toTopU8A()),
+      e.Buffer(user.toTopU8A()),
     ],
   });
 
@@ -465,6 +503,28 @@ export const itsDeployTokenManagerMintBurn = async (world, user: LSWallet, flowL
   await tokenManager.setAccount({
     ...(await tokenManager.getAccount()),
     kvs: baseTokenManagerKvs,
+  });
+
+
+  kvs = await its.getAccount();
+
+  // Token manager was succesfully deployed
+  assertAccount(kvs, {
+    hasKvs: [
+      e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(
+        e.Addr(TOKEN_MANAGER_ADDRESS)
+      ),
+    ],
+  });
+
+  // Set interchain token factory back
+  await its.setAccount({
+    ...await its.getAccount(),
+    kvs: [
+      kvs.kvs,
+
+      e.kvs.Mapper('interchain_token_factory').Value(interchainTokenFactory),
+    ],
   });
 
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
@@ -509,7 +569,7 @@ export const computeCanonicalInterchainTokenDeploySalt = (tokenIdentifier: strin
 export const baseItsKvs = (
   operator: LSWallet | LSContract,
   interchainTokenFactory: LSContract | LSWallet | null = null,
-  computedTokenId: string | null = null
+  computedTokenId: string | null = null,
 ) => {
   return [
     e.kvs.Mapper('gateway').Value(gateway),

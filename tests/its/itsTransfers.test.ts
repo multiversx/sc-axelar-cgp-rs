@@ -12,7 +12,7 @@ import {
   deployContracts,
   gasService,
   its,
-  itsDeployTokenManagerLockUnlock,
+  itsRegisterCustomTokenLockUnlock,
   LATEST_METADATA_VERSION,
 } from '../itsHelpers';
 
@@ -20,11 +20,10 @@ let world: LSWorld;
 let deployer: LSWallet;
 let collector: LSWallet;
 let user: LSWallet;
-let otherUser: LSWallet;
 
 beforeEach(async () => {
   world = await LSWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
   });
@@ -60,20 +59,17 @@ beforeEach(async () => {
       ]),
     ],
   });
-  otherUser = await world.createWallet({
-    balance: BigInt('10000000000000000'),
-  });
 
   await deployContracts(deployer, collector);
 });
 
 afterEach(async () => {
-  await world.terminate();
+  world.terminate();
 });
 
 describe('Interchain transfer', () => {
   test('No metadata', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -112,7 +108,7 @@ describe('Interchain transfer', () => {
   });
 
   test('With metadata', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     // Specify custom metadata
     await user.callContract({
@@ -153,7 +149,7 @@ describe('Interchain transfer', () => {
   });
 
   test('With partial metadata', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     // Specify custom metadata
     await user.callContract({
@@ -193,7 +189,7 @@ describe('Interchain transfer', () => {
   });
 
   test('Errors', async () => {
-    const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -414,7 +410,7 @@ describe('Interchain transfer', () => {
   });
 
   test('Gas token egld', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
       world,
       user,
       false,
@@ -454,7 +450,7 @@ describe('Interchain transfer', () => {
   });
 
   test('Gas token one esdt', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -497,7 +493,7 @@ describe('Interchain transfer', () => {
   });
 
   test('Gas token two esdts', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -541,7 +537,7 @@ describe('Interchain transfer', () => {
   });
 
   test('Gas token esdt + egld', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -583,7 +579,7 @@ describe('Interchain transfer', () => {
 
 describe('Call contract with interchain token', () => {
   test('Call contract', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -622,7 +618,7 @@ describe('Call contract with interchain token', () => {
   });
 
   test('Errors', async () => {
-    const { computedTokenId } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -811,7 +807,7 @@ describe('Call contract with interchain token', () => {
   });
 
   test('Gas token egld', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
       world,
       user,
       false,
@@ -851,7 +847,7 @@ describe('Call contract with interchain token', () => {
   });
 
   test('Gas token one esdt', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -894,7 +890,7 @@ describe('Call contract with interchain token', () => {
   });
 
   test('Gas token two esdts', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -938,7 +934,7 @@ describe('Call contract with interchain token', () => {
   });
 
   test('Gas token esdt + egld', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,

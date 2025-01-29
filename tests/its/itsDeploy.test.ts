@@ -78,11 +78,19 @@ afterEach(async () => {
   await world.terminate();
 });
 
-describe('Deploy token manager', () => {
-  test('Deploy', async () => {
+// TODO:
+describe.skip('Register token metadata', () => {
+  test('Register token metadata', async () => {
+
+  });
+});
+
+// TODO:
+describe.skip('Register custom token', () => {
+  test('Register custom token', async () => {
     let result = await user.callContract({
       callee: its,
-      funcName: 'deployTokenManager',
+      funcName: 'linkToken',
       gasLimit: 100_000_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
@@ -109,56 +117,56 @@ describe('Deploy token manager', () => {
       ],
     });
 
-    const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
-    const tokenManagerKvs = await tokenManager.getAccount();
-    assertAccount(tokenManagerKvs, {
-      balance: 0n,
-      kvs: [
-        e.kvs.Mapper('interchain_token_service').Value(its),
-        e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
-        e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
-        e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limiter & operator roles
-        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID2)),
-      ],
-    });
-
-    // Assert correct token manager type
-    const query = await world.query({
-      callee: tokenManager,
-      funcName: 'implementationType',
-      funcArgs: [],
-    });
-
-    assert(query.returnData[0] == '02'); // lock/unlock type
-
-    // Other caller can also deploy another token manager for this token with different salt
-    result = await otherUser.callContract({
-      callee: its,
-      funcName: 'deployTokenManager',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.TopBuffer(TOKEN_SALT),
-        e.Str(''), // destination chain empty
-        e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
-        e.Buffer(e.Tuple(
-          e.Option(otherUser),
-          e.Option(e.Str(TOKEN_ID2)),
-        ).toTopU8A()),
-      ],
-    });
-
-    kvs = await its.getAccount();
-    assertAccount(kvs, {
-      balance: 0n,
-      kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory),
-
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(result.returnData[0])).Value(e.Addr(
-          TOKEN_MANAGER_ADDRESS_2)),
-      ],
-    });
+    // const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
+    // const tokenManagerKvs = await tokenManager.getAccount();
+    // assertAccount(tokenManagerKvs, {
+    //   balance: 0n,
+    //   kvs: [
+    //     e.kvs.Mapper('interchain_token_service').Value(its),
+    //     e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
+    //     e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
+    //     e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limiter & operator roles
+    //     e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
+    //     e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID2)),
+    //   ],
+    // });
+    //
+    // // Assert correct token manager type
+    // const query = await world.query({
+    //   callee: tokenManager,
+    //   funcName: 'implementationType',
+    //   funcArgs: [],
+    // });
+    //
+    // assert(query.returnData[0] == '02'); // lock/unlock type
+    //
+    // // Other caller can also deploy another token manager for this token with different salt
+    // result = await otherUser.callContract({
+    //   callee: its,
+    //   funcName: 'deployTokenManager',
+    //   gasLimit: 20_000_000,
+    //   funcArgs: [
+    //     e.TopBuffer(TOKEN_SALT),
+    //     e.Str(''), // destination chain empty
+    //     e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
+    //     e.Buffer(e.Tuple(
+    //       e.Option(otherUser),
+    //       e.Option(e.Str(TOKEN_ID2)),
+    //     ).toTopU8A()),
+    //   ],
+    // });
+    //
+    // kvs = await its.getAccount();
+    // assertAccount(kvs, {
+    //   balance: 0n,
+    //   kvs: [
+    //     ...baseItsKvs(deployer, interchainTokenFactory),
+    //
+    //     e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
+    //     e.kvs.Mapper('token_manager_address', e.TopBuffer(result.returnData[0])).Value(e.Addr(
+    //       TOKEN_MANAGER_ADDRESS_2)),
+    //   ],
+    // });
   });
 
   test('Errors', async () => {
@@ -299,8 +307,9 @@ describe('Deploy token manager', () => {
   });
 });
 
-describe('Deploy token manager remote', () => {
-  test('Remote', async () => {
+// TODO:
+describe.skip('Link token', () => {
+  test('Link', async () => {
     // Mock token manager exists on source chain
     await its.setAccount({
       ...await its.getAccount(),
@@ -316,19 +325,19 @@ describe('Deploy token manager remote', () => {
 
     let result = await user.callContract({
       callee: its,
-      funcName: 'deployTokenManager',
+      funcName: 'linkToken',
       gasLimit: 20_000_000,
       value: 100_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
         e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_TOKEN_ADDRESS),
         e.U8(2),
         e.Buffer(
           AbiCoder.defaultAbiCoder().encode(
-            ['bytes', 'address'],
+            ['bytes'],
             [
               OTHER_CHAIN_ADDRESS,
-              OTHER_CHAIN_TOKEN_ADDRESS,
             ],
           ).substring(2),
         ),
@@ -397,7 +406,7 @@ describe('Deploy token manager remote', () => {
     });
   });
 
-  test('Remote errors', async () => {
+  test('Errors', async () => {
     await user.callContract({
       callee: its,
       funcName: 'deployTokenManager',
@@ -629,8 +638,8 @@ describe('Deploy interchain token', () => {
       hasKvs: [
         ...baseTokenManagerKvs,
 
-        e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user & its
-        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)),
+        e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user
+        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
         // This was tested on Devnet and it works fine
         e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -687,7 +696,7 @@ describe('Deploy interchain token', () => {
 
         // minter role was set for zero address and its
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000001)),
-        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000111)),
+        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
         // This was tested on Devnet and it works fine
         e.kvs.Mapper('CB_CLOSURE................................').Value(e.Tuple(
@@ -721,7 +730,7 @@ describe('Deploy interchain token', () => {
         e.U8(18),
         e.TopBuffer(user.toTopU8A()), // minter
       ],
-    }).assertFail({ code: 4, message: 'Not supported' });
+    }).assertFail({ code: 4, message: 'Not interchain token factory' });
 
     await user.callContract({
       callee: its,

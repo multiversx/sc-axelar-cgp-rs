@@ -171,7 +171,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for RegisterTokenMetadataPayload<M> {
     }
 
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
-        let mut result = ArrayVec::<Token<M>, 4>::new();
+        let mut result = ArrayVec::<Token<M>, 3>::new();
 
         Self::raw_abi_decode(
             &[ParamType::Uint256, ParamType::Bytes, ParamType::Uint8],
@@ -214,7 +214,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for LinkTokenPayload<M> {
     }
 
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
-        let mut result = ArrayVec::<Token<M>, 4>::new();
+        let mut result = ArrayVec::<Token<M>, 6>::new();
 
         Self::raw_abi_decode(
             &[
