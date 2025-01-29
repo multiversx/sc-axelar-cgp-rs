@@ -33,6 +33,8 @@ export const MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN = 1;
 export const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER = 2;
 export const MESSAGE_TYPE_SEND_TO_HUB = 3;
 export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
+export const MESSAGE_TYPE_LINK_TOKEN = 5;
+export const MESSAGE_TYPE_REGISTER_TOKEN_METADATA = 6;
 
 export const ITS_HUB_CHAIN_NAME = 'axelar';
 export const ITS_HUB_ROUTING_IDENTIFIER = 'hub';
@@ -44,6 +46,8 @@ export const LATEST_METADATA_VERSION = 0;
 export const TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN = 0;
 export const TOKEN_MANAGER_TYPE_LOCK_UNLOCK = 2;
 export const TOKEN_MANAGER_TYPE_MINT_BURN = 4;
+
+export const ESDT_SYSTEM_CONTRACT = 'erd1qqqqqqqqqqqqqqqpqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzllls8a5w6u';
 
 let address: string;
 export let gateway: LSContract;

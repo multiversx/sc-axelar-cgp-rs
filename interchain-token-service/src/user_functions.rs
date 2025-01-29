@@ -23,7 +23,6 @@ pub trait UserFunctionsModule:
     + multiversx_sc_modules::pause::PauseModule
     + executable::ExecutableModule
 {
-    // TODO: Test
     #[payable("EGLD")]
     #[endpoint(registerTokenMetadata)]
     fn register_token_metadata(&self, token_identifier: TokenIdentifier) {
@@ -37,7 +36,6 @@ pub trait UserFunctionsModule:
         self.register_token_metadata_async_call(token_identifier, gas_value);
     }
 
-    // TODO: Test this
     #[endpoint(registerCustomToken)]
     fn register_custom_token(
         &self,
@@ -52,7 +50,7 @@ pub trait UserFunctionsModule:
         // Custom token managers can't be deployed with native interchain token type, which is reserved for interchain tokens
         require!(
             token_manager_type != TokenManagerType::NativeInterchainToken,
-            "Cannot deploy native interchain token"
+            "Can not deploy native interchain token"
         );
 
         let deployer = ManagedAddress::zero();
@@ -71,7 +69,6 @@ pub trait UserFunctionsModule:
         token_id
     }
 
-    // TODO: Test this
     // Payable with EGLD for cross chain calls gas
     #[payable("EGLD")]
     #[endpoint(linkToken)]
@@ -90,7 +87,7 @@ pub trait UserFunctionsModule:
         // Custom token managers can't be deployed with Interchain token mint burn type, which is reserved for interchain tokens
         require!(
             token_manager_type != TokenManagerType::NativeInterchainToken,
-            "Can not deploy"
+            "Can not deploy native interchain token"
         );
 
         // Cannot deploy to this chain using linkToken anymore
@@ -146,7 +143,6 @@ pub trait UserFunctionsModule:
         token_id
     }
 
-    // TODO: Fix tests, check if minter is ok with link_params handling
     // Payable with EGLD for:
     // - ESDT token deploy (2nd transaction)
     // - cross chain calls gas
@@ -190,11 +186,13 @@ pub trait UserFunctionsModule:
                 return token_id;
             }
 
-            let minter_raw = ManagedAddress::try_from(minter);
-            let minter = if minter_raw.is_err() {
+            let minter = if minter.is_empty() {
                 None
             } else {
-                Some(minter_raw.unwrap())
+                Some(
+                    ManagedAddress::try_from(minter)
+                        .unwrap_or_else(|_| sc_panic!("Invalid MultiversX address")),
+                )
             };
 
             self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);

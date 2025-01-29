@@ -151,14 +151,14 @@ pub trait ProxyItsModule:
             ESDTSystemSCAddress.to_managed_address(),
             ManagedBuffer::from("getTokenProperties"),
         );
-        contract_call.push_raw_argument(token_identifier.into_managed_buffer());
+        contract_call.push_raw_argument(token_identifier.clone().into_managed_buffer());
 
         contract_call
             .async_call()
             .with_callback(
                 self.callbacks()
-                    .register_token_metadata_callback(gas_value, self.blockchain().get_caller()),
-            ) // TODO: Is the caller the correct sender here?)
+                    .register_token_metadata_callback(token_identifier, gas_value, self.blockchain().get_caller()),
+            )
             .call_and_exit();
     }
 
@@ -281,6 +281,7 @@ pub trait ProxyItsModule:
     #[callback]
     fn register_token_metadata_callback(
         &self,
+        token_identifier: TokenIdentifier,
         gas_value: BigUint,
         caller: ManagedAddress,
         #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
@@ -289,7 +290,6 @@ pub trait ProxyItsModule:
             ManagedAsyncCallResult::Ok(values) => {
                 let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
 
-                let token_name = vec.get(0).clone_value();
                 let token_type = vec.get(1);
                 let decimals_buffer_ref = vec.get(5);
 
@@ -309,7 +309,7 @@ pub trait ProxyItsModule:
                 let token_decimals = token_decimals_buf.ascii_to_u8();
 
                 self.register_token_metadata_raw(
-                    TokenIdentifier::from(token_name),
+                    token_identifier,
                     token_decimals,
                     gas_value,
                 );

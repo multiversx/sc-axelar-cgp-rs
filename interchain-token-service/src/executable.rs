@@ -70,8 +70,8 @@ pub trait ExecutableModule:
     ) {
         let send_token_payload = InterchainTransferPayload::<Self::Api>::abi_decode(payload);
 
-        let destination_address =
-            ManagedAddress::try_from(send_token_payload.destination_address).unwrap();
+        let destination_address = ManagedAddress::try_from(send_token_payload.destination_address)
+            .unwrap_or_else(|_| sc_panic!("Invalid MultiversX address"));
 
         self.interchain_transfer_received_event(
             &send_token_payload.token_id,
@@ -206,11 +206,13 @@ pub trait ExecutableModule:
 
         require!(valid, "Not approved by gateway");
 
-        let minter_raw = ManagedAddress::try_from(data.minter);
-        let minter = if minter_raw.is_err() {
+        let minter = if data.minter.is_empty() {
             None
         } else {
-            Some(minter_raw.unwrap())
+            Some(
+                ManagedAddress::try_from(data.minter)
+                    .unwrap_or_else(|_| sc_panic!("Invalid MultiversX address")),
+            )
         };
 
         self.token_manager_deploy_interchain_token(
@@ -242,11 +244,13 @@ pub trait ExecutableModule:
         arguments.push_arg(token_manager_type);
         arguments.push_arg(token_id);
 
-        let operator_raw = ManagedAddress::try_from(operator);
-        let operator = if operator_raw.is_err() {
+        let operator = if operator.is_empty() {
             None
         } else {
-            Some(operator_raw.unwrap())
+            Some(
+                ManagedAddress::try_from(operator)
+                    .unwrap_or_else(|_| sc_panic!("Invalid MultiversX address")),
+            )
         };
 
         let params = DeployTokenManagerParams {
