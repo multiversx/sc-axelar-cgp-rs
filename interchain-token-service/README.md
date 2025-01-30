@@ -7,20 +7,20 @@ The contract is made to be permissionless, to allow anyone to register an existi
 a new token, as well as register a token remotely for another chain. The [Interchain Token Factory](../interchain-token-factory) contract exists
 to abstract some functionality regarding deployment of tokens.  
 
-This contract is based on version v2.0.1 of the [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v2.0.1/contracts/InterchainTokenService.sol).
+This contract is based on version v2.1.0 of the [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v/contracts/InterchainTokenService.sol).
 
 ## User callable endpoints
-- **deployTokenManager** (salt, destination_chain, token_manager_type, params) - deploys a custom token manager on MultiversX or another chain
-  - **params** needs to be in the format accepted by the ITS Token Manager of the appropriate chain
+- **registerTokenMetadata** (token_identifier) - registers metadata (decimals) for a token identifier with the ITS Hub
+  - should be used in case of custom tokens when wanting to link an existing token on MultiversX with an existing token on another blockchain
+- **linkToken** (salt, destination_chain, destination_token_address, token_manager_type, link_params) - links an existing token on MultiversX with an existing token on another chain
+  - in practice this is called only be the factory 
+  - **link_params** needs to be in the format accepted by the ITS Token Manager of the appropriate chain
   - it also takes EGLD payment to pay for cross-chain gas costs (if applicable)
   - the generated token id depends on the caller and the salt provided
-- **deployInterchainToken** (salt, destination_chain, name, symbol, decimals, minter) - deploys a new token and a Mint Burn Token Manager on MultiversX or another chain
-  - the generated token id depends on the caller and the salt provided
-  - it also takes EGLD payment to pay for cross-chain gas costs (if applicable) OR pay for ESDT issue cost
-  - if deploying on MultiversX, **it needs to be called twice**, first time it will deploy the Token Manager and the second time it will issue the ESDT through the Token Manager
 - **interchainTransfer** (token_id, destination_chain, destination_address, metadata, gas_value) - initiates a new cross-chain transfer for the received token
   - it will call the appropriate token manager for the token id that will either burn or lock the tokens on MultiversX
   - it will then call the destination chain ITS contract execute receive token command using a cross chain call through the CGP Gateway contract
+  - accepts up to two ESDT tokens, with the 2nd one being used for gas, also supporting EGLD as ESDT to pay for cross chain gas
 - **callContractWithInterchainToken** (token_id, destination_chain, destination_address, data, gas_value) - similar to **interchainTransfer**, but it will call a contract with token on the destination chain
 
 ## Owner callable endpoints
@@ -50,7 +50,7 @@ The Gateway contract is called to validate that this cross-chain contract call w
   - it also takes EGLD payment to pay for ESDT issue cost
   - **needs to be called twice**, first time it will deploy the Token Manager and NOT mark the Gateway cross-chain call as executed
   - the second time it will issue the ESDT through the Token Manager and mark the Gateway cross-chain call as executed
-- **MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER (2)** - it will deploy a custom Token Manager with the specified parameters
 - **MESSAGE_TYPE_SEND_TO_HUB (3)** - this message is used to route an ITS message via the ITS Hub. The ITS Hub applies certain security checks, and then routes it to the true destination chain.
 - **MESSAGE_TYPE_RECEIVE_FROM_HUB (4)** - this message is used to receive an ITS message from the ITS Hub. The ITS Hub applies certain security checks, and then routes it to the ITS contract.
-- 
+- **MESSAGE_TYPE_LINK_TOKEN (5)** - used to link an existing token with an existing one on another blockchain
+- **MESSAGE_TYPE_REGISTER_TOKEN_METADATA (6)** - register metadata (decimals) for a ESDT on MultiversX with the ITS Hub
