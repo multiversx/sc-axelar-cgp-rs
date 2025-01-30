@@ -14,10 +14,9 @@ permissions:
 jobs:
   contracts:
     name: Contracts
-    uses: multiversx/mx-sc-actions/.github/workflows/contracts.yml@v3.3.1
+    uses: multiversx/mx-sc-actions/.github/workflows/contracts.yml@v4.2.1
     with:
-      rust-toolchain: 1.81.0
-      pip-mxpy-args: "multiversx-sdk-cli==v9.7.0"
+      rust-toolchain: 1.84.0
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -30,18 +29,12 @@ jobs:
       - name: Install rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.78.0
+          toolchain: 1.84.0
           target: wasm32-unknown-unknown
 
       - name: Install prerequisites
         run: |
           pipx install "multiversx-sdk-cli==v9.7.0"
-          
-          wget -O binaryen.tar.gz https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz
-          tar -xf binaryen.tar.gz
-          cp binaryen-version_112/bin/wasm-opt $HOME/.local/bin
-
-          sudo apt install -y wabt=1.0.27-1
 
           cargo install wasm-opt
           cargo install twiggy
