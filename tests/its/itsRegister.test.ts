@@ -646,7 +646,7 @@ describe('Deploy interchain token', () => {
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000001)), // minter role was added to user
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
-        // This was tested on Devnet and it works fine
+        // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
           .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
@@ -674,14 +674,7 @@ describe('Deploy interchain token', () => {
       funcName: 'deployInterchainToken',
       gasLimit: 200_000_000, // needs to be above 100_000_000
       value: BigInt('50000000000000000'),
-      funcArgs: [
-        e.TopBuffer(TOKEN_SALT),
-        e.Str(''),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
-        e.U8(18),
-        e.Str(''),
-      ],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(''), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.Str('')],
     });
 
     assertAccount(await its.getAccount(), {
@@ -702,7 +695,7 @@ describe('Deploy interchain token', () => {
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000001)),
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
-        // This was tested on Devnet and it works fine
+        // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
           .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),

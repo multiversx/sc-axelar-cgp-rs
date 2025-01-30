@@ -251,7 +251,6 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         )
     }
 
-    // TODO: Test this
     #[endpoint(registerCanonicalInterchainToken)]
     fn register_canonical_interchain_token(
         &self,
@@ -295,7 +294,6 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         )
     }
 
-    // TODO: Test
     #[endpoint(registerCustomToken)]
     fn register_custom_token(
         &self,
@@ -324,7 +322,6 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         )
     }
 
-    // TODO: Test
     #[payable("EGLD")]
     #[endpoint(linkToken)]
     fn link_token(

@@ -74,17 +74,19 @@ afterEach(async () => {
 });
 
 const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
-  const payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
-    [
-      MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-      Buffer.from(tokenId, 'hex'),
-      Buffer.from(OTHER_CHAIN_ADDRESS),
-      Buffer.from(pingPong.toTopU8A()),
-      1_000,
-      Buffer.from(e.Tuple(e.Str(fnc), otherUser).toTopU8A()), // data passed to contract
-    ],
-  ).substring(2);
+  const payload = AbiCoder.defaultAbiCoder()
+    .encode(
+      ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
+      [
+        MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+        Buffer.from(tokenId, 'hex'),
+        Buffer.from(OTHER_CHAIN_ADDRESS),
+        Buffer.from(pingPong.toTopU8A()),
+        1_000,
+        Buffer.from(e.Tuple(e.Str(fnc), otherUser).toTopU8A()), // data passed to contract
+      ]
+    )
+    .substring(2);
 
   const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
@@ -98,7 +100,7 @@ test('Transfer with data', async () => {
     world,
     user,
     true,
-    'EGLD',
+    'EGLD'
   );
 
   const { payload, crossChainId } = await mockGatewayCall(computedTokenId);
@@ -107,33 +109,23 @@ test('Transfer with data', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 100_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(MESSAGE_ID),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
-    ],
+    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
   });
 
-  await user.callContract({
-    callee: its,
-    funcName: 'execute',
-    gasLimit: 100_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(MESSAGE_ID),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Not approved by gateway' });
+  await user
+    .callContract({
+      callee: its,
+      funcName: 'execute',
+      gasLimit: 100_000_000,
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+    })
+    .assertFail({ code: 4, message: 'Not approved by gateway' });
 
   // Assert no tokens left in its contract & lock removed
   const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
-    ],
+    kvs: [...baseItsKvs(deployer, interchainTokenFactory, computedTokenId)],
   });
 
   // Assert ping pong was successfully called with tokens
@@ -160,18 +152,12 @@ test('Transfer with data', async () => {
   const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 99_000,
-    kvs: [
-      ...baseTokenManagerKvs,
-    ],
+    kvs: [...baseTokenManagerKvs],
   });
 
   // Gateway message was marked as executed
   assertAccount(await gateway.getAccount(), {
-    kvs: [
-      ...baseGatewayKvs(deployer),
-
-      e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
-    ],
+    kvs: [...baseGatewayKvs(deployer), e.kvs.Mapper('messages', crossChainId).Value(e.Str('1'))],
   });
 });
 
@@ -182,7 +168,7 @@ test('Transfer with data contract error', async () => {
     world,
     user,
     true,
-    'EGLD',
+    'EGLD'
   );
 
   const { payload, crossChainId, messageHash } = await mockGatewayCall(computedTokenId, 'wrong');
@@ -191,20 +177,13 @@ test('Transfer with data contract error', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 300_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(MESSAGE_ID),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      payload,
-    ],
+    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
   });
 
   // Assert its doesn't have balance & lock removed
   assertAccount(await its.getAccount(), {
     balance: 0n,
-    kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory, computedTokenId),
-    ],
+    kvs: [...baseItsKvs(deployer, interchainTokenFactory, computedTokenId)],
   });
   // Assert ping pong was NOT called
   assertAccount(await pingPong.getAccount(), {
@@ -220,39 +199,25 @@ test('Transfer with data contract error', async () => {
   // Assert token manager still has tokens
   assertAccount(await tokenManager.getAccount(), {
     balance: 100_000,
-    kvs: [
-      ...baseTokenManagerKvs,
-    ],
+    kvs: [...baseTokenManagerKvs],
   });
 
   // Gateway message was NOT marked as executed
   assertAccount(await gateway.getAccount(), {
-    kvs: [
-      ...baseGatewayKvs(deployer),
-
-      e.kvs.Mapper('messages', crossChainId).Value(messageHash),
-    ],
+    kvs: [...baseGatewayKvs(deployer), e.kvs.Mapper('messages', crossChainId).Value(messageHash)],
   });
 });
 
 test('Errors', async () => {
-  const payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256'],
-    [
-      MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-    ],
-  ).substring(2);
+  const payload = AbiCoder.defaultAbiCoder().encode(['uint256'], [MESSAGE_TYPE_INTERCHAIN_TRANSFER]).substring(2);
 
   // Invalid other address from other chain
-  await user.callContract({
-    callee: its,
-    funcName: 'execute',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(MESSAGE_ID),
-      e.Str('SomeOtherAddress'),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Not remote service' });
+  await user
+    .callContract({
+      callee: its,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str('SomeOtherAddress'), payload],
+    })
+    .assertFail({ code: 4, message: 'Not remote service' });
 });

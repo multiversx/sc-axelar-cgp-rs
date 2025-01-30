@@ -152,7 +152,6 @@ pub trait InterchainTokenServiceContract:
                     payload,
                 );
             }
-            // TODO: Add tests for this
             MESSAGE_TYPE_LINK_TOKEN => {
                 require!(
                     self.call_value().egld_value().deref() == &BigUint::zero(),

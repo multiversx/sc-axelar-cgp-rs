@@ -30,7 +30,7 @@ export const ADDRESS_ZERO: string = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
 
 export const CHAIN_NAME: string = 'MultiversX';
 export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
-export const OTHER_CHAIN_NAME: string = 'Ethereum';
+export const OTHER_CHAIN_NAME: string = 'ethereum';
 export const OTHER_CHAIN_ADDRESS: string = '0x032fF26CbbdcE740e1Ff0A069Ad3fCf886fde220';
 export const OTHER_CHAIN_TOKEN_ADDRESS: string = '0x79563F018EA5312cD84d7Ca9ecdB37c74A786B72';
 

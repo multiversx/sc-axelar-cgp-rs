@@ -1,4 +1,4 @@
-import { assertAccount, e, Encodable, LSContract, LSWallet, LSWorld } from 'xsuite';
+import { assertAccount, e, Encodable, LSContract, LSWallet, LSWorld, Wallet } from 'xsuite';
 import {
   ADDRESS_ZERO,
   ALICE_PUB_KEY,
@@ -27,10 +27,10 @@ export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
 
 export const PREFIX_CANONICAL_TOKEN_SALT = 'canonical-token-salt';
 export const PREFIX_INTERCHAIN_TOKEN_SALT = 'interchain-token-salt';
+export const PREFIX_CUSTOM_TOKEN_SALT = 'custom-token-salt';
 
 export const MESSAGE_TYPE_INTERCHAIN_TRANSFER = 0;
 export const MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN = 1;
-export const MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER = 2;
 export const MESSAGE_TYPE_SEND_TO_HUB = 3;
 export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
 export const MESSAGE_TYPE_LINK_TOKEN = 5;
@@ -38,8 +38,7 @@ export const MESSAGE_TYPE_REGISTER_TOKEN_METADATA = 6;
 
 export const ITS_HUB_CHAIN_NAME = 'axelar';
 export const ITS_HUB_ROUTING_IDENTIFIER = 'hub';
-
-export const ITS_CHAIN_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
+export const ITS_HUB_CHAIN_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
 
 export const LATEST_METADATA_VERSION = 0;
 
@@ -77,7 +76,7 @@ export const defaultSignersHash = getSignersHash(
   getKeccak256Hash('nonce1'),
 );
 
-export const baseGatewayKvs = (operator: LSWallet) => {
+export const baseGatewayKvs = (operator: Wallet) => {
   return [
     e.kvs.Mapper('previous_signers_retention').Value(e.U(16)),
     e.kvs.Mapper('domain_separator').Value(e.TopBuffer(DOMAIN_SEPARATOR)),
@@ -565,6 +564,19 @@ export const computeCanonicalInterchainTokenDeploySalt = (tokenIdentifier: strin
     Buffer.from(prefix, 'hex'),
     Buffer.from(chain_name_hash, 'hex'),
     Buffer.from(tokenIdentifier),
+  ]);
+
+  return createKeccakHash('keccak256').update(buffer).digest('hex');
+};
+
+export const computeLinkedTokenDeploySalt = (user: Encodable, salt = TOKEN_SALT) => {
+  const prefix = createKeccakHash('keccak256').update(PREFIX_CUSTOM_TOKEN_SALT).digest('hex');
+  const chain_name_hash = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
+  const buffer = Buffer.concat([
+    Buffer.from(prefix, 'hex'),
+    Buffer.from(chain_name_hash, 'hex'),
+    Buffer.from(user.toTopHex(), 'hex'),
+    Buffer.from(salt, 'hex'),
   ]);
 
   return createKeccakHash('keccak256').update(buffer).digest('hex');
