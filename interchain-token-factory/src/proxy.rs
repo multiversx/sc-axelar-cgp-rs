@@ -11,6 +11,10 @@ use token_manager::constants::TokenManagerType;
 use token_manager::mintership::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
+const ESDT_PROPERTIES_TOKEN_NAME_INDEX: usize = 0;
+const ESDT_PROPERTIES_TOKEN_TYPE_INDEX: usize = 1;
+const ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX: usize = 5;
+
 #[multiversx_sc::module]
 pub trait ProxyModule {
     fn its_chain_name(&self) -> ManagedBuffer {
@@ -36,7 +40,14 @@ pub trait ProxyModule {
         gas_value: BigUint,
     ) {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .deploy_interchain_token(deploy_salt, destination_chain, name, symbol, decimals, minter)
+            .deploy_interchain_token(
+                deploy_salt,
+                destination_chain,
+                name,
+                symbol,
+                decimals,
+                minter,
+            )
             .with_egld_transfer(gas_value)
             .execute_on_dest_context::<()>();
     }
@@ -227,9 +238,9 @@ pub trait ProxyModule {
             ManagedAsyncCallResult::Ok(values) => {
                 let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
 
-                let token_name = vec.get(0).clone_value();
-                let token_type = vec.get(1);
-                let decimals_buffer_ref = vec.get(5);
+                let token_name = vec.get(ESDT_PROPERTIES_TOKEN_NAME_INDEX).clone_value();
+                let token_type = vec.get(ESDT_PROPERTIES_TOKEN_TYPE_INDEX);
+                let decimals_buffer_ref = vec.get(ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX);
 
                 if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
                     // Send back paid cross chain gas value to initial caller if token is non fungible

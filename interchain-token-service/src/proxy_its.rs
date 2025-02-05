@@ -33,6 +33,9 @@ pub mod executable_contract_proxy {
     }
 }
 
+const ESDT_PROPERTIES_TOKEN_TYPE_INDEX: usize = 1;
+const ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX: usize = 5;
+
 #[multiversx_sc::module]
 pub trait ProxyItsModule:
     events::EventsModule + proxy_gmp::ProxyGmpModule + address_tracker::AddressTracker
@@ -155,10 +158,11 @@ pub trait ProxyItsModule:
 
         contract_call
             .async_call()
-            .with_callback(
-                self.callbacks()
-                    .register_token_metadata_callback(token_identifier, gas_value, self.blockchain().get_caller()),
-            )
+            .with_callback(self.callbacks().register_token_metadata_callback(
+                token_identifier,
+                gas_value,
+                self.blockchain().get_caller(),
+            ))
             .call_and_exit();
     }
 
@@ -290,8 +294,8 @@ pub trait ProxyItsModule:
             ManagedAsyncCallResult::Ok(values) => {
                 let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
 
-                let token_type = vec.get(1);
-                let decimals_buffer_ref = vec.get(5);
+                let token_type = vec.get(ESDT_PROPERTIES_TOKEN_TYPE_INDEX);
+                let decimals_buffer_ref = vec.get(ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX);
 
                 if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
                     // Send back paid cross chain gas value to initial caller if token is non fungible
@@ -308,11 +312,7 @@ pub trait ProxyItsModule:
                     .unwrap();
                 let token_decimals = token_decimals_buf.ascii_to_u8();
 
-                self.register_token_metadata_raw(
-                    token_identifier,
-                    token_decimals,
-                    gas_value,
-                );
+                self.register_token_metadata_raw(token_identifier, token_decimals, gas_value);
             }
             ManagedAsyncCallResult::Err(_) => {
                 // Send back paid gas value to initial caller
