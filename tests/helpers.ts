@@ -15,6 +15,7 @@ export const MULTISIG_PROVER_PUB_KEY_1 = 'ca5b4abdf9eec1f8e2d12c187d41ddd054c819
 export const MULTISIG_PROVER_PUB_KEY_2 = 'ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449';
 
 export const TOKEN_SALT: string = '91b44915de5f5bb438be952d4cda1bcc08829495e8704e40751dcee97aa83886';
+export const TOKEN_SALT2: string = '8be14915de5f5bb438be952d4cda1bcc08829495e8704e40751dcee97aa89854';
 export const TOKEN_ID: string = 'WEGLD-123456';
 export const TOKEN_ID2: string = 'OTHER-654321';
 export const TOKEN_ID_EGLD: string = 'EGLD-000000';
@@ -29,7 +30,7 @@ export const ADDRESS_ZERO: string = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
 
 export const CHAIN_NAME: string = 'MultiversX';
 export const CHAIN_NAME_HASH: string = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
-export const OTHER_CHAIN_NAME: string = 'Ethereum';
+export const OTHER_CHAIN_NAME: string = 'ethereum';
 export const OTHER_CHAIN_ADDRESS: string = '0x032fF26CbbdcE740e1Ff0A069Ad3fCf886fde220';
 export const OTHER_CHAIN_TOKEN_ADDRESS: string = '0x79563F018EA5312cD84d7Ca9ecdB37c74A786B72';
 

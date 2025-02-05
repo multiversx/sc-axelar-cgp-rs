@@ -1,8 +1,9 @@
 use crate::abi::AbiEncodeDecode;
+use crate::abi_types::SendToHubPayload;
 use crate::address_tracker;
 use crate::constants::{
-    Hash, MetadataVersion, SendToHubPayload, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
-    MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER, MESSAGE_TYPE_SEND_TO_HUB,
+    Hash, MetadataVersion, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
+    MESSAGE_TYPE_SEND_TO_HUB,
 };
 use gas_service::ProxyTrait as _;
 use gateway::ProxyTrait as _;
@@ -116,9 +117,8 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
             .execute_on_dest_context::<bool>()
     }
 
-    fn call_contract(
+    fn route_message(
         &self,
-        message_type: BigUint,
         destination_chain: ManagedBuffer,
         payload: ManagedBuffer,
         metadata_version: MetadataVersion,
@@ -126,7 +126,29 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         gas_value: BigUint,
     ) {
         let (destination_chain, destination_address, payload) =
-            self.get_call_params(message_type, destination_chain, payload);
+            self.get_call_params(destination_chain, payload);
+
+        self.call_contract(
+            destination_chain,
+            destination_address,
+            payload,
+            metadata_version,
+            gas_token,
+            gas_value,
+        );
+    }
+
+    fn call_contract(
+        &self,
+        destination_chain: ManagedBuffer,
+        destination_address: ManagedBuffer,
+        payload: ManagedBuffer,
+        metadata_version: MetadataVersion,
+        gas_token: EgldOrEsdtTokenIdentifier,
+        gas_value: BigUint,
+    ) {
+        // Check whether no trusted address was set for the destination chain
+        require!(!destination_address.is_empty(), "Untrusted chain");
 
         if gas_value > 0 {
             match metadata_version {
@@ -145,7 +167,6 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
 
     fn get_call_params(
         &self,
-        message_type: BigUint,
         destination_chain: ManagedBuffer,
         payload: ManagedBuffer,
     ) -> (ManagedBuffer, ManagedBuffer, ManagedBuffer) {
@@ -159,15 +180,13 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
 
         // Check whether the ITS call should be routed via ITS hub for this destination chain
         if destination_address == *ITS_HUB_ROUTING_IDENTIFIER {
-            // Prevent deploy token manager to be usable on ITS hub
-            require!(
-                message_type != MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
-                "Not supported"
-            );
-
+            // Wrap ITS message in an ITS Hub message
             let new_destination_address_mapper =
                 self.trusted_address(&ManagedBuffer::from(ITS_HUB_CHAIN_NAME));
-            require!(!new_destination_address_mapper.is_empty(), "Untrusted chain");
+            require!(
+                !new_destination_address_mapper.is_empty(),
+                "Untrusted chain"
+            );
             let new_destination_address = new_destination_address_mapper.get();
 
             let data = SendToHubPayload::<Self::Api> {

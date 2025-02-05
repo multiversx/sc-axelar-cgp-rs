@@ -6,6 +6,7 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 pub const PREFIX_CANONICAL_TOKEN_SALT: &[u8] = b"canonical-token-salt";
 pub const PREFIX_INTERCHAIN_TOKEN_SALT: &[u8] = b"interchain-token-salt";
 pub const PREFIX_DEPLOY_APPROVAL: &[u8] = b"deploy-approval";
+pub const PREFIX_CUSTOM_TOKEN_SALT: &[u8] = b"custom-token-salt";
 
 pub type Hash<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;

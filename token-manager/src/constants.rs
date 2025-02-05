@@ -38,7 +38,7 @@ impl From<TokenManagerType> for u8 {
     }
 }
 
-#[derive(TypeAbi, TopEncode, TopDecode)]
+#[derive(TypeAbi, TopEncode, TopDecode, NestedEncode)]
 pub struct DeployTokenManagerParams<M: ManagedTypeApi> {
     pub operator: Option<ManagedAddress<M>>,
     pub token_identifier: Option<EgldOrEsdtTokenIdentifier<M>>,

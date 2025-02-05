@@ -1,15 +1,17 @@
+multiversx_sc::imports!();
+
 use core::convert::TryFrom;
 use core::ops::Deref;
 
-use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
+use token_manager::constants::TokenManagerType;
 
+use crate::abi::AbiEncodeDecode;
+use crate::abi_types::LinkTokenPayload;
 use crate::constants::{
     Hash, MetadataVersion, TokenId, TransferAndGasTokens, ESDT_EGLD_IDENTIFIER,
-    ITS_HUB_ROUTING_IDENTIFIER, PREFIX_INTERCHAIN_TOKEN_ID,
+    MESSAGE_TYPE_LINK_TOKEN, PREFIX_INTERCHAIN_TOKEN_ID,
 };
 use crate::{address_tracker, events, executable, proxy_gmp, proxy_its, remote};
-
-multiversx_sc::imports!();
 
 #[multiversx_sc::module]
 pub trait UserFunctionsModule:
@@ -21,36 +23,86 @@ pub trait UserFunctionsModule:
     + multiversx_sc_modules::pause::PauseModule
     + executable::ExecutableModule
 {
+    #[payable("EGLD")]
+    #[endpoint(registerTokenMetadata)]
+    fn register_token_metadata(&self, token_identifier: TokenIdentifier) {
+        require!(
+            token_identifier.is_valid_esdt_identifier(),
+            "Invalid token identifier"
+        );
+
+        let gas_value = self.call_value().egld_value().clone_value();
+
+        self.register_token_metadata_async_call(token_identifier, gas_value);
+    }
+
+    #[endpoint(registerCustomToken)]
+    fn register_custom_token(
+        &self,
+        salt: Hash<Self::Api>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
+        token_manager_type: TokenManagerType,
+        link_params: ManagedBuffer,
+    ) -> TokenId<Self::Api> {
+        self.require_not_paused();
+        self.only_token_factory();
+
+        // Custom token managers can't be deployed with native interchain token type, which is reserved for interchain tokens
+        require!(
+            token_manager_type != TokenManagerType::NativeInterchainToken,
+            "Can not deploy native interchain token"
+        );
+
+        let deployer = ManagedAddress::zero();
+
+        let token_id = self.interchain_token_id(&deployer, &salt);
+
+        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
+
+        self.deploy_token_manager_raw(
+            &token_id,
+            token_manager_type,
+            Some(token_identifier),
+            link_params,
+        );
+
+        token_id
+    }
+
     // Payable with EGLD for cross chain calls gas
     #[payable("EGLD")]
-    #[endpoint(deployTokenManager)]
-    fn deploy_token_manager(
+    #[endpoint(linkToken)]
+    fn link_token(
         &self,
         salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
+        destination_token_address: ManagedBuffer,
         token_manager_type: TokenManagerType,
-        params: ManagedBuffer,
+        link_params: ManagedBuffer,
     ) -> TokenId<Self::Api> {
         self.require_not_paused();
 
-        require!(!params.is_empty(), "Empty params");
+        require!(!destination_token_address.is_empty(), "Empty token address");
 
         // Custom token managers can't be deployed with Interchain token mint burn type, which is reserved for interchain tokens
         require!(
             token_manager_type != TokenManagerType::NativeInterchainToken,
-            "Can not deploy"
+            "Can not deploy native interchain token"
+        );
+
+        // Cannot deploy to this chain using linkToken anymore
+        require!(!destination_chain.is_empty(), "Not supported");
+
+        // Cannot deploy to this chain using linkToken anymore
+        require!(
+            destination_chain != self.chain_name().get(),
+            "Cannot deploy remotely to self"
         );
 
         let mut deployer = self.blockchain().get_caller();
 
         if deployer == self.interchain_token_factory().get() {
             deployer = ManagedAddress::zero();
-        } else if destination_chain.is_empty() {
-            // Restricted on ITS contracts deployed to Amplifier chains until ITS Hub adds support
-            require!(
-                self.trusted_address(&self.chain_name().get()).get() != *ITS_HUB_ROUTING_IDENTIFIER,
-                "Not supported"
-            );
         }
 
         let token_id = self.interchain_token_id(&deployer, &salt);
@@ -59,28 +111,34 @@ pub trait UserFunctionsModule:
 
         let gas_value = self.call_value().egld_value().clone_value();
 
-        if destination_chain.is_empty() {
-            require!(
-                gas_value == 0,
-                "Can not accept EGLD if not cross chain call"
-            );
+        let source_token_address = self.registered_token_identifier(&token_id).into_name();
 
-            self.deploy_token_manager_raw(&token_id, token_manager_type, params);
-        } else {
-            require!(
-                self.chain_name().get() != destination_chain,
-                "Cannot deploy remotely to self",
-            );
+        self.emit_link_token_started_event(
+            &token_id,
+            &destination_chain,
+            &source_token_address,
+            &destination_token_address,
+            &token_manager_type,
+            &link_params,
+        );
 
-            self.deploy_remote_token_manager(
-                &token_id,
-                destination_chain,
-                token_manager_type,
-                params,
-                EgldOrEsdtTokenIdentifier::egld(),
-                gas_value,
-            );
-        }
+        let data = LinkTokenPayload {
+            message_type: BigUint::from(MESSAGE_TYPE_LINK_TOKEN),
+            token_id: token_id.clone(),
+            token_manager_type,
+            source_token_address,
+            destination_token_address,
+            link_params,
+        };
+        let payload = data.abi_encode();
+
+        self.route_message(
+            destination_chain,
+            payload,
+            MetadataVersion::ContractCall,
+            EgldOrEsdtTokenIdentifier::egld(),
+            gas_value,
+        );
 
         token_id
     }
@@ -100,28 +158,15 @@ pub trait UserFunctionsModule:
         minter: ManagedBuffer,
     ) -> TokenId<Self::Api> {
         self.require_not_paused();
+        self.only_token_factory();
 
-        let mut deployer = self.blockchain().get_caller();
-
-        if deployer == self.interchain_token_factory().get() {
-            deployer = ManagedAddress::zero();
-        } else {
-            // Currently, deployments directly on ITS contract (instead of ITS Factory) are restricted for ITS contracts deployed on Amplifier, i.e registered with the Hub
-            sc_panic!("Not supported");
-        }
+        let deployer = ManagedAddress::zero();
 
         let token_id = self.interchain_token_id(&deployer, &salt);
 
         self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
 
         if destination_chain.is_empty() {
-            let minter_raw = ManagedAddress::try_from(minter);
-            let minter = if minter_raw.is_err() {
-                None
-            } else {
-                Some(minter_raw.unwrap())
-            };
-
             // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
             // This is because we can not deploy token manager and call it to deploy the token in the same transaction
             let token_manager_address_mapper = self.token_manager_address(&token_id);
@@ -131,23 +176,24 @@ pub trait UserFunctionsModule:
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
-                let mut params = ManagedBuffer::new();
-
-                DeployTokenManagerParams {
-                    operator: minter,
-                    token_identifier: None,
-                }
-                .top_encode(&mut params)
-                .unwrap();
-
                 self.deploy_token_manager_raw(
                     &token_id,
                     TokenManagerType::NativeInterchainToken,
-                    params,
+                    None,
+                    minter,
                 );
 
                 return token_id;
             }
+
+            let minter = if minter.is_empty() {
+                None
+            } else {
+                Some(
+                    ManagedAddress::try_from(minter)
+                        .unwrap_or_else(|_| sc_panic!("Invalid MultiversX address")),
+                )
+            };
 
             self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);
         } else {
@@ -311,6 +357,13 @@ pub trait UserFunctionsModule:
                 };
             }
         }
+    }
+
+    fn only_token_factory(&self) {
+        require!(
+            self.blockchain().get_caller() == self.interchain_token_factory().get(),
+            "Not interchain token factory"
+        );
     }
 
     #[view(interchainTokenId)]

@@ -1,4 +1,4 @@
-use token_manager::constants::TokenManagerType;
+use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
 use crate::constants::{Hash, TokenId};
 
@@ -9,7 +9,7 @@ multiversx_sc::derive_imports!();
 pub struct TokenManagerDeployedEventData<M: ManagedTypeApi> {
     token_manager: ManagedAddress<M>,
     token_manager_type: TokenManagerType,
-    params: ManagedBuffer<M>, // Should actually be of type DeployTokenManagerParams
+    params: DeployTokenManagerParams<M>,
 }
 
 #[derive(TypeAbi, TopEncode)]
@@ -22,10 +22,12 @@ pub struct InterchainTokenDeploymentStartedEventData<M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-pub struct TokenManagerDeploymentStartedEventData<M: ManagedTypeApi> {
-    destination_chain: ManagedBuffer<M>,
-    token_manager_type: TokenManagerType,
-    params: ManagedBuffer<M>,
+pub struct LinkTokenStartedEventData<'a, M: ManagedTypeApi> {
+    destination_chain: &'a ManagedBuffer<M>,
+    source_token_address: &'a ManagedBuffer<M>,
+    destination_token_address: &'a ManagedBuffer<M>,
+    token_manager_type: &'a TokenManagerType,
+    params: &'a ManagedBuffer<M>,
 }
 
 #[derive(TypeAbi, TopEncode)]
@@ -51,7 +53,7 @@ pub trait EventsModule {
         token_id: &TokenId<Self::Api>,
         token_manager: ManagedAddress,
         token_manager_type: TokenManagerType,
-        params: ManagedBuffer,
+        params: DeployTokenManagerParams<Self::Api>,
     ) {
         self.token_manager_deployed_event(
             token_id,
@@ -83,20 +85,24 @@ pub trait EventsModule {
         self.interchain_token_deployment_started_event(token_id, data);
     }
 
-    fn emit_token_manager_deployment_started(
+    fn emit_link_token_started_event<'a>(
         &self,
         token_id: &TokenId<Self::Api>,
-        destination_chain: ManagedBuffer,
-        token_manager_type: TokenManagerType,
-        params: ManagedBuffer,
+        destination_chain: &'a ManagedBuffer,
+        source_token_address: &ManagedBuffer,
+        destination_token_address: &'a ManagedBuffer,
+        token_manager_type: &'a TokenManagerType,
+        params: &'a ManagedBuffer,
     ) {
-        let data = TokenManagerDeploymentStartedEventData {
+        let data = LinkTokenStartedEventData {
             destination_chain,
+            source_token_address,
+            destination_token_address,
             token_manager_type,
             params,
         };
 
-        self.token_manager_deployment_started_event(token_id, data);
+        self.link_token_started_event(token_id, data);
     }
 
     fn emit_standardized_token_deployed_event(
@@ -160,11 +166,18 @@ pub trait EventsModule {
         salt: &Hash<Self::Api>,
     );
 
-    #[event("token_manager_deployment_started_event")]
-    fn token_manager_deployment_started_event(
+    #[event("token_metadata_registered_event")]
+    fn token_metadata_registered_event(
+        &self,
+        #[indexed] token_identifier: &TokenIdentifier,
+        decimals: u8,
+    );
+
+    #[event("link_token_started_event")]
+    fn link_token_started_event(
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
-        data: TokenManagerDeploymentStartedEventData<Self::Api>,
+        data: LinkTokenStartedEventData<Self::Api>,
     );
 
     #[event("standardized_token_deployed_event")]
