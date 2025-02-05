@@ -202,12 +202,8 @@ pub trait TokenManagerLockUnlockContract:
         require!(!name.is_empty(), "Empty token name");
         require!(!symbol.is_empty(), "Empty token symbol");
 
-        /*
-         * Set the token service as a minter to allow it to mint and burn tokens.
-         * Also add the provided address as a minter. If zero address was provided,
-         * add it as a minter to allow anyone to easily check that no custom minter was set.
-         */
-        self.add_minter(interchain_token_service);
+        // For native interchain tokens, we transfer mintership to the token manager.
+        self.add_minter(self.blockchain().get_sc_address());
         if minter.is_some() {
             self.add_minter(minter.unwrap());
         } else {

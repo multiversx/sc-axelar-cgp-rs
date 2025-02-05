@@ -8,9 +8,9 @@ The Mint/Burn type is generally used for tokens which come from other chains (wr
 It is deployed by the [Interchain Token Service contract](../interchain-token-service) when appropriate.
 
 It is lousily based on the ITS Solidity implementation of the following 3 contracts:
-- https://github.com/axelarnetwork/interchain-token-service/blob/v2.0.1/contracts/TokenHandler.sol
-- https://github.com/axelarnetwork/interchain-token-service/blob/v2.0.1/contracts/token-manager/TokenManager.sol
-- https://github.com/axelarnetwork/interchain-token-service/blob/v2.0.1/contracts/interchain-token/InterchainToken.sol
+- https://github.com/axelarnetwork/interchain-token-service/blob/v/contracts/TokenHandler.sol
+- https://github.com/axelarnetwork/interchain-token-service/blob/v/contracts/token-manager/TokenManager.sol
+- https://github.com/axelarnetwork/interchain-token-service/blob/v/contracts/interchain-token/InterchainToken.sol
 
 Because of architectural differences between MultiversX and EVM, it was simpler to create one contract on MultiversX which has similar functionality
 and works together with the ITS contract to facilitate cross-chain token transfers.

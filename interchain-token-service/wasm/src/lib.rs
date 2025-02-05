@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           33
-// Async Callback (empty):               1
+// Endpoints:                           35
+// Async Callback:                       1
 // Promise callbacks:                    1
-// Total number of exported functions:  37
+// Total number of exported functions:  39
 
 #![no_std]
 
@@ -24,7 +24,9 @@ multiversx_sc_wasm_adapter::endpoints! {
         setInterchainTokenFactory => set_interchain_token_factory
         setFlowLimits => set_flow_limits
         execute => execute
-        deployTokenManager => deploy_token_manager
+        registerTokenMetadata => register_token_metadata
+        registerCustomToken => register_custom_token
+        linkToken => link_token
         deployInterchainToken => deploy_interchain_token
         interchainTransfer => interchain_transfer
         callContractWithInterchainToken => call_contract_with_interchain_token
@@ -58,4 +60,4 @@ multiversx_sc_wasm_adapter::endpoints! {
     )
 }
 
-multiversx_sc_wasm_adapter::async_callback_empty! {}
+multiversx_sc_wasm_adapter::async_callback! { interchain_token_service }

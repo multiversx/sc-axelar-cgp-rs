@@ -11,6 +11,10 @@ use token_manager::constants::TokenManagerType;
 use token_manager::mintership::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
+const ESDT_PROPERTIES_TOKEN_NAME_INDEX: usize = 0;
+const ESDT_PROPERTIES_TOKEN_TYPE_INDEX: usize = 1;
+const ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX: usize = 5;
+
 #[multiversx_sc::module]
 pub trait ProxyModule {
     fn its_chain_name(&self) -> ManagedBuffer {
@@ -27,7 +31,7 @@ pub trait ProxyModule {
 
     fn its_deploy_interchain_token(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
@@ -36,7 +40,14 @@ pub trait ProxyModule {
         gas_value: BigUint,
     ) {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .deploy_interchain_token(salt, destination_chain, name, symbol, decimals, minter)
+            .deploy_interchain_token(
+                deploy_salt,
+                destination_chain,
+                name,
+                symbol,
+                decimals,
+                minter,
+            )
             .with_egld_transfer(gas_value)
             .execute_on_dest_context::<()>();
     }
@@ -53,16 +64,40 @@ pub trait ProxyModule {
             .execute_on_dest_context()
     }
 
-    fn its_deploy_token_manager(
+    fn its_register_custom_token(
         &self,
-        salt: Hash<Self::Api>,
-        destination_chain: ManagedBuffer,
+        deploy_salt: Hash<Self::Api>,
+        token_identifier: EgldOrEsdtTokenIdentifier,
         token_manager_type: TokenManagerType,
-        params: ManagedBuffer,
+        link_params: ManagedBuffer,
+    ) -> TokenId<Self::Api> {
+        self.interchain_token_service_proxy(self.interchain_token_service().get())
+            .register_custom_token(
+                deploy_salt,
+                token_identifier,
+                token_manager_type,
+                link_params,
+            )
+            .execute_on_dest_context()
+    }
+
+    fn its_link_token(
+        &self,
+        deploy_salt: Hash<Self::Api>,
+        destination_chain: ManagedBuffer,
+        destination_token_address: ManagedBuffer,
+        token_manager_type: TokenManagerType,
+        link_params: ManagedBuffer,
         gas_value: BigUint,
     ) -> TokenId<Self::Api> {
         self.interchain_token_service_proxy(self.interchain_token_service().get())
-            .deploy_token_manager(salt, destination_chain, token_manager_type, params)
+            .link_token(
+                deploy_salt,
+                destination_chain,
+                destination_token_address,
+                token_manager_type,
+                link_params,
+            )
             .with_egld_transfer(gas_value)
             .execute_on_dest_context()
     }
@@ -191,10 +226,10 @@ pub trait ProxyModule {
     #[callback]
     fn deploy_remote_token_callback(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         token_symbol: ManagedBuffer,
-        minter_raw: &ManagedBuffer,
+        destination_minter: &ManagedBuffer,
         gas_value: BigUint,
         caller: ManagedAddress,
         #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
@@ -203,9 +238,9 @@ pub trait ProxyModule {
             ManagedAsyncCallResult::Ok(values) => {
                 let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
 
-                let token_name = vec.get(0).clone_value();
-                let token_type = vec.get(1);
-                let decimals_buffer_ref = vec.get(5);
+                let token_name = vec.get(ESDT_PROPERTIES_TOKEN_NAME_INDEX).clone_value();
+                let token_type = vec.get(ESDT_PROPERTIES_TOKEN_TYPE_INDEX);
+                let decimals_buffer_ref = vec.get(ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX);
 
                 if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
                     // Send back paid cross chain gas value to initial caller if token is non fungible
@@ -223,17 +258,17 @@ pub trait ProxyModule {
                 let token_decimals = token_decimals_buf.ascii_to_u8();
 
                 self.its_deploy_interchain_token(
-                    salt,
+                    deploy_salt,
                     destination_chain,
                     token_name,
                     token_symbol,
                     token_decimals,
-                    minter_raw,
+                    destination_minter,
                     gas_value,
                 );
             }
             ManagedAsyncCallResult::Err(_) => {
-                // Send back payed gas value to initial caller
+                // Send back paid gas value to initial caller
                 self.send().direct_non_zero_egld(&caller, &gas_value);
             }
         }

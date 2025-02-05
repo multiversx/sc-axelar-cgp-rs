@@ -20,22 +20,24 @@ import {
   computeInterchainTokenId,
   deployContracts,
   deployPingPongInterchain,
+  deployTokenManagerLockUnlock,
   gasService,
   gateway,
   interchainTokenFactory,
   its,
-  ITS_CHAIN_ADDRESS,
+  ITS_HUB_CHAIN_ADDRESS,
   ITS_HUB_CHAIN_NAME,
   ITS_HUB_ROUTING_IDENTIFIER,
-  itsDeployTokenManagerLockUnlock,
-  itsDeployTokenManagerMintBurn,
+  itsRegisterCustomTokenLockUnlock,
+  itsRegisterCustomTokenMintBurn,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-  MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+  MESSAGE_TYPE_LINK_TOKEN,
   MESSAGE_TYPE_RECEIVE_FROM_HUB,
   mockGatewayMessageApproved,
   pingPong,
   TOKEN_MANAGER_TYPE_MINT_BURN,
+  tokenManager,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -95,10 +97,7 @@ beforeEach(async () => {
     callee: its,
     funcName: 'setTrustedAddress',
     gasLimit: 10_000_000,
-    funcArgs: [
-      e.Str(ITS_HUB_CHAIN_NAME),
-      e.Str(ITS_CHAIN_ADDRESS),
-    ],
+    funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(ITS_HUB_CHAIN_ADDRESS)],
   });
 
   // Route original chain through ITS Hub
@@ -106,10 +105,7 @@ beforeEach(async () => {
     callee: its,
     funcName: 'setTrustedAddress',
     gasLimit: 10_000_000,
-    funcArgs: [
-      e.Str(OTHER_CHAIN_NAME),
-      e.Str(ITS_HUB_ROUTING_IDENTIFIER),
-    ],
+    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
   });
 });
 
@@ -128,24 +124,19 @@ const mockTransferGatewayCall = async (interchainTokenId: string, payload: strin
         Buffer.from(otherUser.toTopU8A()),
         1_000,
         Buffer.from(''),
-      ],
+      ]
     );
 
-    payload = AbiCoder.defaultAbiCoder().encode(
-      ['uint256', 'string', 'bytes'],
-      [
-        MESSAGE_TYPE_RECEIVE_FROM_HUB,
-        OTHER_CHAIN_NAME,
-        payload,
-      ],
-    ).substring(2);
+    payload = AbiCoder.defaultAbiCoder()
+      .encode(['uint256', 'string', 'bytes'], [MESSAGE_TYPE_RECEIVE_FROM_HUB, OTHER_CHAIN_NAME, payload])
+      .substring(2);
   }
 
   const { crossChainId, messageHash } = await mockGatewayMessageApproved(
     payload,
     deployer,
     ITS_HUB_CHAIN_NAME,
-    ITS_CHAIN_ADDRESS,
+    ITS_HUB_CHAIN_ADDRESS
   );
 
   return { payload, crossChainId, messageHash };
@@ -161,23 +152,18 @@ const mockTransferWithDataGatewayCall = async (tokenId: string, fnc = 'ping') =>
       Buffer.from(pingPong.toTopU8A()),
       1_000,
       Buffer.from(e.Tuple(e.Str(fnc), otherUser).toTopU8A()), // data passed to contract
-    ],
+    ]
   );
 
-  payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'string', 'bytes'],
-    [
-      MESSAGE_TYPE_RECEIVE_FROM_HUB,
-      OTHER_CHAIN_NAME,
-      payload,
-    ],
-  ).substring(2);
+  payload = AbiCoder.defaultAbiCoder()
+    .encode(['uint256', 'string', 'bytes'], [MESSAGE_TYPE_RECEIVE_FROM_HUB, OTHER_CHAIN_NAME, payload])
+    .substring(2);
 
   const { crossChainId, messageHash } = await mockGatewayMessageApproved(
     payload,
     deployer,
     ITS_HUB_CHAIN_NAME,
-    ITS_CHAIN_ADDRESS,
+    ITS_HUB_CHAIN_ADDRESS
   );
 
   return { payload, crossChainId, messageHash };
@@ -193,58 +179,45 @@ const mockDeployInterchainTokenGatewayCall = async (tokenId = INTERCHAIN_TOKEN_I
       'SYMBOL',
       18,
       Buffer.from(user.toTopU8A()), // minter
-    ],
+    ]
   );
 
-  payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'string', 'bytes'],
-    [
-      MESSAGE_TYPE_RECEIVE_FROM_HUB,
-      OTHER_CHAIN_NAME,
-      payload,
-    ],
-  ).substring(2);
+  payload = AbiCoder.defaultAbiCoder()
+    .encode(['uint256', 'string', 'bytes'], [MESSAGE_TYPE_RECEIVE_FROM_HUB, OTHER_CHAIN_NAME, payload])
+    .substring(2);
 
   const { crossChainId, messageHash } = await mockGatewayMessageApproved(
     payload,
     deployer,
     ITS_HUB_CHAIN_NAME,
-    ITS_CHAIN_ADDRESS,
+    ITS_HUB_CHAIN_ADDRESS
   );
 
   return { payload, crossChainId, messageHash };
 };
 
-const mockDeployTokenManagerGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID, type = TOKEN_MANAGER_TYPE_MINT_BURN) => {
+const mockLinkTokenGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID, type = TOKEN_MANAGER_TYPE_MINT_BURN) => {
   let payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'bytes32', 'uint8', 'bytes'],
+    ['uint256', 'bytes32', 'uint256', 'bytes', 'bytes', 'bytes'],
     [
-      MESSAGE_TYPE_DEPLOY_TOKEN_MANAGER,
+      MESSAGE_TYPE_LINK_TOKEN,
       Buffer.from(tokenId, 'hex'),
       type,
-      Buffer.from(
-        e.Tuple(
-          e.Option(its),
-          e.Option(e.Str(TOKEN_ID)),
-        ).toTopU8A(),
-      ),
-    ],
+      Buffer.from(OTHER_CHAIN_TOKEN_ADDRESS),
+      Buffer.from(TOKEN_ID),
+      Buffer.from(''), // empty operator
+    ]
   );
 
-  payload = AbiCoder.defaultAbiCoder().encode(
-    ['uint256', 'string', 'bytes'],
-    [
-      MESSAGE_TYPE_RECEIVE_FROM_HUB,
-      OTHER_CHAIN_NAME,
-      payload,
-    ],
-  ).substring(2);
+  payload = AbiCoder.defaultAbiCoder()
+    .encode(['uint256', 'string', 'bytes'], [MESSAGE_TYPE_RECEIVE_FROM_HUB, OTHER_CHAIN_NAME, payload])
+    .substring(2);
 
   const { crossChainId, messageHash } = await mockGatewayMessageApproved(
     payload,
     deployer,
     ITS_HUB_CHAIN_NAME,
-    ITS_CHAIN_ADDRESS,
+    ITS_HUB_CHAIN_ADDRESS
   );
 
   return { payload, crossChainId, messageHash };
@@ -252,7 +225,7 @@ const mockDeployTokenManagerGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID, 
 
 describe('Execute', () => {
   test('Transfer', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerMintBurn(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenMintBurn(world, user);
 
     const { payload, crossChainId } = await mockTransferGatewayCall(computedTokenId);
 
@@ -260,21 +233,14 @@ describe('Execute', () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(ITS_CHAIN_ADDRESS),
-        payload,
-      ],
+      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_CHAIN_ADDRESS), payload],
     });
 
     // Tokens should be minted for otherUser
     const otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
       balance: BigInt('10000000000000000'),
-      kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
-      ],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
     });
 
     // Nothing changed for token manager
@@ -286,22 +252,18 @@ describe('Execute', () => {
 
     // Gateway message was marked as executed
     assertAccount(await gateway.getAccount(), {
-      kvs: [
-        ...baseGatewayKvs(deployer),
-
-        e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
-      ],
+      kvs: [...baseGatewayKvs(deployer), e.kvs.Mapper('messages', crossChainId).Value(e.Str('1'))],
     });
   });
 
   test('Transfer with data', async () => {
     await deployPingPongInterchain(deployer);
 
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
       world,
       user,
       true,
-      'EGLD',
+      'EGLD'
     );
 
     const { payload, crossChainId } = await mockTransferWithDataGatewayCall(computedTokenId);
@@ -310,12 +272,7 @@ describe('Execute', () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 100_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(ITS_CHAIN_ADDRESS),
-        payload,
-      ],
+      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_CHAIN_ADDRESS), payload],
     });
 
     // Assert ping pong was successfully called with tokens
@@ -342,18 +299,12 @@ describe('Execute', () => {
     const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 99_000,
-      kvs: [
-        ...baseTokenManagerKvs,
-      ],
+      kvs: [...baseTokenManagerKvs],
     });
 
     // Gateway message was marked as executed
     assertAccount(await gateway.getAccount(), {
-      kvs: [
-        ...baseGatewayKvs(deployer),
-
-        e.kvs.Mapper('messages', crossChainId).Value(e.Str('1')),
-      ],
+      kvs: [...baseGatewayKvs(deployer), e.kvs.Mapper('messages', crossChainId).Value(e.Str('1'))],
     });
   });
 
@@ -364,12 +315,7 @@ describe('Execute', () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 100_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(ITS_CHAIN_ADDRESS),
-        payload,
-      ],
+      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_CHAIN_ADDRESS), payload],
     });
 
     const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
@@ -386,131 +332,102 @@ describe('Execute', () => {
 
     // Gateway message approved key was NOT removed
     assertAccount(await gateway.getAccount(), {
-      kvs: [
-        ...baseGatewayKvs(deployer),
-
-        e.kvs.Mapper('messages', crossChainId).Value(messageHash),
-      ],
+      kvs: [...baseGatewayKvs(deployer), e.kvs.Mapper('messages', crossChainId).Value(messageHash)],
     });
   });
 
-  test('Deploy token manager', async () => {
-    const { payload, crossChainId } = await mockDeployTokenManagerGatewayCall();
+  test('Link token', async () => {
+    const { payload, crossChainId } = await mockLinkTokenGatewayCall();
 
     await user.callContract({
       callee: its,
       funcName: 'execute',
       gasLimit: 50_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(ITS_CHAIN_ADDRESS),
-        payload,
-      ],
-    }).assertFail({ code: 4, message: 'Not supported' });
+      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_CHAIN_ADDRESS), payload],
+    });
 
-    // For now ITS Hub does not support deploy token manager
-    // const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
-    // const tokenManagerKvs = await tokenManager.getAccount();
-    // assertAccount(tokenManagerKvs, {
-    //   balance: 0,
-    //   kvs: [
-    //     e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
-    //     e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_MINT_BURN)),
-    //     e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
-    //     e.kvs.Mapper('interchain_token_service').Value(its),
-    //     e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
-    //   ],
-    // });
-    //
-    // // Gateway message was marked as executed
-    // assertAccount(await gateway.getAccount(), {
-    //   kvs: [
-    //     ...baseGatewayKvs(deployer),
-    //
-    //     e.kvs.Mapper('messages', crossChainId).Value(e.Str("1")),
-    //   ],
-    // });
+    const kvs = await its.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseItsKvs(deployer, interchainTokenFactory, INTERCHAIN_TOKEN_ID),
+
+        e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
+        e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_HUB_CHAIN_ADDRESS)),
+      ],
+    });
+
+    const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
+    const tokenManagerKvs = await tokenManager.getAccount();
+    assertAccount(tokenManagerKvs, {
+      balance: 0,
+      kvs: [
+        e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
+        e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_MINT_BURN)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+        e.kvs.Mapper('interchain_token_service').Value(its),
+        e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit and operator roles
+        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
+      ],
+    });
+
+    // Gateway message was marked as executed
+    assertAccount(await gateway.getAccount(), {
+      kvs: [...baseGatewayKvs(deployer), e.kvs.Mapper('messages', crossChainId).Value(e.Str('1'))],
+    });
   });
 
   test('Errors', async () => {
-    let payload = AbiCoder.defaultAbiCoder().encode(
-      ['uint256'],
-      [
-        MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-      ],
-    ).substring(2);
+    let payload = AbiCoder.defaultAbiCoder().encode(['uint256'], [MESSAGE_TYPE_INTERCHAIN_TRANSFER]).substring(2);
 
     // Can not receive normal messages from ITS Hub chain
-    await user.callContract({
-      callee: its,
-      funcName: 'execute',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(ITS_CHAIN_ADDRESS),
-        payload,
-      ],
-    }).assertFail({ code: 4, message: 'Untrusted chain' });
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'execute',
+        gasLimit: 20_000_000,
+        funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_CHAIN_ADDRESS), payload],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
 
-    payload = AbiCoder.defaultAbiCoder().encode(
-      ['uint256'],
-      [
-        MESSAGE_TYPE_RECEIVE_FROM_HUB,
-      ],
-    ).substring(2);
+    payload = AbiCoder.defaultAbiCoder().encode(['uint256'], [MESSAGE_TYPE_RECEIVE_FROM_HUB]).substring(2);
 
     await deployer.callContract({
       callee: its,
       funcName: 'setTrustedAddress',
       gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(OTHER_CHAIN_ADDRESS),
-      ],
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(OTHER_CHAIN_ADDRESS)],
     });
 
     // Can not receive from hub from other chain than ITS Hub chain
-    await user.callContract({
-      callee: its,
-      funcName: 'execute',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(OTHER_CHAIN_ADDRESS),
-        payload,
-      ],
-    }).assertFail({ code: 4, message: 'Untrusted chain' });
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'execute',
+        gasLimit: 20_000_000,
+        funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
 
-    payload = AbiCoder.defaultAbiCoder().encode(
-      ['uint256', 'bytes', 'bytes'],
-      [
-        MESSAGE_TYPE_RECEIVE_FROM_HUB,
-        Buffer.from(OTHER_CHAIN_NAME),
-        '0x',
-      ],
-    ).substring(2);
+    payload = AbiCoder.defaultAbiCoder()
+      .encode(['uint256', 'bytes', 'bytes'], [MESSAGE_TYPE_RECEIVE_FROM_HUB, Buffer.from(OTHER_CHAIN_NAME), '0x'])
+      .substring(2);
 
     // Original source chain is not routed via ITS Hub
-    await user.callContract({
-      callee: its,
-      funcName: 'execute',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(MESSAGE_ID),
-        e.Str(ITS_CHAIN_ADDRESS),
-        payload,
-      ],
-    }).assertFail({ code: 4, message: 'Untrusted chain' });
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'execute',
+        gasLimit: 20_000_000,
+        funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_CHAIN_ADDRESS), payload],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
   });
 });
 
 describe('Transfers', () => {
   test('Interchain transfer', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -530,9 +447,7 @@ describe('Transfers', () => {
     let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
-      kvs: [
-        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-      ],
+      kvs: [e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString()))],
     });
 
     let tokenManagerKvs = await tokenManager.getAccount();
@@ -549,7 +464,7 @@ describe('Transfers', () => {
   });
 
   test('Call contract', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     await user.callContract({
       callee: its,
@@ -569,9 +484,7 @@ describe('Transfers', () => {
     let kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 0,
-      kvs: [
-        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-      ],
+      kvs: [e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString()))],
     });
 
     let tokenManagerKvs = await tokenManager.getAccount();
@@ -588,77 +501,80 @@ describe('Transfers', () => {
   });
 
   test('Errors', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsDeployTokenManagerLockUnlock(world, user);
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(world, user);
 
     // Can not send directly to ITS Hub chain
-    await user.callContract({
-      callee: its,
-      funcName: 'interchainTransfer',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.TopBuffer(computedTokenId),
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(OTHER_CHAIN_ADDRESS),
-        e.Buffer(''), // No metadata, uses default
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-    }).assertFail({ code: 4, message: 'Untrusted chain' });
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'interchainTransfer',
+        gasLimit: 20_000_000,
+        funcArgs: [
+          e.TopBuffer(computedTokenId),
+          e.Str(ITS_HUB_CHAIN_NAME),
+          e.Str(OTHER_CHAIN_ADDRESS),
+          e.Buffer(''), // No metadata, uses default
+          e.U(0),
+        ],
+        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
 
     // Chain is not trusted
-    await user.callContract({
-      callee: its,
-      funcName: 'interchainTransfer',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.TopBuffer(computedTokenId),
-        e.Str('RandomChain'),
-        e.Str(OTHER_CHAIN_ADDRESS),
-        e.Buffer(''), // No metadata, uses default
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-    }).assertFail({ code: 4, message: 'Untrusted chain' });
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'interchainTransfer',
+        gasLimit: 20_000_000,
+        funcArgs: [
+          e.TopBuffer(computedTokenId),
+          e.Str('RandomChain'),
+          e.Str(OTHER_CHAIN_ADDRESS),
+          e.Buffer(''), // No metadata, uses default
+          e.U(0),
+        ],
+        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
 
     // Remove ITS Hub chain address
     await deployer.callContract({
       callee: its,
       funcName: 'removeTrustedAddress',
       gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-      ],
+      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME)],
     });
 
     // Can not route to ITS Hub chain
-    await user.callContract({
-      callee: its,
-      funcName: 'interchainTransfer',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.TopBuffer(computedTokenId),
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(OTHER_CHAIN_ADDRESS),
-        e.Buffer(''), // No metadata, uses default
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
-    }).assertFail({ code: 4, message: 'Untrusted chain' });
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'interchainTransfer',
+        gasLimit: 20_000_000,
+        funcArgs: [
+          e.TopBuffer(computedTokenId),
+          e.Str(OTHER_CHAIN_NAME),
+          e.Str(OTHER_CHAIN_ADDRESS),
+          e.Buffer(''), // No metadata, uses default
+          e.U(0),
+        ],
+        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
   });
 });
 
-describe('Deploy', () => {
-  test('Remote token manager', async () => {
+describe('Register', () => {
+  test('Remote link token', async () => {
     // Mock token manager exists on source chain
+    await deployTokenManagerLockUnlock(deployer, its);
     await its.setAccount({
-      ...await its.getAccount(),
+      ...(await its.getAccount()),
       kvs: [
         ...baseItsKvs(deployer, interchainTokenFactory),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
-          TOKEN_MANAGER_ADDRESS)),
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(e.Addr(
-          TOKEN_MANAGER_ADDRESS_2)),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(tokenManager),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(tokenManager),
       ],
     });
 
@@ -667,10 +583,7 @@ describe('Deploy', () => {
       callee: its,
       funcName: 'setTrustedAddress',
       gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(ITS_HUB_ROUTING_IDENTIFIER),
-      ],
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
     });
 
     // Trust ITS Hub chain
@@ -678,63 +591,49 @@ describe('Deploy', () => {
       callee: its,
       funcName: 'setTrustedAddress',
       gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(ITS_CHAIN_ADDRESS),
-      ],
+      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(ITS_HUB_CHAIN_ADDRESS)],
     });
 
-    await user.callContract({
+    const result = await user.callContract({
       callee: its,
-      funcName: 'deployTokenManager',
+      funcName: 'linkToken',
       gasLimit: 20_000_000,
       value: 100_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
         e.Str(OTHER_CHAIN_NAME),
-        e.U8(2),
-        e.Buffer(
-          AbiCoder.defaultAbiCoder().encode(
-            ['bytes', 'address'],
-            [
-              OTHER_CHAIN_ADDRESS,
-              OTHER_CHAIN_TOKEN_ADDRESS,
-            ],
-          ).substring(2),
-        ),
+        e.Str(OTHER_CHAIN_TOKEN_ADDRESS),
+        e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
+        e.Buffer(AbiCoder.defaultAbiCoder().encode(['bytes'], [OTHER_CHAIN_ADDRESS]).substring(2)),
       ],
-    }).assertFail({ code: 4, message: 'Not supported' });
+    });
 
     // For now ITS Hub does not support deploy token manager
-    // assert(result.returnData[0] === computeInterchainTokenId(user));
-    //
-    // // Nothing changes for its keys
-    // let kvs = await its.getAccount();
-    // assertAccount(kvs, {
-    //   balance: 0n,
-    //   kvs: [
-    //     ...baseItsKvs(deployer, interchainTokenFactory),
-    //
-    //     e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
-    //     e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_CHAIN_ADDRESS)),
-    //
-    //     e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(e.Addr(
-    //       TOKEN_MANAGER_ADDRESS)),
-    //     e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(e.Addr(
-    //       TOKEN_MANAGER_ADDRESS_2)),
-    //   ],
-    // });
-    //
-    // // Assert gas was paid for cross chain call
-    // kvs = await gasService.getAccount();
-    // assertAccount(kvs, {
-    //   balance: 100_000,
-    //   kvs: [
-    //     e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-    //   ],
-    // });
-    //
-    // // There are events emitted for the Gateway contract, but there is no way to test those currently...
+    assert(result.returnData[0] === computeInterchainTokenId(user));
+
+    // Nothing changes for its keys
+    let kvs = await its.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseItsKvs(deployer, interchainTokenFactory),
+
+        e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
+        e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_HUB_CHAIN_ADDRESS)),
+
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(tokenManager),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(tokenManager),
+      ],
+    });
+
+    // Assert gas was paid for cross chain call
+    kvs = await gasService.getAccount();
+    assertAccount(kvs, {
+      balance: 100_000,
+      kvs: [e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString()))],
+    });
+
+    // There are events emitted for the Gateway contract, but there is no way to test those currently...
   });
 
   test('Remote interchain token', async () => {
@@ -742,12 +641,11 @@ describe('Deploy', () => {
 
     // Mock token manager exists on source chain
     await its.setAccount({
-      ...await its.getAccount(),
+      ...(await its.getAccount()),
       kvs: [
         ...baseItsKvs(deployer, deployer), // mock deployer as the factory
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(
-          TOKEN_MANAGER_ADDRESS)),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
       ],
     });
 
@@ -756,54 +654,52 @@ describe('Deploy', () => {
       callee: its,
       funcName: 'setTrustedAddress',
       gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str(ITS_HUB_ROUTING_IDENTIFIER),
-      ],
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
     });
 
     // No address for ITS Hub chain
-    await deployer.callContract({
-      callee: its,
-      funcName: 'deployInterchainToken',
-      gasLimit: 20_000_000,
-      value: 100_000,
-      funcArgs: [
-        e.TopBuffer(TOKEN_SALT),
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
-        e.U8(18),
-        e.Str(OTHER_CHAIN_ADDRESS), // minter
-      ],
-    }).assertFail({ code: 4, message: 'Untrusted chain' });
+    await deployer
+      .callContract({
+        callee: its,
+        funcName: 'deployInterchainToken',
+        gasLimit: 20_000_000,
+        value: 100_000,
+        funcArgs: [
+          e.TopBuffer(TOKEN_SALT),
+          e.Str(OTHER_CHAIN_NAME),
+          e.Str('Token Name'),
+          e.Str('TOKEN-SYMBOL'),
+          e.U8(18),
+          e.Str(OTHER_CHAIN_ADDRESS), // minter
+        ],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
 
     // Trust ITS Hub chain
     await deployer.callContract({
       callee: its,
       funcName: 'setTrustedAddress',
       gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(ITS_HUB_CHAIN_NAME),
-        e.Str(ITS_CHAIN_ADDRESS),
-      ],
+      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(ITS_HUB_CHAIN_ADDRESS)],
     });
 
     // Only supports deploying interchain token through the factory
-    await user.callContract({
-      callee: its,
-      funcName: 'deployInterchainToken',
-      gasLimit: 20_000_000,
-      value: 100_000,
-      funcArgs: [
-        e.TopBuffer(TOKEN_SALT),
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
-        e.U8(18),
-        e.Str(OTHER_CHAIN_ADDRESS), // minter
-      ],
-    }).assertFail({ code: 4, message: 'Not supported' });
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'deployInterchainToken',
+        gasLimit: 20_000_000,
+        value: 100_000,
+        funcArgs: [
+          e.TopBuffer(TOKEN_SALT),
+          e.Str(OTHER_CHAIN_NAME),
+          e.Str('Token Name'),
+          e.Str('TOKEN-SYMBOL'),
+          e.U8(18),
+          e.Str(OTHER_CHAIN_ADDRESS), // minter
+        ],
+      })
+      .assertFail({ code: 4, message: 'Not interchain token factory' });
 
     // Deployer is actually the factory
     await deployer.callContract({
@@ -829,10 +725,9 @@ describe('Deploy', () => {
         ...baseItsKvs(deployer, deployer),
 
         e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
-        e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_CHAIN_ADDRESS)),
+        e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_HUB_CHAIN_ADDRESS)),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(
-          TOKEN_MANAGER_ADDRESS)),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
       ],
     });
 
@@ -840,9 +735,7 @@ describe('Deploy', () => {
     kvs = await gasService.getAccount();
     assertAccount(kvs, {
       balance: 100_000,
-      kvs: [
-        e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
-      ],
+      kvs: [e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString()))],
     });
 
     // There are events emitted for the Gateway contract, but there is no way to test those currently...
