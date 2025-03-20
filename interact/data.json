@@ -87,6 +87,15 @@
       "MEX-a659d0": {
         "tokenId": "5f2a70ee6ef62578e6c13283c84b20edaa76d20ff6744b703b613aa4ec376522",
         "tokenManager": "erd1qqqqqqqqqqqqqpgqyud9dhd7d4al34l5xvaz4g6hm6nypqawkklszy7e88"
+      },
+      "UTK-14d57d": {
+        "tokenId": "7c704442671c54e50c08599a9751d1987d635281f8ab2dd4d0a6f5c534b23133"
+      },
+      "NIT-3844dc": {
+        "tokenId": "d34f765596bb68d26ba144dda1e78f35ad8d07e45765811a55a044f9ff09fd9f"
+      },
+      "TFM-5c6a4a": {
+        "tokenId": "641dbb07afbd73875ef0740c239a5cd29e278f9ca6ac4453d80301005ade7dc3"
       }
     },
     "mainnet": {}

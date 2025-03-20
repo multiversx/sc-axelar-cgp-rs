@@ -22,10 +22,7 @@ const deployBaseTokenManager = async (deployer: Wallet) => {
       deployer,
       e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
       e.TopBuffer(INTERCHAIN_TOKEN_ID),
-      e.Tuple(
-        e.Option(deployer),
-        e.Option(e.Str('EGLD')),
-      ),
+      e.Tuple(e.Option(deployer), e.Option(e.Str('EGLD'))),
     ],
   });
   console.log('Result Base Token Manager:', result);
@@ -71,9 +68,7 @@ const deployInterchainTokenFactory = async (deployer: Wallet, its: string) => {
     code: data.codeInterchainTokenFactory,
     codeMetadata: ['upgradeable'],
     gasLimit: 200_000_000,
-    codeArgs: [
-      e.Addr(its),
-    ],
+    codeArgs: [e.Addr(its)],
   });
   console.log('Result Interchain Token Factory:', result);
 
@@ -81,9 +76,7 @@ const deployInterchainTokenFactory = async (deployer: Wallet, its: string) => {
   await deployer.callContract({
     callee: e.Addr(its),
     funcName: 'setInterchainTokenFactory',
-    funcArgs: [
-      e.Addr(result.address),
-    ],
+    funcArgs: [e.Addr(result.address)],
     gasLimit: 10_000_000,
   });
   console.log('Set interchain token factory contract on ITS:', result);
@@ -186,30 +179,21 @@ export const setupITSCommands = (program: Command) => {
         wallet,
         e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
         e.TopBuffer(INTERCHAIN_TOKEN_ID),
-        e.Tuple(
-          e.Option(wallet),
-          e.Option(e.Str('EGLD')),
-        ),
+        e.Tuple(e.Option(wallet), e.Option(e.Str('EGLD'))),
       ],
     });
     console.log('Result:', result);
   });
 
-  program.command('itsInterchainTransfer')
+  program
+    .command('itsInterchainTransfer')
     .argument('tokenIdentifier')
     .argument('amount')
     .argument('otherChainName')
     .argument('destinationAddress')
     .argument('[gasValue]', '', '5000000000000000') // 0.005 EGLD
     .argument('[gasToken]', '', 'EGLD-000000')
-    .action(async (
-      tokenIdentifier,
-      amount,
-      otherChainName,
-      destinationAddress,
-      gasValue,
-      gasToken,
-    ) => {
+    .action(async (tokenIdentifier, amount, otherChainName, destinationAddress, gasValue, gasToken) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
@@ -224,30 +208,27 @@ export const setupITSCommands = (program: Command) => {
           e.TopBuffer(''), // No metadata, uses default
           e.U(BigInt(gasValue)),
         ],
-        esdts: (tokenIdentifier !== 'EGLD' ? [
-          { id: tokenIdentifier, amount: BigInt(amount) },
-          { id: gasToken, amount: BigInt(gasValue) },
-        ] : []),
+        esdts:
+          tokenIdentifier !== 'EGLD'
+            ? [
+                { id: tokenIdentifier, amount: BigInt(amount) },
+                { id: gasToken, amount: BigInt(gasValue) },
+              ]
+            : [],
       });
 
       console.log(`Result`, result);
     });
 
-  program.command('callContractWithInterchainToken')
+  program
+    .command('callContractWithInterchainToken')
     .argument('tokenIdentifier')
     .argument('amount')
     .argument('otherChainName')
     .argument('destinationAddress')
     .argument('[gasValue]', '', '5000000000000000') // 0.005 EGLD
     .argument('[gasToken]', '', 'EGLD-000000')
-    .action(async (
-      tokenIdentifier,
-      amount,
-      otherChainName,
-      destinationAddress,
-      gasValue,
-      gasToken,
-    ) => {
+    .action(async (tokenIdentifier, amount, otherChainName, destinationAddress, gasValue, gasToken) => {
       const wallet = await loadWallet();
 
       const abiCoded = AbiCoder.defaultAbiCoder().encode(['uint256'], [amount]).slice(2);
@@ -270,10 +251,29 @@ export const setupITSCommands = (program: Command) => {
           e.TopBuffer(metadata),
           e.U(BigInt(0)),
         ],
-        esdts: (tokenIdentifier !== 'EGLD' ? [
-          { id: tokenIdentifier, amount: BigInt(amount) },
-          { id: gasToken, amount: BigInt(gasValue) },
-        ] : []),
+        esdts:
+          tokenIdentifier !== 'EGLD'
+            ? [
+                { id: tokenIdentifier, amount: BigInt(amount) },
+                { id: gasToken, amount: BigInt(gasValue) },
+              ]
+            : [],
+      });
+
+      console.log(`Result`, result);
+    });
+
+  program
+    .command('registerTokenMetadata')
+    .argument('tokenIdentifier')
+    .action(async (tokenIdentifier) => {
+      const wallet = await loadWallet();
+
+      const result = await wallet.callContract({
+        callee: envChain.select(data.addressIts),
+        funcName: 'registerTokenMetadata',
+        gasLimit: 100_000_000,
+        funcArgs: [e.Str(tokenIdentifier)],
       });
 
       console.log(`Result`, result);
@@ -282,38 +282,42 @@ export const setupITSCommands = (program: Command) => {
 
 const setupInterchainTokenFactoryCommands = (program: Command) => {
   // Needs to be called 3 times to fully finish the token deployment!
-  program.command('itsDeployInterchainToken')
+  program
+    .command('itsDeployInterchainToken')
     .argument('[tokenName]')
     .argument('[tokenSymbol]')
     .argument('[decimals]')
     .argument('[supply]')
-    .action(async (
-      tokenName = 'ITSTestToken',
-      tokenSymbol = 'ITSTT',
-      decimals = '18',
-      supply = '1000000000000000000000000' // 1M tokens
-    ) => {
-      const wallet = await loadWallet();
+    .action(
+      async (
+        tokenName = 'ITSTestToken',
+        tokenSymbol = 'ITSTT',
+        decimals = '18',
+        supply = '1000000000000000000000000' // 1M tokens
+      ) => {
+        const wallet = await loadWallet();
 
-      const result = await wallet.callContract({
-        callee: envChain.select(data.addressInterchainTokenFactory),
-        funcName: 'deployInterchainToken',
-        gasLimit: 150_000_000,
-        // value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost (only on 2nd transaction)
-        funcArgs: [
-          e.TopBuffer(getKeccak256Hash(tokenSymbol)),
-          e.Str(tokenName),
-          e.Str(tokenSymbol),
-          e.U8(BigInt(decimals)),
-          e.U(BigInt(supply)),
-          e.Addr(ADDRESS_ZERO),
-        ],
-      });
+        const result = await wallet.callContract({
+          callee: envChain.select(data.addressInterchainTokenFactory),
+          funcName: 'deployInterchainToken',
+          gasLimit: 150_000_000,
+          // value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost (only on 2nd transaction)
+          funcArgs: [
+            e.TopBuffer(getKeccak256Hash(tokenSymbol)),
+            e.Str(tokenName),
+            e.Str(tokenSymbol),
+            e.U8(BigInt(decimals)),
+            e.U(BigInt(supply)),
+            e.Addr(ADDRESS_ZERO),
+          ],
+        });
 
-      console.log(`Result`, result);
-    });
+        console.log(`Result`, result);
+      }
+    );
 
-  program.command('itsDeployRemoteInterchainToken')
+  program
+    .command('itsDeployRemoteInterchainToken')
     .argument('otherChainName')
     .argument('[tokenSymbol]')
     .action(async (otherChainName, tokenSymbol = 'ITSTT') => {
@@ -324,17 +328,14 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
         funcName: 'deployRemoteInterchainToken',
         gasLimit: 100_000_000,
         value: BigInt('5000000000000000'), // 0.005 EGLD, to pay for cross chain gas
-        funcArgs: [
-          e.TopBuffer(getKeccak256Hash(tokenSymbol)),
-          e.Addr(ADDRESS_ZERO),
-          e.Str(otherChainName),
-        ],
+        funcArgs: [e.TopBuffer(getKeccak256Hash(tokenSymbol)), e.Str(otherChainName)],
       });
 
       console.log(`Result`, result);
     });
 
-  program.command('itsRegisterCanonicalInterchainToken')
+  program
+    .command('itsRegisterCanonicalInterchainToken')
     .argument('tokenIdentifier')
     .action(async (tokenIdentifier) => {
       const wallet = await loadWallet();
@@ -343,9 +344,7 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
         callee: envChain.select(data.addressInterchainTokenFactory),
         funcName: 'registerCanonicalInterchainToken',
         gasLimit: 30_000_000,
-        funcArgs: [
-          e.Str(tokenIdentifier),
-        ],
+        funcArgs: [e.Str(tokenIdentifier)],
       });
 
       const tokenId = Buffer.from(d.TopBuffer().topDecode(result.returnData[0])).toString('hex');
@@ -353,7 +352,8 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
       console.log(`Registered canonical interchain token: ${tokenIdentifier} with id ${tokenId}`);
     });
 
-  program.command('itsDeployRemoteCanonicalInterchainToken')
+  program
+    .command('itsDeployRemoteCanonicalInterchainToken')
     .argument('tokenIdentifier')
     .argument('otherChainName')
     .action(async (tokenIdentifier, otherChainName) => {
@@ -364,12 +364,67 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
         funcName: 'deployRemoteCanonicalInterchainToken',
         gasLimit: 100_000_000,
         value: BigInt('5000000000000000'), // 0.005 EGLD, to pay for cross chain gas
-        funcArgs: [
-          e.Str(tokenIdentifier),
-          e.Str(otherChainName),
-        ],
+        funcArgs: [e.Str(tokenIdentifier), e.Str(otherChainName)],
       });
 
       console.log(`Result`, result);
     });
+
+  program
+    .command('registerCustomToken')
+    .argument('salt')
+    .argument('tokenIdentifier')
+    .argument('tokenManagerType')
+    .argument('operator')
+    .action(
+      async (
+        salt, tokenIdentifier, tokenManagerType, operator
+      ) => {
+        const wallet = await loadWallet();
+
+        const result = await wallet.callContract({
+          callee: envChain.select(data.addressInterchainTokenFactory),
+          funcName: 'registerCustomToken',
+          gasLimit: 150_000_000,
+          funcArgs: [
+            e.TopBuffer(salt),
+            e.Str(tokenIdentifier),
+            e.U8(BigInt(tokenManagerType)),
+            e.Addr(operator),
+          ],
+        });
+
+        console.log(`Result`, result);
+      }
+    );
+
+  program
+    .command('linkToken')
+    .argument('salt')
+    .argument('destinationChain')
+    .argument('destinationTokenAddress')
+    .argument('tokenManagerType')
+    .argument('linkParams')
+    .action(
+      async (
+        salt, destinationChain, destinationTokenAddress, tokenManagerType, linkParams
+      ) => {
+        const wallet = await loadWallet();
+
+        const result = await wallet.callContract({
+          callee: envChain.select(data.addressInterchainTokenFactory),
+          funcName: 'linkToken',
+          gasLimit: 150_000_000,
+          funcArgs: [
+            e.TopBuffer(salt),
+            e.Str(destinationChain),
+            e.TopBuffer(destinationTokenAddress),
+            e.U8(BigInt(tokenManagerType)),
+            e.TopBuffer(linkParams),
+          ],
+        });
+
+        console.log(`Result`, result);
+      }
+    );
 };
