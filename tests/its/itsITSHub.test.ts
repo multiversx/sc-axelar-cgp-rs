@@ -11,23 +11,25 @@ import {
   TOKEN_ID2,
   TOKEN_MANAGER_ADDRESS,
   TOKEN_MANAGER_ADDRESS_2,
+  TOKEN_MANAGER_ADDRESS_3,
   TOKEN_SALT,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
   baseGatewayKvs,
   baseItsKvs,
-  computeInterchainTokenId,
+  computeLinkedTokenId,
+  computeInterchainTokenIdRaw,
   deployContracts,
   deployPingPongInterchain,
   deployTokenManagerLockUnlock,
   gasService,
   gateway,
-  interchainTokenFactory,
   its,
   ITS_HUB_CHAIN_ADDRESS,
   ITS_HUB_CHAIN_NAME,
   ITS_HUB_ROUTING_IDENTIFIER,
+  itsRegisterCanonicalToken,
   itsRegisterCustomTokenLockUnlock,
   itsRegisterCustomTokenMintBurn,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
@@ -38,6 +40,7 @@ import {
   pingPong,
   TOKEN_MANAGER_TYPE_MINT_BURN,
   tokenManager,
+  computeInterchainTokenDeploySalt,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -259,7 +262,7 @@ describe('Execute', () => {
   test('Transfer with data', async () => {
     await deployPingPongInterchain(deployer);
 
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCanonicalToken(
       world,
       user,
       true,
@@ -350,7 +353,7 @@ describe('Execute', () => {
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory, INTERCHAIN_TOKEN_ID),
+        ...baseItsKvs(deployer, INTERCHAIN_TOKEN_ID),
 
         e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
         e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_HUB_CHAIN_ADDRESS)),
@@ -571,10 +574,10 @@ describe('Register', () => {
     await its.setAccount({
       ...(await its.getAccount()),
       kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory),
+        ...baseItsKvs(deployer),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(tokenManager),
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(tokenManager),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeLinkedTokenId(user))).Value(tokenManager),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeLinkedTokenId(otherUser))).Value(tokenManager),
       ],
     });
 
@@ -609,20 +612,20 @@ describe('Register', () => {
     });
 
     // For now ITS Hub does not support deploy token manager
-    assert(result.returnData[0] === computeInterchainTokenId(user));
+    assert(result.returnData[0] === computeLinkedTokenId(user));
 
     // Nothing changes for its keys
     let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory),
+        ...baseItsKvs(deployer),
 
         e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
         e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_HUB_CHAIN_ADDRESS)),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(user))).Value(tokenManager),
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeInterchainTokenId(otherUser))).Value(tokenManager),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeLinkedTokenId(user))).Value(tokenManager),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computeLinkedTokenId(otherUser))).Value(tokenManager),
       ],
     });
 
@@ -637,15 +640,17 @@ describe('Register', () => {
   });
 
   test('Remote interchain token', async () => {
-    const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO));
+    const deploySalt = computeInterchainTokenDeploySalt(deployer);
+    const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
 
     // Mock token manager exists on source chain
+    await deployTokenManagerLockUnlock(deployer, its, deployer, 'EGLD');
     await its.setAccount({
       ...(await its.getAccount()),
       kvs: [
-        ...baseItsKvs(deployer, deployer), // mock deployer as the factory
+        ...baseItsKvs(deployer),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS_3)),
       ],
     });
 
@@ -661,17 +666,10 @@ describe('Register', () => {
     await deployer
       .callContract({
         callee: its,
-        funcName: 'deployInterchainToken',
+        funcName: 'deployRemoteInterchainToken',
         gasLimit: 20_000_000,
         value: 100_000,
-        funcArgs: [
-          e.TopBuffer(TOKEN_SALT),
-          e.Str(OTHER_CHAIN_NAME),
-          e.Str('Token Name'),
-          e.Str('TOKEN-SYMBOL'),
-          e.U8(18),
-          e.Str(OTHER_CHAIN_ADDRESS), // minter
-        ],
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(OTHER_CHAIN_NAME)],
       })
       .assertFail({ code: 4, message: 'Untrusted chain' });
 
@@ -683,38 +681,12 @@ describe('Register', () => {
       funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(ITS_HUB_CHAIN_ADDRESS)],
     });
 
-    // Only supports deploying interchain token through the factory
-    await user
-      .callContract({
-        callee: its,
-        funcName: 'deployInterchainToken',
-        gasLimit: 20_000_000,
-        value: 100_000,
-        funcArgs: [
-          e.TopBuffer(TOKEN_SALT),
-          e.Str(OTHER_CHAIN_NAME),
-          e.Str('Token Name'),
-          e.Str('TOKEN-SYMBOL'),
-          e.U8(18),
-          e.Str(OTHER_CHAIN_ADDRESS), // minter
-        ],
-      })
-      .assertFail({ code: 4, message: 'Not interchain token factory' });
-
-    // Deployer is actually the factory
     await deployer.callContract({
       callee: its,
-      funcName: 'deployInterchainToken',
-      gasLimit: 20_000_000,
+      funcName: 'deployRemoteInterchainToken',
+      gasLimit: 50_000_000,
       value: 100_000,
-      funcArgs: [
-        e.TopBuffer(TOKEN_SALT),
-        e.Str(OTHER_CHAIN_NAME),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
-        e.U8(18),
-        e.Str(OTHER_CHAIN_ADDRESS), // minter
-      ],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(OTHER_CHAIN_NAME)],
     });
 
     // Nothing changes for its keys
@@ -722,12 +694,12 @@ describe('Register', () => {
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
-        ...baseItsKvs(deployer, deployer),
+        ...baseItsKvs(deployer),
 
         e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
         e.kvs.Mapper('trusted_address', e.Str(ITS_HUB_CHAIN_NAME)).Value(e.Str(ITS_HUB_CHAIN_ADDRESS)),
 
-        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS_3)),
       ],
     });
 

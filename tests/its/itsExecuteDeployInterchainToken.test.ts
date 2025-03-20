@@ -16,7 +16,6 @@ import {
   deployContracts,
   deployTokenManagerInterchainToken,
   gateway,
-  interchainTokenFactory,
   its,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
   mockGatewayMessageApproved,
@@ -109,7 +108,7 @@ test('Only deploy token manager', async () => {
   const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
-    kvs: [...baseItsKvs(deployer, interchainTokenFactory, INTERCHAIN_TOKEN_ID)],
+    kvs: [...baseItsKvs(deployer, INTERCHAIN_TOKEN_ID)],
   });
 
   const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
@@ -137,7 +136,7 @@ test('Only issue esdt', async () => {
   await its.setAccount({
     ...(await its.getAccount()),
     kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
+      ...baseItsKvs(deployer),
 
       e.kvs.Mapper('token_manager_address', e.TopBuffer(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
@@ -157,7 +156,7 @@ test('Only issue esdt', async () => {
   assertAccount(await its.getAccount(), {
     balance: 0n,
     hasKvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
+      ...baseItsKvs(deployer),
 
       e.kvs.Mapper('token_manager_address', e.TopBuffer(INTERCHAIN_TOKEN_ID)).Value(tokenManager),
     ],
@@ -236,7 +235,7 @@ test('Errors', async () => {
   await its.setAccount({
     ...(await its.getAccount()),
     kvs: [
-      ...baseItsKvs(deployer, interchainTokenFactory),
+      ...baseItsKvs(deployer),
 
       e.kvs.Mapper('token_manager_address', e.TopBuffer(INTERCHAIN_TOKEN_ID)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
     ],

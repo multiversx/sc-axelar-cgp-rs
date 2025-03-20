@@ -11,19 +11,17 @@ import {
   TOKEN_ID,
   TOKEN_ID2,
   TOKEN_MANAGER_ADDRESS,
-  TOKEN_MANAGER_ADDRESS_2,
+  TOKEN_MANAGER_ADDRESS_2, TOKEN_MANAGER_ADDRESS_3,
   TOKEN_SALT,
   TOKEN_SALT2,
 } from '../helpers';
 import {
   baseItsKvs,
-  computeInterchainTokenId,
+  computeInterchainTokenIdRaw, computeLinkedTokenId,
   deployContracts,
-  deployInterchainTokenFactory,
   deployIts,
   gasService,
   gateway,
-  interchainTokenFactory,
   its,
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
   tokenManager,
@@ -182,41 +180,6 @@ test(
   { timeout: 30_000 }
 );
 
-test('Set interchain token factory', async () => {
-  await deployContracts(deployer, collector, false);
-  await deployIts(deployer);
-  await deployInterchainTokenFactory(deployer, false);
-
-  await user
-    .callContract({
-      callee: its,
-      funcName: 'setInterchainTokenFactory',
-      funcArgs: [interchainTokenFactory],
-      gasLimit: 10_000_000,
-    })
-    .assertFail({ code: 4, message: 'Endpoint can only be called by owner' });
-
-  await deployer.callContract({
-    callee: its,
-    funcName: 'setInterchainTokenFactory',
-    funcArgs: [interchainTokenFactory],
-    gasLimit: 10_000_000,
-  });
-
-  // Calling endpoint again won't change the storage
-  await deployer.callContract({
-    callee: its,
-    funcName: 'setInterchainTokenFactory',
-    funcArgs: [user],
-    gasLimit: 10_000_000,
-  });
-
-  const kvs = await its.getAccount();
-  assertAccount(kvs, {
-    kvs: [...baseItsKvs(deployer, interchainTokenFactory)],
-  });
-});
-
 describe('Operatorship', () => {
   test('Transfer', async () => {
     await deployContracts(deployer, collector);
@@ -240,7 +203,7 @@ describe('Operatorship', () => {
     let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [...baseItsKvs(user, interchainTokenFactory)],
+      kvs: [...baseItsKvs(user)],
     });
 
     // Check that operator was changed
@@ -275,7 +238,7 @@ describe('Operatorship', () => {
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory),
+        ...baseItsKvs(deployer),
 
         e.kvs.Mapper('proposed_roles', deployer, user).Value(e.U32(0b00000010)),
       ],
@@ -303,7 +266,7 @@ describe('Operatorship', () => {
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory),
+        ...baseItsKvs(deployer),
 
         e.kvs.Mapper('proposed_roles', deployer, user).Value(e.U32(0b00000010)),
         e.kvs.Mapper('proposed_roles', deployer, otherUser).Value(e.U32(0b00000010)),
@@ -358,7 +321,7 @@ describe('Operatorship', () => {
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
-        ...baseItsKvs(user, interchainTokenFactory),
+        ...baseItsKvs(user),
 
         e.kvs.Mapper('proposed_roles', deployer, otherUser).Value(e.U32(0b00000010)),
       ],
@@ -399,7 +362,7 @@ describe('Pause unpause', () => {
     const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [...baseItsKvs(deployer, interchainTokenFactory), e.kvs.Mapper('pause_module:paused').Value(e.Bool(true))],
+      kvs: [...baseItsKvs(deployer), e.kvs.Mapper('pause_module:paused').Value(e.Bool(true))],
     });
 
     await user
@@ -407,7 +370,7 @@ describe('Pause unpause', () => {
         callee: its,
         funcName: 'registerCustomToken',
         gasLimit: 20_000_000,
-        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Buffer('')],
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
       })
       .assertFail({ code: 4, message: 'Contract is paused' });
 
@@ -434,10 +397,10 @@ describe('Pause unpause', () => {
         value: 0,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          e.Str(''),
           e.Str('Token Name'),
           e.Str('TOKEN-SYMBOL'),
           e.U8(18),
+          e.U(0),
           e.TopBuffer(user.toTopU8A()), // minter
         ],
       })
@@ -486,10 +449,10 @@ describe('Pause unpause', () => {
   test('Unpause', async () => {
     await deployContracts(deployer, collector);
 
-    // Mock paused and user as interchain token factory
+    // Mock paused
     await its.setAccount({
       ...(await its.getAccount()),
-      kvs: [...baseItsKvs(deployer, user), e.kvs.Mapper('pause_module:paused').Value(e.Bool(true))],
+      kvs: [...baseItsKvs(deployer), e.kvs.Mapper('pause_module:paused').Value(e.Bool(true))],
     });
 
     await user
@@ -511,7 +474,7 @@ describe('Pause unpause', () => {
     const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [...baseItsKvs(deployer, user), e.kvs.Mapper('pause_module:paused').Value(e.Bool(false))],
+      kvs: [...baseItsKvs(deployer), e.kvs.Mapper('pause_module:paused').Value(e.Bool(false))],
     });
 
     // Call works
@@ -519,7 +482,7 @@ describe('Pause unpause', () => {
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Buffer('')],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
     });
   });
 });
@@ -561,7 +524,7 @@ describe('Address tracker', () => {
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory),
+        ...baseItsKvs(deployer),
 
         e.kvs.Mapper('trusted_address', e.Str(someChainName)).Value(e.Str(someChainAddress)),
       ],
@@ -600,7 +563,7 @@ describe('Address tracker', () => {
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
-        ...baseItsKvs(deployer, interchainTokenFactory),
+        ...baseItsKvs(deployer),
 
         e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
 
@@ -635,29 +598,22 @@ describe('Set flow limits', () => {
   test('Set', async () => {
     await deployContracts(deployer, collector);
 
-    // Mock user as interchain token factory
-    await its.setAccount({
-      ...(await its.getAccount()),
-      kvs: [...baseItsKvs(deployer, user)],
-    });
-
-    const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO));
-
     await user.callContract({
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Buffer('')],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
     });
 
     await user.callContract({
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT2), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Buffer('')],
+      funcArgs: [e.TopBuffer(TOKEN_SALT2), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
     });
 
-    const computedTokenId2 = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), TOKEN_SALT2);
+    const computedTokenId = computeLinkedTokenId(user);
+    const computedTokenId2 = computeLinkedTokenId(user, TOKEN_SALT2);
 
     await deployer.callContract({
       callee: its,
@@ -702,7 +658,7 @@ describe('Set flow limits', () => {
   test('Errors', async () => {
     await deployContracts(deployer, collector);
 
-    const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO));
+    const computedTokenId = computeLinkedTokenId(user);
 
     await user
       .callContract({
@@ -730,12 +686,6 @@ describe('Set flow limits', () => {
         funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.U(100)],
       })
       .assertFail({ code: 4, message: 'Token manager does not exist' });
-
-    // Mock user as interchain token factory
-    await its.setAccount({
-      ...(await its.getAccount()),
-      kvs: [...baseItsKvs(deployer, user)],
-    });
 
     await user.callContract({
       callee: its,

@@ -23,8 +23,6 @@ pub trait FactoryModule:
     + executable::ExecutableModule
 {
     // Needs to be payable because it issues ESDT token through the TokenManager
-    // Payable with EGLD for:
-    // - ESDT token deploy (2nd transaction)
     #[payable("*")]
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
@@ -54,7 +52,7 @@ pub trait FactoryModule:
             sc_panic!("Zero supply token");
         }
 
-        let token_id = self.interchain_token_id(&ManagedAddress::zero(), &deploy_salt);
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
         let token_manager = self.invalid_token_manager_address(&token_id);
 
         let egld_value = self.call_value().egld_value();
@@ -190,8 +188,7 @@ pub trait FactoryModule:
         )
     }
 
-    // Payable with EGLD for:
-    // - cross chain calls gas
+    // Payable with EGLD for cross chain calls gas
     #[payable("EGLD")]
     #[endpoint(deployRemoteInterchainTokenWithMinter)]
     fn deploy_remote_interchain_token_with_minter(
@@ -207,7 +204,7 @@ pub trait FactoryModule:
         let mut destination_minter_raw = ManagedBuffer::new();
 
         if !minter.is_zero() {
-            let deployed_token_id = self.interchain_token_id(&ManagedAddress::zero(), &deploy_salt);
+            let deployed_token_id = self.interchain_token_id_raw(&deploy_salt);
 
             self.check_token_minter(&deployed_token_id, &minter);
 
@@ -257,8 +254,7 @@ pub trait FactoryModule:
         )
     }
 
-    // Payable with EGLD for:
-    // - cross chain calls gas
+    // Payable with EGLD for cross chain calls gas
     #[payable("EGLD")]
     #[endpoint(deployRemoteCanonicalInterchainToken)]
     fn deploy_remote_canonical_interchain_token(
@@ -391,7 +387,7 @@ pub trait FactoryModule:
         sender: ManagedAddress,
     ) -> TokenId<Self::Api> {
         // Ensure that a token is registered locally for the tokenId before allowing a remote deployment
-        let expected_token_id = self.interchain_token_id(&ManagedAddress::zero(), &deploy_salt);
+        let expected_token_id = self.interchain_token_id_raw(&deploy_salt);
         let token_identifier = self.registered_token_identifier(&expected_token_id);
 
         let gas_value = self.call_value().egld_value().clone_value();
@@ -498,7 +494,7 @@ pub trait FactoryModule:
     ) -> TokenId<Self::Api> {
         let deploy_salt = self.interchain_token_deploy_salt(deployer, salt);
 
-        self.interchain_token_id_raw(&ManagedAddress::zero(), &deploy_salt)
+        self.interchain_token_id_raw(&deploy_salt)
     }
 
     #[view(canonicalInterchainTokenId)]
@@ -508,7 +504,7 @@ pub trait FactoryModule:
     ) -> TokenId<Self::Api> {
         let deploy_salt = self.canonical_interchain_token_deploy_salt(token_identifier);
 
-        self.interchain_token_id_raw(&ManagedAddress::zero(), &deploy_salt)
+        self.interchain_token_id_raw(&deploy_salt)
     }
 
     #[view(linkedTokenId)]
@@ -519,7 +515,7 @@ pub trait FactoryModule:
     ) -> TokenId<Self::Api> {
         let deploy_salt = self.linked_token_deploy_salt(deployer, salt);
 
-        self.interchain_token_id(&ManagedAddress::zero(), &deploy_salt)
+        self.interchain_token_id_raw(&deploy_salt)
     }
 
     #[view(chainNameHash)]

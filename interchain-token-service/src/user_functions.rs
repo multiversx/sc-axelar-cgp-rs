@@ -35,10 +35,9 @@ pub trait UserFunctionsModule:
         self.register_token_metadata_async_call(token_identifier, gas_value);
     }
 
-    // #[endpoint(registerCustomToken)]
     fn register_custom_token_raw(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         token_manager_type: TokenManagerType,
         link_params: ManagedBuffer,
@@ -51,11 +50,9 @@ pub trait UserFunctionsModule:
             "Can not deploy native interchain token"
         );
 
-        let deployer = ManagedAddress::zero();
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
 
-        let token_id = self.interchain_token_id_raw(&deployer, &salt);
-
-        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
+        self.interchain_token_id_claimed_event(&token_id, &deploy_salt);
 
         self.deploy_token_manager_raw(
             &token_id,
@@ -67,12 +64,9 @@ pub trait UserFunctionsModule:
         token_id
     }
 
-    // Payable with EGLD for cross chain calls gas
-    // #[payable("EGLD")]
-    // #[endpoint(linkToken)]
     fn link_token_raw(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         destination_token_address: ManagedBuffer,
         token_manager_type: TokenManagerType,
@@ -98,11 +92,9 @@ pub trait UserFunctionsModule:
             "Cannot deploy remotely to self"
         );
 
-        let deployer = ManagedAddress::zero();
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
 
-        let token_id = self.interchain_token_id_raw(&deployer, &salt);
-
-        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
+        self.interchain_token_id_claimed_event(&token_id, &deploy_salt);
 
         let source_token_address = self.registered_token_identifier(&token_id).into_name();
 
@@ -136,14 +128,9 @@ pub trait UserFunctionsModule:
         token_id
     }
 
-    // Payable with EGLD for:
-    // - ESDT token deploy (2nd transaction)
-    // - cross chain calls gas
-    // #[payable("EGLD")]
-    // #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token_raw(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
@@ -153,11 +140,9 @@ pub trait UserFunctionsModule:
     ) -> TokenId<Self::Api> {
         self.require_not_paused();
 
-        let deployer = ManagedAddress::zero();
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
 
-        let token_id = self.interchain_token_id_raw(&deployer, &salt);
-
-        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
+        self.interchain_token_id_claimed_event(&token_id, &deploy_salt);
 
         if destination_chain.is_empty() {
             // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
@@ -197,7 +182,7 @@ pub trait UserFunctionsModule:
                 "Cannot deploy remotely to self",
             );
 
-            self.deploy_remote_interchain_token_raw_raw(
+            self.deploy_remote_interchain_token_base(
                 &token_id,
                 name,
                 symbol,
@@ -352,11 +337,7 @@ pub trait UserFunctionsModule:
         }
     }
 
-    fn interchain_token_id_raw(
-        &self,
-        sender: &ManagedAddress,
-        salt: &Hash<Self::Api>,
-    ) -> TokenId<Self::Api> {
+    fn interchain_token_id_raw(&self, salt: &Hash<Self::Api>) -> TokenId<Self::Api> {
         let prefix_interchain_token_id = self
             .crypto()
             .keccak256(ManagedBuffer::new_from_bytes(PREFIX_INTERCHAIN_TOKEN_ID));
@@ -364,7 +345,7 @@ pub trait UserFunctionsModule:
         let mut encoded = ManagedBuffer::new();
 
         encoded.append(prefix_interchain_token_id.as_managed_buffer());
-        encoded.append(sender.as_managed_buffer());
+        encoded.append(ManagedAddress::zero().as_managed_buffer());
         encoded.append(salt.as_managed_buffer());
 
         self.crypto().keccak256(encoded)

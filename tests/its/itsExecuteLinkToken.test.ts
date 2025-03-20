@@ -17,7 +17,6 @@ import {
   baseItsKvs,
   deployContracts,
   gateway,
-  interchainTokenFactory,
   its,
   itsRegisterCustomTokenLockUnlock,
   MESSAGE_TYPE_LINK_TOKEN,
@@ -117,7 +116,7 @@ test('Execute no operator', async () => {
   const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
-    kvs: [...baseItsKvs(deployer, interchainTokenFactory, INTERCHAIN_TOKEN_ID)],
+    kvs: [...baseItsKvs(deployer, INTERCHAIN_TOKEN_ID)],
   });
 
   const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
@@ -157,7 +156,7 @@ test('Execute with operator', async () => {
   const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
-    kvs: [...baseItsKvs(deployer, interchainTokenFactory, INTERCHAIN_TOKEN_ID)],
+    kvs: [...baseItsKvs(deployer, INTERCHAIN_TOKEN_ID)],
   });
 
   const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);

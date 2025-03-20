@@ -25,6 +25,7 @@ export const CANONICAL_INTERCHAIN_TOKEN_ID: string = 'ab13e48029a0672cd3a669e258
 
 export const TOKEN_MANAGER_ADDRESS: string = 'erd1qqqqqqqqqqqqqpgqzyg3zygqqqqqqqqqqqqq2qqqqqqqqqqqqqqqtstllp';
 export const TOKEN_MANAGER_ADDRESS_2: string = 'erd1qqqqqqqqqqqqqpgqzyg3zygqqqqqqqqqqqqq2qqqqqqqqqqpqqqq03de6q';
+export const TOKEN_MANAGER_ADDRESS_3: string = 'erd1qqqqqqqqqqqqqpgqqqqqqqqqqqqq2qqqqqqqqqqqqqqqqqqqqqqqglm4l5';
 
 export const ADDRESS_ZERO: string = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6gq4hu';
 

@@ -162,8 +162,7 @@ pub trait EventsModule {
     fn interchain_token_id_claimed_event(
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
-        #[indexed] deployer: &ManagedAddress,
-        salt: &Hash<Self::Api>,
+        deploy_salt: &Hash<Self::Api>,
     );
 
     #[event("token_metadata_registered_event")]
