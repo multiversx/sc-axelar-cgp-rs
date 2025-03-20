@@ -19,6 +19,7 @@ pub mod proxy_gmp;
 pub mod proxy_its;
 pub mod remote;
 pub mod user_functions;
+pub mod factory;
 
 #[multiversx_sc::contract]
 pub trait InterchainTokenServiceContract:
@@ -31,6 +32,7 @@ pub trait InterchainTokenServiceContract:
     + executable::ExecutableModule
     + events::EventsModule
     + remote::RemoteModule
+    + factory::FactoryModule
     + multiversx_sc_modules::pause::PauseModule
 {
     #[allow_multiple_var_args]
@@ -74,17 +76,13 @@ pub trait InterchainTokenServiceContract:
         {
             self.set_trusted_address(name.deref(), address.deref());
         }
+
+        self.chain_name_hash()
+            .set(self.crypto().keccak256(chain_name));
     }
 
     #[upgrade]
     fn upgrade(&self) {}
-
-    #[only_owner]
-    #[endpoint(setInterchainTokenFactory)]
-    fn set_interchain_token_factory(&self, interchain_token_factory: ManagedAddress) {
-        self.interchain_token_factory()
-            .set_if_empty(interchain_token_factory)
-    }
 
     /// Owner functions
     #[allow_multiple_var_args]

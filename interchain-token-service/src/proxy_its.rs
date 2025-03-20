@@ -1,5 +1,7 @@
 use core::ops::Deref;
+use operatable::ProxyTrait as _;
 use token_manager::flow_limit::ProxyTrait as _;
+use token_manager::mintership::ProxyTrait as _;
 use token_manager::ProxyTrait as _;
 
 use crate::abi::AbiEncodeDecode;
@@ -33,8 +35,9 @@ pub mod executable_contract_proxy {
     }
 }
 
-const ESDT_PROPERTIES_TOKEN_TYPE_INDEX: usize = 1;
-const ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX: usize = 5;
+pub const ESDT_PROPERTIES_TOKEN_NAME_INDEX: usize = 0;
+pub const ESDT_PROPERTIES_TOKEN_TYPE_INDEX: usize = 1;
+pub const ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX: usize = 5;
 
 #[multiversx_sc::module]
 pub trait ProxyItsModule:
@@ -87,6 +90,72 @@ pub trait ProxyItsModule:
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
             .execute_on_dest_context::<()>();
+    }
+
+    fn token_manager_invalid_token_identifier(
+        &self,
+        sc_address: ManagedAddress,
+    ) -> Option<EgldOrEsdtTokenIdentifier> {
+        self.token_manager_proxy(sc_address)
+            .invalid_token_identifier()
+            .execute_on_dest_context()
+    }
+
+    fn token_manager_mint(
+        &self,
+        sc_address: ManagedAddress,
+        address: ManagedAddress,
+        amount: BigUint,
+    ) {
+        self.token_manager_proxy(sc_address)
+            .mint(address, amount)
+            .execute_on_dest_context::<()>();
+    }
+
+    fn token_manager_transfer_mintership(
+        &self,
+        sc_address: ManagedAddress,
+        minter: ManagedAddress,
+    ) {
+        self.token_manager_proxy(sc_address)
+            .transfer_mintership(minter)
+            .execute_on_dest_context::<()>();
+    }
+
+    fn token_manager_remove_flow_limiter(
+        &self,
+        sc_address: ManagedAddress,
+        flow_limiter: ManagedAddress,
+    ) {
+        self.token_manager_proxy(sc_address)
+            .remove_flow_limiter(flow_limiter)
+            .execute_on_dest_context::<()>();
+    }
+
+    fn token_manager_add_flow_limiter(
+        &self,
+        sc_address: ManagedAddress,
+        flow_limiter: ManagedAddress,
+    ) {
+        self.token_manager_proxy(sc_address)
+            .add_flow_limiter(flow_limiter)
+            .execute_on_dest_context::<()>();
+    }
+
+    fn token_manager_transfer_operatorship(
+        &self,
+        sc_address: ManagedAddress,
+        operator: ManagedAddress,
+    ) {
+        self.token_manager_proxy(sc_address)
+            .transfer_operatorship(operator)
+            .execute_on_dest_context::<()>();
+    }
+
+    fn token_manager_is_minter(&self, sc_address: ManagedAddress, minter: &ManagedAddress) -> bool {
+        self.token_manager_proxy(sc_address)
+            .is_minter(minter)
+            .execute_on_dest_context()
     }
 
     fn executable_contract_execute_with_interchain_token(
@@ -149,20 +218,30 @@ pub trait ProxyItsModule:
         token_identifier: TokenIdentifier,
         gas_value: BigUint,
     ) {
-        // Get ESDT token properties
+        self.esdt_get_token_properties(
+            token_identifier.clone(),
+            self.callbacks().register_token_metadata_callback(
+                token_identifier,
+                gas_value,
+                self.blockchain().get_caller(),
+            ),
+        );
+    }
+
+    fn esdt_get_token_properties(
+        &self,
+        token_identifier: TokenIdentifier,
+        callback: CallbackClosure<Self::Api>,
+    ) {
         let mut contract_call = self.send().contract_call::<()>(
             ESDTSystemSCAddress.to_managed_address(),
             ManagedBuffer::from("getTokenProperties"),
         );
-        contract_call.push_raw_argument(token_identifier.clone().into_managed_buffer());
+        contract_call.push_raw_argument(token_identifier.into_managed_buffer());
 
         contract_call
             .async_call()
-            .with_callback(self.callbacks().register_token_metadata_callback(
-                token_identifier,
-                gas_value,
-                self.blockchain().get_caller(),
-            ))
+            .with_callback(callback)
             .call_and_exit();
     }
 
