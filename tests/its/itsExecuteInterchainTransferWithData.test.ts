@@ -8,8 +8,7 @@ import {
   deployContracts,
   deployPingPongInterchain,
   gateway,
-  interchainTokenFactory,
-  its,
+  its, itsRegisterCanonicalToken,
   itsRegisterCustomTokenLockUnlock,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   mockGatewayMessageApproved,
@@ -96,7 +95,7 @@ const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
 test('Transfer with data', async () => {
   await deployPingPongInterchain(deployer);
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCanonicalToken(
     world,
     user,
     true,
@@ -125,7 +124,7 @@ test('Transfer with data', async () => {
   const kvs = await its.getAccount();
   assertAccount(kvs, {
     balance: 0n,
-    kvs: [...baseItsKvs(deployer, interchainTokenFactory, computedTokenId)],
+    kvs: [...baseItsKvs(deployer, computedTokenId)],
   });
 
   // Assert ping pong was successfully called with tokens
@@ -164,7 +163,7 @@ test('Transfer with data', async () => {
 test('Transfer with data contract error', async () => {
   await deployPingPongInterchain(deployer);
 
-  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
+  const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCanonicalToken(
     world,
     user,
     true,
@@ -183,7 +182,7 @@ test('Transfer with data contract error', async () => {
   // Assert its doesn't have balance & lock removed
   assertAccount(await its.getAccount(), {
     balance: 0n,
-    kvs: [...baseItsKvs(deployer, interchainTokenFactory, computedTokenId)],
+    kvs: [...baseItsKvs(deployer, computedTokenId)],
   });
   // Assert ping pong was NOT called
   assertAccount(await pingPong.getAccount(), {

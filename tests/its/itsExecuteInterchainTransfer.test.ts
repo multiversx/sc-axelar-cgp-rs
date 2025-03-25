@@ -11,15 +11,12 @@ import {
 import { Buffer } from 'buffer';
 import {
   baseGatewayKvs,
-  baseItsKvs,
   deployContracts,
   gateway,
-  interchainTokenFactory,
   its,
   itsRegisterCustomTokenLockUnlock,
   itsRegisterCustomTokenMintBurn,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-  MESSAGE_TYPE_RECEIVE_FROM_HUB,
   mockGatewayMessageApproved,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';

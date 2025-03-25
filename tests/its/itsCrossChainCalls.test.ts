@@ -2,8 +2,9 @@ import { assert, beforeEach, test } from 'vitest';
 import { assertAccount, d, e, FSContract, FSWallet, FSWorld } from 'xsuite';
 import {
   baseGatewayKvs,
+  computeLinkedTokenId,
   computeInterchainTokenDeploySalt,
-  computeInterchainTokenId,
+  computeInterchainTokenIdRaw,
   defaultWeightedSigners,
   ESDT_SYSTEM_CONTRACT,
   ITS_HUB_CHAIN_ADDRESS,
@@ -15,6 +16,7 @@ import {
   MESSAGE_TYPE_REGISTER_TOKEN_METADATA,
   MESSAGE_TYPE_SEND_TO_HUB,
   TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
+  TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
   TOKEN_MANAGER_TYPE_MINT_BURN,
 } from '../itsHelpers';
 import {
@@ -43,7 +45,6 @@ let fsGateway: FSContract;
 let fsGasService: FSContract;
 let fsTokenManager: FSContract;
 let fsIts: FSContract;
-let fsFactory: FSContract;
 
 beforeEach(async () => {
   world = await FSWorld.start();
@@ -68,7 +69,7 @@ async function getCallContractDataFromEsdtAsync(hash: string) {
   );
 }
 
-const deployContracts = async (mockFactory = true) => {
+const deployContracts = async () => {
   ({ contract: fsGateway } = await deployer.deployContract({
     code: 'file:gateway/output/gateway.wasm',
     codeMetadata: ['upgradeable'],
@@ -116,41 +117,12 @@ const deployContracts = async (mockFactory = true) => {
       e.Str(ITS_HUB_CHAIN_ADDRESS),
     ],
   }));
-
-  if (mockFactory) {
-    // Set interchain token factory on its to user
-    await deployer.callContract({
-      callee: fsIts,
-      funcName: 'setInterchainTokenFactory',
-      funcArgs: [user],
-      gasLimit: 10_000_000,
-    });
-  }
 };
 
-const deployInterchainTokenFactory = async () => {
-  ({ contract: fsFactory } = await deployer.deployContract({
-    code: 'file:interchain-token-factory/output/interchain-token-factory.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [fsIts],
-  }));
-
-  // Set interchain token factory contract on its
-  await deployer.callContract({
-    callee: fsIts,
-    funcName: 'setInterchainTokenFactory',
-    funcArgs: [fsFactory],
-    gasLimit: 10_000_000,
-  });
-};
-
-const deployNewEsdtThroughFactory = async () => {
-  await deployInterchainTokenFactory();
-
+const deployNewEsdt = async () => {
   // First deploys a new token manager contract
   let result = await user.callContract({
-    callee: fsFactory,
+    callee: fsIts,
     funcName: 'deployInterchainToken',
     gasLimit: 100_000_000,
     funcArgs: [
@@ -163,13 +135,13 @@ const deployNewEsdtThroughFactory = async () => {
     ],
   });
   const deploySalt = computeInterchainTokenDeploySalt(user);
-  const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), deploySalt);
+  const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
 
   assert(result.returnData[0] === computedTokenId);
 
   // Second deploys a new ESDT token
   await user.callContract({
-    callee: fsFactory,
+    callee: fsIts,
     funcName: 'deployInterchainToken',
     gasLimit: 200_000_000,
     value: 10n ** 17n,
@@ -185,7 +157,7 @@ const deployNewEsdtThroughFactory = async () => {
 
   // Third mints ESDT token to user
   await user.callContract({
-    callee: fsFactory,
+    callee: fsIts,
     funcName: 'deployInterchainToken',
     gasLimit: 200_000_000,
     funcArgs: [
@@ -251,9 +223,9 @@ const mockDeployInterchainTokenGatewayCall = async () => {
 test(
   'Interchain transfer ABI payload',
   async () => {
-    await deployContracts(false);
+    await deployContracts();
 
-    const computedTokenId = await deployNewEsdtThroughFactory();
+    const computedTokenId = await deployNewEsdt();
 
     const tokenIdentifier = d.Str().fromTop(
       (
@@ -287,9 +259,7 @@ test(
       (result: any) => result.sender === user.toString() && result.receiver === fsIts.toString()
     )[0];
     // Message was validate in gateway
-    const relevantEvent = relevantResult.logs.events.filter(
-      (result: any) => result.identifier === 'callContract'
-    )[0];
+    const relevantEvent = relevantResult.logs.events.filter((result: any) => result.identifier === 'callContract')[0];
 
     const topics = relevantEvent.topics.map((topic: any) => Buffer.from(topic, 'base64'));
 
@@ -328,12 +298,12 @@ test(
 test(
   'Factory deploy remote interchain token ESDT async call and ABI Payload',
   async () => {
-    await deployContracts(false);
+    await deployContracts();
 
-    const computedTokenId = await deployNewEsdtThroughFactory();
+    const computedTokenId = await deployNewEsdt();
 
     const { hash } = await user.callContract({
-      callee: fsFactory,
+      callee: fsIts,
       funcName: 'deployRemoteInterchainToken',
       gasLimit: 150_000_000,
       value: 100_000_000n,
@@ -365,9 +335,9 @@ test(
 test(
   'Send to hub ABI payload deploy remote interchain token',
   async () => {
-    await deployContracts(false);
+    await deployContracts();
 
-    const computedTokenId = await deployNewEsdtThroughFactory();
+    const computedTokenId = await deployNewEsdt();
 
     // Route original chain through ITS Hub
     await deployer.callContract({
@@ -385,7 +355,7 @@ test(
     });
 
     const { hash } = await user.callContract({
-      callee: fsFactory,
+      callee: fsIts,
       funcName: 'deployRemoteInterchainToken',
       gasLimit: 150_000_000,
       value: 100_000_000n,
@@ -426,21 +396,23 @@ test(
   async () => {
     await deployContracts();
 
-    // First deploys a new token manager contract
+    // Deploy a new interchain token just so we have an ESDT token to use
     let result = await user.callContract({
       callee: fsIts,
       funcName: 'deployInterchainToken',
       gasLimit: 100_000_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str(''),
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
-        e.TopBuffer(''),
+        e.U(1_000),
+        e.Addr(ADDRESS_ZERO),
       ],
     });
-    const computedTokenId = computeInterchainTokenId(e.Addr(ADDRESS_ZERO), TOKEN_SALT);
+
+    const deploySalt = computeInterchainTokenDeploySalt(user);
+    const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
 
     assert(result.returnData[0] === computedTokenId);
 
@@ -452,11 +424,11 @@ test(
       value: 10n ** 17n,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str(''),
         e.Str('Token Name'),
         e.Str('TOKEN-SYMBOL'),
         e.U8(18),
-        e.TopBuffer(''),
+        e.U(1_000),
+        e.Addr(ADDRESS_ZERO),
       ],
     });
 
@@ -497,6 +469,26 @@ test(
     });
 
     /**
+     * Assert register custom token
+     */
+
+    result = await user.callContract({
+      callee: fsIts,
+      funcName: 'registerCustomToken',
+      gasLimit: 100_000_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(tokenIdentifier),
+        e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
+        e.Addr(ADDRESS_ZERO),
+      ],
+    });
+
+    const computedTokenIdLink = computeLinkedTokenId(user);
+
+    assert(result.returnData[0] === computedTokenIdLink);
+
+    /**
      * Assert link token
      */
 
@@ -515,7 +507,7 @@ test(
       ],
     });
 
-    assert(result.returnData[0] === computeInterchainTokenId(e.Addr(ADDRESS_ZERO)));
+    assert(result.returnData[0] === computedTokenIdLink);
 
     const tx = await world.proxy.getTx(result.hash);
 

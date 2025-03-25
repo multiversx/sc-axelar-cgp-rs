@@ -18,7 +18,7 @@ pub trait RemoteModule:
     + proxy_its::ProxyItsModule
     + address_tracker::AddressTracker
 {
-    fn deploy_remote_interchain_token(
+    fn deploy_remote_interchain_token_base(
         &self,
         token_id: &TokenId<Self::Api>,
         name: ManagedBuffer,

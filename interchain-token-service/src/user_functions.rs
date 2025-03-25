@@ -1,7 +1,6 @@
 multiversx_sc::imports!();
 
 use core::convert::TryFrom;
-use core::ops::Deref;
 
 use token_manager::constants::TokenManagerType;
 
@@ -36,16 +35,14 @@ pub trait UserFunctionsModule:
         self.register_token_metadata_async_call(token_identifier, gas_value);
     }
 
-    #[endpoint(registerCustomToken)]
-    fn register_custom_token(
+    fn register_custom_token_raw(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         token_manager_type: TokenManagerType,
         link_params: ManagedBuffer,
     ) -> TokenId<Self::Api> {
         self.require_not_paused();
-        self.only_token_factory();
 
         // Custom token managers can't be deployed with native interchain token type, which is reserved for interchain tokens
         require!(
@@ -53,11 +50,9 @@ pub trait UserFunctionsModule:
             "Can not deploy native interchain token"
         );
 
-        let deployer = ManagedAddress::zero();
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
 
-        let token_id = self.interchain_token_id(&deployer, &salt);
-
-        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
+        self.interchain_token_id_claimed_event(&token_id, &deploy_salt);
 
         self.deploy_token_manager_raw(
             &token_id,
@@ -69,16 +64,14 @@ pub trait UserFunctionsModule:
         token_id
     }
 
-    // Payable with EGLD for cross chain calls gas
-    #[payable("EGLD")]
-    #[endpoint(linkToken)]
-    fn link_token(
+    fn link_token_raw(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         destination_token_address: ManagedBuffer,
         token_manager_type: TokenManagerType,
         link_params: ManagedBuffer,
+        gas_value: BigUint,
     ) -> TokenId<Self::Api> {
         self.require_not_paused();
 
@@ -99,17 +92,9 @@ pub trait UserFunctionsModule:
             "Cannot deploy remotely to self"
         );
 
-        let mut deployer = self.blockchain().get_caller();
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
 
-        if deployer == self.interchain_token_factory().get() {
-            deployer = ManagedAddress::zero();
-        }
-
-        let token_id = self.interchain_token_id(&deployer, &salt);
-
-        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
-
-        let gas_value = self.call_value().egld_value().clone_value();
+        self.interchain_token_id_claimed_event(&token_id, &deploy_salt);
 
         let source_token_address = self.registered_token_identifier(&token_id).into_name();
 
@@ -143,28 +128,21 @@ pub trait UserFunctionsModule:
         token_id
     }
 
-    // Payable with EGLD for:
-    // - ESDT token deploy (2nd transaction)
-    // - cross chain calls gas
-    #[payable("EGLD")]
-    #[endpoint(deployInterchainToken)]
-    fn deploy_interchain_token(
+    fn deploy_interchain_token_raw(
         &self,
-        salt: Hash<Self::Api>,
+        deploy_salt: Hash<Self::Api>,
         destination_chain: ManagedBuffer,
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
         minter: ManagedBuffer,
+        egld_value: BigUint,
     ) -> TokenId<Self::Api> {
         self.require_not_paused();
-        self.only_token_factory();
 
-        let deployer = ManagedAddress::zero();
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
 
-        let token_id = self.interchain_token_id(&deployer, &salt);
-
-        self.interchain_token_id_claimed_event(&token_id, &deployer, &salt);
+        self.interchain_token_id_claimed_event(&token_id, &deploy_salt);
 
         if destination_chain.is_empty() {
             // On first transaction, deploy the token manager and on second transaction deploy ESDT through the token manager
@@ -172,7 +150,7 @@ pub trait UserFunctionsModule:
             let token_manager_address_mapper = self.token_manager_address(&token_id);
             if token_manager_address_mapper.is_empty() {
                 require!(
-                    self.call_value().egld_value().deref() == &BigUint::zero(),
+                    egld_value == BigUint::zero(),
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
@@ -197,14 +175,14 @@ pub trait UserFunctionsModule:
 
             self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);
         } else {
-            let gas_value = self.call_value().egld_value().clone_value();
+            let gas_value = egld_value;
 
             require!(
                 self.chain_name().get() != destination_chain,
                 "Cannot deploy remotely to self",
             );
 
-            self.deploy_remote_interchain_token(
+            self.deploy_remote_interchain_token_base(
                 &token_id,
                 name,
                 symbol,
@@ -359,19 +337,7 @@ pub trait UserFunctionsModule:
         }
     }
 
-    fn only_token_factory(&self) {
-        require!(
-            self.blockchain().get_caller() == self.interchain_token_factory().get(),
-            "Not interchain token factory"
-        );
-    }
-
-    #[view(interchainTokenId)]
-    fn interchain_token_id(
-        &self,
-        sender: &ManagedAddress,
-        salt: &Hash<Self::Api>,
-    ) -> TokenId<Self::Api> {
+    fn interchain_token_id_raw(&self, salt: &Hash<Self::Api>) -> TokenId<Self::Api> {
         let prefix_interchain_token_id = self
             .crypto()
             .keccak256(ManagedBuffer::new_from_bytes(PREFIX_INTERCHAIN_TOKEN_ID));
@@ -379,13 +345,9 @@ pub trait UserFunctionsModule:
         let mut encoded = ManagedBuffer::new();
 
         encoded.append(prefix_interchain_token_id.as_managed_buffer());
-        encoded.append(sender.as_managed_buffer());
+        encoded.append(ManagedAddress::zero().as_managed_buffer());
         encoded.append(salt.as_managed_buffer());
 
         self.crypto().keccak256(encoded)
     }
-
-    #[view(interchainTokenFactory)]
-    #[storage_mapper("interchain_token_factory")]
-    fn interchain_token_factory(&self) -> SingleValueMapper<ManagedAddress>;
 }
