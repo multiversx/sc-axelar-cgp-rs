@@ -77,7 +77,7 @@ describe('Give token mint burn', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(500)],
+      funcArgs: [e.Option(e.U(500))],
     });
 
     await user.callContract({
@@ -94,7 +94,7 @@ describe('Give token mint burn', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
       ],
     });
@@ -134,7 +134,7 @@ describe('Give token mint burn', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
         e.kvs.Mapper('flow_in_amount', e.U64(1)).Value(e.U(500)),
       ],
@@ -163,7 +163,7 @@ describe('Give token mint burn', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(999)],
+      funcArgs: [e.Option(e.U(999))],
     });
 
     await user
@@ -232,7 +232,7 @@ describe('Take token mint burn', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(500)],
+      funcArgs: [e.Option(e.U(500))],
     });
 
     await user.callContract({
@@ -250,7 +250,7 @@ describe('Take token mint burn', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
       ],
     });
@@ -287,7 +287,7 @@ describe('Take token mint burn', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
         e.kvs.Mapper('flow_out_amount', e.U64(1)).Value(e.U(500)),
       ],
@@ -339,7 +339,7 @@ describe('Take token mint burn', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(999)],
+      funcArgs: [e.Option(e.U(999))],
     });
 
     await user
@@ -388,6 +388,7 @@ describe('Deploy interchain token', () => {
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // minter role was added to user (ITS)
+        e.kvs.Mapper('minter_address').Value(user),
 
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
@@ -638,6 +639,7 @@ describe('Mintership', () => {
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
         e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000111)), // flow limit & operator & minter role
+        e.kvs.Mapper('minter_address').Value(otherUser),
       ],
     });
 
@@ -756,6 +758,7 @@ describe('Mintership', () => {
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
         e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000111)), // flow limit & operator & minter role
+        e.kvs.Mapper('minter_address').Value(otherUser),
 
         e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000001)),
       ],

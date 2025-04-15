@@ -243,7 +243,7 @@ export const deployTokenManagerLockUnlock = async (
   operator: LSWallet = deployer,
   tokenId: string = TOKEN_ID,
   interchainTokenId: string = INTERCHAIN_TOKEN_ID
-): Promise<EncodableKvs> => {
+): Promise<Kvs[]> => {
   ({ contract: tokenManager, address } = await deployer.deployContract({
     code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
@@ -450,7 +450,7 @@ export const itsRegisterCustomTokenMintBurn = async (world: LSWorld, user: LSWal
 
     e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
 
-    ...(flowLimit ? [e.kvs.Mapper('flow_limit').Value(e.U(flowLimit))] : []),
+    ...(flowLimit ? [e.kvs.Mapper('flow_limit').Value(e.Option(e.U(flowLimit)))] : []),
   ];
 
   // Set mint/burn role for token

@@ -88,7 +88,7 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const deployAndMockTokenManagerInterchainToken = async (burnRole: boolean = false, minter: LSWallet = null) => {
+const deployAndMockTokenManagerInterchainToken = async (burnRole: boolean = false, minter: LSWallet | null = null) => {
   await deployContracts(deployer, collector);
 
   let baseTokenManagerKvs;
@@ -433,6 +433,7 @@ describe('Deploy interchain token', () => {
 
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000000)), // roles removed
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // all roles
+        e.kvs.Mapper('minter_address').Value(user),
       ],
     });
 
@@ -481,6 +482,7 @@ describe('Deploy interchain token', () => {
 
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000000)), // roles removed
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000111)), // operator & flow limiter & minter role
+        e.kvs.Mapper('minter_address').Value(e.Addr(ADDRESS_ZERO)),
       ],
     });
 

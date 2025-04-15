@@ -6,9 +6,9 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           30
+// Endpoints:                           31
 // Async Callback:                       1
-// Total number of exported functions:  33
+// Total number of exported functions:  34
 
 #![no_std]
 
@@ -50,6 +50,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         proposeMintership => propose_mintership
         acceptMintership => accept_mintership
         isMinter => is_minter
+        getMinterAddress => minter_address
     )
 }
 

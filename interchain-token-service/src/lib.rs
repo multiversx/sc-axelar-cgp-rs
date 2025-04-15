@@ -90,7 +90,7 @@ pub trait InterchainTokenServiceContract:
     fn set_flow_limits(
         &self,
         token_ids: MultiValueManagedVecCounted<TokenId<Self::Api>>,
-        flow_limits: MultiValueManagedVecCounted<BigUint>,
+        flow_limits: MultiValueManagedVecCounted<Option<BigUint>>,
     ) {
         self.only_operator();
 
@@ -101,7 +101,7 @@ pub trait InterchainTokenServiceContract:
             .iter()
             .zip(flow_limits.into_vec().iter())
         {
-            self.token_manager_set_flow_limit(token_id.deref(), flow_limit.deref());
+            self.token_manager_set_flow_limit(token_id.deref(), flow_limit);
         }
     }
 

@@ -112,7 +112,7 @@ pub trait TokenManagerLockUnlockContract:
     }
 
     #[endpoint(setFlowLimit)]
-    fn set_flow_limit(&self, flow_limit: BigUint) {
+    fn set_flow_limit(&self, flow_limit: Option<BigUint>) {
         self.only_flow_limiter();
 
         self.set_flow_limit_raw(flow_limit, self.interchain_token_id().get());
@@ -202,12 +202,12 @@ pub trait TokenManagerLockUnlockContract:
         require!(!name.is_empty(), "Empty token name");
         require!(!symbol.is_empty(), "Empty token symbol");
 
-        // For native interchain tokens, we transfer mintership to the token manager.
-        self.add_minter(self.blockchain().get_sc_address());
-        if minter.is_some() {
-            self.add_minter(minter.unwrap());
-        } else {
-            self.add_minter(ManagedAddress::zero());
+        if self.minter_address().is_empty() {
+            if minter.is_some() {
+                self.add_minter(minter.unwrap());
+            } else {
+                self.add_minter(ManagedAddress::zero());
+            }
         }
 
         let issue_cost = BigUint::from(DEFAULT_ESDT_ISSUE_COST);
@@ -388,7 +388,7 @@ pub trait TokenManagerLockUnlockContract:
                     &token_identifier,
                 );
 
-                self.token_identifier().set(token_identifier);
+                self.token_identifier().set_if_empty(token_identifier);
             }
             ManagedAsyncCallResult::Err(_) => {
                 self.interchain_token_deployment_failed();

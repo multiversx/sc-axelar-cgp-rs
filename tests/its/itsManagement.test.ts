@@ -11,13 +11,15 @@ import {
   TOKEN_ID,
   TOKEN_ID2,
   TOKEN_MANAGER_ADDRESS,
-  TOKEN_MANAGER_ADDRESS_2, TOKEN_MANAGER_ADDRESS_3,
+  TOKEN_MANAGER_ADDRESS_2,
+  TOKEN_MANAGER_ADDRESS_3,
   TOKEN_SALT,
   TOKEN_SALT2,
 } from '../helpers';
 import {
   baseItsKvs,
-  computeInterchainTokenIdRaw, computeLinkedTokenId,
+  computeInterchainTokenIdRaw,
+  computeLinkedTokenId,
   deployContracts,
   deployIts,
   gasService,
@@ -237,11 +239,7 @@ describe('Operatorship', () => {
     let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [
-        ...baseItsKvs(deployer),
-
-        e.kvs.Mapper('proposed_roles', deployer, user).Value(e.U32(0b00000010)),
-      ],
+      kvs: [...baseItsKvs(deployer), e.kvs.Mapper('proposed_roles', deployer, user).Value(e.U32(0b00000010))],
     });
 
     // Proposed operator can not call this function
@@ -320,11 +318,7 @@ describe('Operatorship', () => {
     let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [
-        ...baseItsKvs(user),
-
-        e.kvs.Mapper('proposed_roles', deployer, otherUser).Value(e.U32(0b00000010)),
-      ],
+      kvs: [...baseItsKvs(user), e.kvs.Mapper('proposed_roles', deployer, otherUser).Value(e.U32(0b00000010))],
     });
 
     // otherUser can no longer accept because user doesn't have operator role anymore
@@ -370,7 +364,12 @@ describe('Pause unpause', () => {
         callee: its,
         funcName: 'registerCustomToken',
         gasLimit: 20_000_000,
-        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
+        funcArgs: [
+          e.TopBuffer(TOKEN_SALT),
+          e.Str(TOKEN_ID2),
+          e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
+          e.Addr(ADDRESS_ZERO),
+        ],
       })
       .assertFail({ code: 4, message: 'Contract is paused' });
 
@@ -609,7 +608,12 @@ describe('Set flow limits', () => {
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT2), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT2),
+        e.Str(TOKEN_ID2),
+        e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
+        e.Addr(ADDRESS_ZERO),
+      ],
     });
 
     const computedTokenId = computeLinkedTokenId(user);
@@ -619,7 +623,14 @@ describe('Set flow limits', () => {
       callee: its,
       funcName: 'setFlowLimits',
       gasLimit: 20_000_000,
-      funcArgs: [e.U32(2), e.TopBuffer(computedTokenId), e.TopBuffer(computedTokenId2), e.U32(2), e.U(99), e.U(100)],
+      funcArgs: [
+        e.U32(2),
+        e.TopBuffer(computedTokenId),
+        e.TopBuffer(computedTokenId2),
+        e.U32(2),
+        e.Option(e.U(99)),
+        e.Option(e.U(100)),
+      ],
     });
 
     let tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
@@ -634,7 +645,7 @@ describe('Set flow limits', () => {
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit & operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
-        e.kvs.Mapper('flow_limit').Value(e.U(99)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(99))),
       ],
     });
 
@@ -650,7 +661,7 @@ describe('Set flow limits', () => {
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit & operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
-        e.kvs.Mapper('flow_limit').Value(e.U(100)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(100))),
       ],
     });
   });
@@ -665,7 +676,7 @@ describe('Set flow limits', () => {
         callee: its,
         funcName: 'setFlowLimits',
         gasLimit: 20_000_000,
-        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.U(99)],
+        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.Option(e.U(99))],
       })
       .assertFail({ code: 4, message: 'Missing any of roles' });
 
@@ -674,7 +685,7 @@ describe('Set flow limits', () => {
         callee: its,
         funcName: 'setFlowLimits',
         gasLimit: 20_000_000,
-        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(2), e.U(99), e.U(100)],
+        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(2), e.Option(e.U(99)), e.Option(e.U(100))],
       })
       .assertFail({ code: 4, message: 'Length mismatch' });
 
@@ -683,7 +694,7 @@ describe('Set flow limits', () => {
         callee: its,
         funcName: 'setFlowLimits',
         gasLimit: 20_000_000,
-        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.U(100)],
+        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.Option(e.U(100))],
       })
       .assertFail({ code: 4, message: 'Token manager does not exist' });
 
@@ -714,7 +725,7 @@ describe('Set flow limits', () => {
         callee: its,
         funcName: 'setFlowLimits',
         gasLimit: 20_000_000,
-        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.U(100)],
+        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.Option(e.U(100))],
       })
       .assertFail({ code: 10, message: 'error signalled by smartcontract' });
   });

@@ -59,7 +59,7 @@ pub trait ProxyItsModule:
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_set_flow_limit(&self, token_id: &TokenId<Self::Api>, flow_limit: &BigUint) {
+    fn token_manager_set_flow_limit(&self, token_id: &TokenId<Self::Api>, flow_limit: Option<BigUint>) {
         self.token_manager_proxy(self.deployed_token_manager(token_id))
             .set_flow_limit(flow_limit)
             .execute_on_dest_context::<()>();

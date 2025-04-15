@@ -455,7 +455,7 @@ describe('Flow limit', () => {
         callee: tokenManager,
         funcName: 'setFlowLimit',
         gasLimit: 5_000_000,
-        funcArgs: [e.U(100)],
+        funcArgs: [e.Option(e.U(100))],
       })
       .assertFail({ code: 4, message: 'Missing any of roles' });
 
@@ -470,7 +470,7 @@ describe('Flow limit', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(100)],
+      funcArgs: [e.Option(e.U(100))],
     });
 
     let kvs = await tokenManager.getAccount();
@@ -481,7 +481,7 @@ describe('Flow limit', () => {
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
 
-        e.kvs.Mapper('flow_limit').Value(e.U(100)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(100))),
       ],
     });
 
@@ -489,7 +489,7 @@ describe('Flow limit', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(200)],
+      funcArgs: [e.Option(e.U(200))],
     });
 
     kvs = await tokenManager.getAccount();
@@ -500,7 +500,26 @@ describe('Flow limit', () => {
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
 
-        e.kvs.Mapper('flow_limit').Value(e.U(200)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(200))),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(null)],
+    });
+
+    kvs = await tokenManager.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs,
+
+        e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
+
+        e.kvs.Mapper('flow_limit').Value(e.Option(null)),
       ],
     });
   });
@@ -514,6 +533,14 @@ describe('Give token lock unlock', () => {
     await tokenManager.setAccount({
       ...(await tokenManager.getAccount()),
       kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+    });
+
+    // Set unlimited flow limit
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(null)],
     });
 
     await user.callContract({
@@ -545,12 +572,29 @@ describe('Give token lock unlock', () => {
       kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
     });
 
+    // Set flow limit to zero
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(e.U(0))],
+    });
+
+    await user
+      .callContract({
+        callee: tokenManager,
+        funcName: 'giveToken',
+        gasLimit: 20_000_000,
+        funcArgs: [otherUser, e.U(500)],
+      })
+      .assertFail({ code: 4, message: 'Flow limit exceeded' });
+
     // Set flow limit
     await deployer.callContract({
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(500)],
+      funcArgs: [e.Option(e.U(500))],
     });
 
     await user.callContract({
@@ -567,7 +611,7 @@ describe('Give token lock unlock', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
@@ -609,7 +653,7 @@ describe('Give token lock unlock', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
         e.kvs.Mapper('flow_in_amount', e.U64(1)).Value(e.U(500)),
 
@@ -640,7 +684,7 @@ describe('Give token lock unlock', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(999)],
+      funcArgs: [e.Option(e.U(999))],
     });
 
     await user
@@ -668,6 +712,14 @@ describe('Take token lock unlock', () => {
   test('Normal', async () => {
     const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
 
+    // Set unlimited flow limit
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(null)],
+    });
+
     await user.callContract({
       callee: tokenManager,
       funcName: 'takeToken',
@@ -687,12 +739,30 @@ describe('Take token lock unlock', () => {
   test('With flow limit', async () => {
     const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
 
+    // Set flow limit to zero
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(e.U(0))],
+    });
+
+    await user
+      .callContract({
+        callee: tokenManager,
+        funcName: 'takeToken',
+        gasLimit: 20_000_000,
+        funcArgs: [],
+        esdts: [{ id: TOKEN_ID, amount: 500 }],
+      })
+      .assertFail({ code: 4, message: 'Flow limit exceeded' });
+
     // Set flow limit
     await deployer.callContract({
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(500)],
+      funcArgs: [e.Option(e.U(500))],
     });
 
     await user.callContract({
@@ -710,7 +780,7 @@ describe('Take token lock unlock', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
@@ -749,7 +819,7 @@ describe('Take token lock unlock', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
         e.kvs.Mapper('flow_out_amount', e.U64(1)).Value(e.U(500)),
 
@@ -786,7 +856,7 @@ describe('Take token lock unlock', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(999)],
+      funcArgs: [e.Option(e.U(999))],
     });
 
     await user
