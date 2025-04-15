@@ -178,7 +178,7 @@ describe('Execute proposal', () => {
         wrongCallData,
         e.U(0),
       ],
-    }).assertFail({ code: 4, message: 'Invalid time lock hash' });
+    }).assertFail({ code: 4, message: 'Proposal is not submitted' });
 
     const proposalHash = getProposalHash(
       gateway,
@@ -193,6 +193,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
@@ -220,6 +221,29 @@ describe('Execute proposal', () => {
         e.U(0),
       ],
     }).assertFail({ code: 4, message: 'Could not decode call data' });
+
+    // Mock proposal being executed
+    await contract.setAccount({
+      ...await contract.getAccount(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('time_lock_proposals_being_executed', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Proposal is being executed' });
   });
 
   test('Esdt transfer', async () => {
@@ -248,6 +272,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
     // Increase timestamp so finalize_time_lock passes
@@ -272,6 +297,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
@@ -339,6 +365,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
     // Increase timestamp so finalize_time_lock passes
@@ -402,6 +429,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
     // Increase timestamp so finalize_time_lock passes
@@ -427,6 +455,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
         e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000)),
       ],
     });
@@ -474,6 +503,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
     // Increase timestamp so finalize_time_lock passes
@@ -510,6 +540,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
         e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(500)),
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500, nonce: 1 }]), // esdt still in contract
@@ -536,6 +567,7 @@ describe('Execute proposal', () => {
         ...baseKvs(),
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
         e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(1_000)),
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
@@ -671,7 +703,7 @@ describe('Execute operator proposal', () => {
         wrongCallData,
         e.U(0),
       ],
-    }).assertFail({ code: 4, message: 'Not approved' });
+    }).assertFail({ code: 4, message: 'Proposal is not submitted' });
 
     const proposalHash = getProposalHash(
       gateway,
@@ -679,13 +711,34 @@ describe('Execute operator proposal', () => {
       e.U(0),
     );
 
+    await contract.setAccount({
+      ...await contract.getAccount(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeOperatorProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Not approved' });
+
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
@@ -699,6 +752,29 @@ describe('Execute operator proposal', () => {
         e.U(0),
       ],
     }).assertFail({ code: 4, message: 'Could not decode call data' });
+
+    // Mock proposal being executed
+    await contract.setAccount({
+      ...await contract.getAccount(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_being_executed', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      gasLimit: 100_000_000,
+      funcName: 'executeOperatorProposal',
+      funcArgs: [
+        gateway,
+        wrongCallData,
+        e.U(0),
+      ],
+    }).assertFail({ code: 4, message: 'Proposal is being executed' });
   });
 
   test('Esdt transfer', async () => {
@@ -722,11 +798,12 @@ describe('Execute operator proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
@@ -743,17 +820,18 @@ describe('Execute operator proposal', () => {
     });
 
     // Operator approval was NOT deleted
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
     // Assert deployer still has the tokens
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
       ],
@@ -773,13 +851,13 @@ describe('Execute operator proposal', () => {
     });
 
     // Operator apporval was deleted
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: baseKvs(),
     });
 
     // Assert user received tokens
-    assertAccount(await user.getAccountWithKvs(), {
+    assertAccount(await user.getAccount(), {
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
       ],
@@ -807,11 +885,12 @@ describe('Execute operator proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
@@ -838,13 +917,13 @@ describe('Execute operator proposal', () => {
     });
 
     // Operator approval was deleted
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: baseKvs(),
     });
 
     // Assert Gateway was successfully upgraded (operator was changed)
-    assertAccount(await gateway.getAccountWithKvs(), {
+    assertAccount(await gateway.getAccount(), {
       kvs: baseGatewayKvs(newOperator),
     });
   });
@@ -868,11 +947,12 @@ describe('Execute operator proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
@@ -889,13 +969,14 @@ describe('Execute operator proposal', () => {
     }); // async call actually fails
 
     // Operator approval NOT deleted and refund token was created
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 1_000, // EGLD still in contract
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
         e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000)),
       ],
     });
@@ -910,7 +991,7 @@ describe('Execute operator proposal', () => {
       ],
     });
 
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n, // got egld back
     });
   });
@@ -938,11 +1019,12 @@ describe('Execute operator proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
@@ -970,13 +1052,14 @@ describe('Execute operator proposal', () => {
     }); // async call actually fails
 
     // Operator approval was NOT deleted and refund token was created
-    let kvs = await contract.getAccountWithKvs();
+    let kvs = await contract.getAccount();
     assertAccount(kvs, {
       balance: 0n,
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
         e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(500)),
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 500, nonce: 1 }]), // esdt still in contract
@@ -997,12 +1080,13 @@ describe('Execute operator proposal', () => {
     }); // async call actually fails
 
     // Amount was added to refund token
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
         e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(1_000)),
 
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
@@ -1019,7 +1103,7 @@ describe('Execute operator proposal', () => {
       ],
     });
 
-    assertAccount(await deployer.getAccountWithKvs(), {
+    assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n,
       kvs: [
         e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]), // got esdt back
@@ -1044,11 +1128,12 @@ describe('Execute operator proposal', () => {
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccountWithKvs(),
+      ...await contract.getAccount(),
       kvs: [
         ...baseKvs(),
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
       ],
     });
 
@@ -1064,7 +1149,7 @@ describe('Execute operator proposal', () => {
     });
 
     // Operator approval was deleted and operator was changed
-    assertAccount(await contract.getAccountWithKvs(), {
+    assertAccount(await contract.getAccount(), {
       balance: 0n,
       kvs: [
         ...baseKvs(),
@@ -1092,7 +1177,7 @@ test('Withdraw', async () => {
   const callData = e.TopBuffer(e.Tuple(
     e.Str('withdraw'),
     e.List(
-      e.Buffer(deployer.toNestBytes()),
+      e.Buffer(deployer.toNestU8A()),
       e.U(100),
     ),
     e.U64(1_000_000), // min gas limit
@@ -1108,6 +1193,7 @@ test('Withdraw', async () => {
       ...baseKvs(),
 
       e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+      e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
     ],
   });
   // Increase timestamp so finalize_time_lock passes
@@ -1163,7 +1249,7 @@ test('Transfer operatorship', async () => {
   });
 
   // Operator was changed
-  assertAccount(await contract.getAccountWithKvs(), {
+  assertAccount(await contract.getAccount(), {
     kvs: [
       ...baseKvs(),
 
@@ -1188,11 +1274,12 @@ test('Transfer operatorship', async () => {
 
   // Mock hash
   await contract.setAccount({
-    ...await contract.getAccountWithKvs(),
+    ...await contract.getAccount(),
     kvs: [
       ...baseKvs(),
 
       e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
+      e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
     ],
   });
   // Increase timestamp so finalize_time_lock passes
@@ -1210,231 +1297,345 @@ test('Transfer operatorship', async () => {
   });
 
   // Time lock eta was deleted and operator was set back to deployer
-  let kvs = await contract.getAccountWithKvs();
-  assertAccount(kvs, {
-    kvs: [
-      ...baseKvs(),
-    ],
-  });
-});
-
-test('Execute errors', async () => {
-  await deployContract();
-
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 10_000_000,
-    funcArgs: [
-      e.Str('otherChain'),
-      e.Str(MESSAGE_ID),
-      e.Str(GOVERNANCE_ADDRESS),
-      e.TopBuffer(''),
-    ],
-  }).assertFail({ code: 4, message: 'Not governance' });
-
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 10_000_000,
-    funcArgs: [
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(MESSAGE_ID),
-      e.Str('otherAddress'),
-      e.TopBuffer(''),
-    ],
-  }).assertFail({ code: 4, message: 'Not governance' });
-
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 10_000_000,
-    funcArgs: [
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(MESSAGE_ID),
-      e.Str(GOVERNANCE_ADDRESS),
-      e.TopBuffer(''),
-    ],
-  }).assertFail({ code: 4, message: 'Not approved by gateway' });
-
-  let payload = e.TopBuffer('');
-  await mockCallApprovedByGateway(payload);
-
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 10_000_000,
-    funcArgs: [
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(MESSAGE_ID),
-      e.Str(GOVERNANCE_ADDRESS),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Could not decode execute payload' });
-
-  payload = e.TopBuffer(e.Tuple(
-    e.U8(0),
-    e.Addr(ADDRESS_ZERO),
-    e.Buffer(''),
-    e.U(0),
-    e.U64(0),
-  ).toTopU8A());
-  await mockCallApprovedByGateway(payload);
-
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 10_000_000,
-    funcArgs: [
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(MESSAGE_ID),
-      e.Str(GOVERNANCE_ADDRESS),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Invalid target' });
-});
-
-test('Execute schedule time lock proposal min eta', async () => {
-  await deployContract();
-
-  const callData = e.Buffer('');
-  const payload = e.TopBuffer(e.Tuple(
-    e.U8(0),
-    gateway,
-    callData,
-    e.U(0),
-    e.U64(1), // will use min eta instead
-  ).toTopU8A());
-  await mockCallApprovedByGateway(payload);
-
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(MESSAGE_ID),
-      e.Str(GOVERNANCE_ADDRESS),
-      payload,
-    ],
-  });
-
-  const proposalHash = getProposalHash(gateway, callData, e.U(0));
-
   let kvs = await contract.getAccount();
   assertAccount(kvs, {
-    balance: 0n,
     kvs: [
       ...baseKvs(),
-
-      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(10)),
     ],
   });
 });
 
-test('Execute schedule time lock proposal eta', async () => {
-  await deployContract();
+describe("Execute", () => {
+  test('Execute errors', async () => {
+    await deployContract();
 
-  const callData = e.Buffer('');
-  const payload = e.TopBuffer(e.Tuple(
-    e.U8(0),
-    gateway,
-    callData,
-    e.U(0),
-    e.U64(11),
-  ).toTopU8A());
-  await mockCallApprovedByGateway(payload);
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 10_000_000,
+      funcArgs: [
+        e.Str('otherChain'),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        e.TopBuffer(''),
+      ],
+    }).assertFail({ code: 4, message: 'Not governance' });
 
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(MESSAGE_ID),
-      e.Str(GOVERNANCE_ADDRESS),
-      payload,
-    ],
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 10_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str('otherAddress'),
+        e.TopBuffer(''),
+      ],
+    }).assertFail({ code: 4, message: 'Not governance' });
+
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 10_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        e.TopBuffer(''),
+      ],
+    }).assertFail({ code: 4, message: 'Not approved by gateway' });
+
+    let payload = e.TopBuffer('');
+    await mockCallApprovedByGateway(payload);
+
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 10_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    }).assertFail({ code: 4, message: 'Could not decode execute payload' });
+
+    payload = e.TopBuffer(e.Tuple(
+      e.U8(0),
+      e.Addr(ADDRESS_ZERO),
+      e.Buffer(''),
+      e.U(0),
+      e.U64(0),
+    ).toTopU8A());
+    await mockCallApprovedByGateway(payload);
+
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 10_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    }).assertFail({ code: 4, message: 'Invalid target' });
   });
 
-  const proposalHash = getProposalHash(gateway, callData, e.U(0));
+  test('Execute schedule time lock proposal min eta', async () => {
+    await deployContract();
 
-  let kvs = await contract.getAccount();
-  assertAccount(kvs, {
-    balance: 0n,
-    kvs: [
-      ...baseKvs(),
-
-      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(11)),
-    ],
-  });
-
-  await mockCallApprovedByGateway(payload);
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(MESSAGE_ID),
-      e.Str(GOVERNANCE_ADDRESS),
-      payload,
-    ],
-  }).assertFail({ code: 4, message: 'Time lock already scheduled' });
-
-  const result = await world.query({
-    callee: contract,
-    funcName: 'getProposalEta',
-    funcArgs: [
+    const callData = e.Buffer('');
+    const payload = e.TopBuffer(e.Tuple(
+      e.U8(0),
       gateway,
       callData,
       e.U(0),
-    ],
-  });
-  assert(d.U64().topDecode(result.returnData[0]) === 11n);
-});
+      e.U64(1), // will use min eta instead
+    ).toTopU8A());
+    await mockCallApprovedByGateway(payload);
 
-test('Execute cancel time lock proposal', async () => {
-  await deployContract();
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    });
 
-  const callData = e.Buffer('');
-  const payload = e.TopBuffer(e.Tuple(
-    e.U8(1),
-    gateway,
-    callData,
-    e.U(0),
-    e.U64(0),
-  ).toTopU8A());
-  await mockCallApprovedByGateway(payload);
+    const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
-  // Mock time lock era set
-  const proposalHash = getProposalHash(gateway, callData, e.U(0));
+    let kvs = await contract.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs(),
 
-  await contract.setAccount({
-    ...await contract.getAccount(),
-    kvs: [
-      ...baseKvs(),
-
-      e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(10)),
-    ],
-  });
-
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'execute',
-    gasLimit: 20_000_000,
-    funcArgs: [
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(MESSAGE_ID),
-      e.Str(GOVERNANCE_ADDRESS),
-      payload,
-    ],
+        e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(10)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
+      ],
+    });
   });
 
-  // Time lock eta was removed
-  const kvs = await contract.getAccount();
-  assertAccount(kvs, {
-    balance: 0n,
-    kvs: baseKvs(),
+  test('Execute schedule time lock proposal eta', async () => {
+    await deployContract();
+
+    const callData = e.Buffer('');
+    const payload = e.TopBuffer(e.Tuple(
+      e.U8(0),
+      gateway,
+      callData,
+      e.U(0),
+      e.U64(11),
+    ).toTopU8A());
+    await mockCallApprovedByGateway(payload);
+
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    });
+
+    const proposalHash = getProposalHash(gateway, callData, e.U(0));
+
+    let kvs = await contract.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(11)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    await mockCallApprovedByGateway(payload);
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    }).assertFail({ code: 4, message: 'Proposal was already submitted' });
+
+    const result = await world.query({
+      callee: contract,
+      funcName: 'getProposalEta',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+    });
+    assert(d.U64().topDecode(result.returnData[0]) === 11n);
+  });
+
+  test('Execute cancel time lock proposal', async () => {
+    await deployContract();
+
+    const callData = e.Buffer('');
+    const payload = e.TopBuffer(e.Tuple(
+      e.U8(1),
+      gateway,
+      callData,
+      e.U(0),
+      e.U64(0),
+    ).toTopU8A());
+    await mockCallApprovedByGateway(payload);
+
+    // Mock time lock era set
+    const proposalHash = getProposalHash(gateway, callData, e.U(0));
+
+    await contract.setAccount({
+      ...await contract.getAccount(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(10)),
+        e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    });
+
+    // Time lock eta and proposal submitted was removed
+    const kvs = await contract.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: baseKvs(),
+    });
+  });
+
+  test('Execute approve operator proposal', async () => {
+    await deployContract();
+
+    const callData = e.Buffer('');
+    const payload = e.TopBuffer(e.Tuple(
+      e.U8(2),
+      gateway,
+      callData,
+      e.U(0),
+      e.U64(11),
+    ).toTopU8A());
+    await mockCallApprovedByGateway(payload);
+
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    });
+
+    const proposalHash = getProposalHash(gateway, callData, e.U(0));
+
+    let kvs = await contract.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    await mockCallApprovedByGateway(payload);
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    }).assertFail({ code: 4, message: 'Proposal was already submitted' });
+
+    const result = await world.query({
+      callee: contract,
+      funcName: 'isOperatorProposalApproved',
+      funcArgs: [
+        gateway,
+        callData,
+        e.U(0),
+      ],
+    });
+    assert(result.returnData[0] === '01');
+  });
+
+  test('Execute cancel operator approval', async () => {
+    await deployContract();
+
+    const callData = e.Buffer('');
+    const payload = e.TopBuffer(e.Tuple(
+      e.U8(3),
+      gateway,
+      callData,
+      e.U(0),
+      e.U64(0),
+    ).toTopU8A());
+    await mockCallApprovedByGateway(payload);
+
+    // Mock operator proposal set
+    const proposalHash = getProposalHash(gateway, callData, e.U(0));
+
+    await contract.setAccount({
+      ...await contract.getAccount(),
+      kvs: [
+        ...baseKvs(),
+
+        e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
+        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: contract,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(MESSAGE_ID),
+        e.Str(GOVERNANCE_ADDRESS),
+        payload,
+      ],
+    });
+
+    // Time operator proposal was removed
+    const kvs = await contract.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: baseKvs(),
+    });
   });
 });

@@ -1,39 +1,12 @@
-import { afterEach, assert, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, FSWorld, LSWallet, LSWorld } from 'xsuite';
-import {
-  ADDRESS_ZERO,
-  CHAIN_NAME,
-  INTERCHAIN_TOKEN_ID,
-  OTHER_CHAIN_ADDRESS,
-  OTHER_CHAIN_NAME,
-  OTHER_CHAIN_TOKEN_ADDRESS,
-  TOKEN_ID,
-  TOKEN_ID2,
-  TOKEN_MANAGER_ADDRESS,
-  TOKEN_MANAGER_ADDRESS_2,
-  TOKEN_SALT,
-  TOKEN_SALT2,
-} from '../helpers';
-import {
-  baseItsKvs,
-  computeInterchainTokenIdRaw,
-  deployContracts,
-  deployTokenManagerInterchainToken,
-  deployTokenManagerLockUnlock,
-  gasService,
-  its,
-  TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
-  TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
-  TOKEN_MANAGER_TYPE_MINT_BURN,
-  tokenManager,
-} from '../itsHelpers';
-import { AbiCoder } from 'ethers';
+import { afterEach, beforeEach, describe, test } from 'vitest';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
+import { TOKEN_ID, TOKEN_ID2 } from '../helpers';
+import { baseItsKvs, deployContracts, its } from '../itsHelpers';
 
 let world: LSWorld;
 let deployer: LSWallet;
 let collector: LSWallet;
 let user: LSWallet;
-let otherUser: LSWallet;
 
 beforeEach(async () => {
   world = await LSWorld.start();
@@ -72,9 +45,6 @@ beforeEach(async () => {
         },
       ]),
     ],
-  });
-  otherUser = await world.createWallet({
-    balance: BigInt('10000000000000000'),
   });
 
   await deployContracts(deployer, collector);
