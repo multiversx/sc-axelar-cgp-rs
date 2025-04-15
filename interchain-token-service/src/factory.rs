@@ -1,42 +1,27 @@
-#![no_std]
-
 use core::ops::Deref;
 
 use token_manager::constants::TokenManagerType;
 
 use crate::constants::{
-    DeployApproval, Hash, TokenId, PREFIX_CANONICAL_TOKEN_SALT, PREFIX_CUSTOM_TOKEN_SALT,
-    PREFIX_DEPLOY_APPROVAL, PREFIX_INTERCHAIN_TOKEN_SALT,
+    DeployApproval, Hash, ManagedBufferAscii, TokenId, PREFIX_CANONICAL_TOKEN_SALT,
+    PREFIX_CUSTOM_TOKEN_SALT, PREFIX_DEPLOY_APPROVAL, PREFIX_INTERCHAIN_TOKEN_SALT,
 };
-use crate::proxy::CallbackProxy as _;
+use crate::{address_tracker, events, executable, proxy_gmp, proxy_its, remote, user_functions};
+use crate::proxy_its::{ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX, ESDT_PROPERTIES_TOKEN_NAME_INDEX, ESDT_PROPERTIES_TOKEN_TYPE_INDEX};
 
 multiversx_sc::imports!();
 
-pub mod constants;
-pub mod events;
-pub mod proxy;
-
-#[multiversx_sc::contract]
-pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsModule {
-    #[init]
-    fn init(&self, interchain_token_service: ManagedAddress) {
-        require!(!interchain_token_service.is_zero(), "Zero address");
-        require!(
-            self.blockchain()
-                .is_smart_contract(&interchain_token_service),
-            "Not a smart contract address"
-        );
-
-        self.interchain_token_service()
-            .set_if_empty(&interchain_token_service);
-
-        self.chain_name_hash()
-            .set_if_empty(self.crypto().keccak256(self.its_chain_name()));
-    }
-
-    #[upgrade]
-    fn upgrade(&self) {}
-
+#[multiversx_sc::module]
+pub trait FactoryModule:
+    user_functions::UserFunctionsModule
+    + proxy_gmp::ProxyGmpModule
+    + proxy_its::ProxyItsModule
+    + address_tracker::AddressTracker
+    + events::EventsModule
+    + remote::RemoteModule
+    + multiversx_sc_modules::pause::PauseModule
+    + executable::ExecutableModule
+{
     // Needs to be payable because it issues ESDT token through the TokenManager
     #[payable("*")]
     #[endpoint(deployInterchainToken)]
@@ -60,18 +45,15 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         if initial_supply > 0 {
             minter_bytes = own_address.as_managed_buffer()
         } else if !minter.is_zero() {
-            require!(
-                minter != self.interchain_token_service().get(),
-                "Invalid minter"
-            );
+            require!(minter != own_address, "Invalid minter");
 
             minter_bytes = minter.as_managed_buffer()
         } else {
             sc_panic!("Zero supply token");
         }
 
-        let token_id = self.its_interchain_token_id(&deploy_salt);
-        let token_manager = self.its_invalid_token_manager_address(&token_id);
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
+        let token_manager = self.invalid_token_manager_address(&token_id);
 
         let egld_value = self.call_value().egld_value();
 
@@ -93,13 +75,13 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
                 egld_value.clone_value()
             };
 
-            self.its_deploy_interchain_token(
+            self.deploy_interchain_token_raw(
                 deploy_salt,
                 current_chain,
                 name,
                 symbol,
                 decimals,
-                minter_bytes,
+                minter_bytes.clone(),
                 egld_transfer_value,
             );
 
@@ -141,7 +123,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         self.check_token_minter(&token_id, &minter);
 
         require!(
-            !self.its_trusted_address(&destination_chain).is_empty(),
+            !self.trusted_address(&destination_chain).is_empty(),
             "Invalid chain name"
         );
 
@@ -206,6 +188,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         )
     }
 
+    // Payable with EGLD for cross chain calls gas
     #[payable("EGLD")]
     #[endpoint(deployRemoteInterchainTokenWithMinter)]
     fn deploy_remote_interchain_token_with_minter(
@@ -221,7 +204,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         let mut destination_minter_raw = ManagedBuffer::new();
 
         if !minter.is_zero() {
-            let deployed_token_id = self.its_interchain_token_id(&deploy_salt);
+            let deployed_token_id = self.interchain_token_id_raw(&deploy_salt);
 
             self.check_token_minter(&deployed_token_id, &minter);
 
@@ -263,7 +246,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         // No custom operator is set for canonical token registration
         let link_params = ManagedBuffer::new();
 
-        self.its_register_custom_token(
+        self.register_custom_token_raw(
             deploy_salt,
             token_identifier,
             TokenManagerType::LockUnlock,
@@ -271,6 +254,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         )
     }
 
+    // Payable with EGLD for cross chain calls gas
     #[payable("EGLD")]
     #[endpoint(deployRemoteCanonicalInterchainToken)]
     fn deploy_remote_canonical_interchain_token(
@@ -314,7 +298,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
             link_params.append(operator.as_managed_buffer());
         }
 
-        self.its_register_custom_token(
+        self.register_custom_token_raw(
             deploy_salt,
             EgldOrEsdtTokenIdentifier::esdt(token_identifier),
             token_manager_type,
@@ -322,6 +306,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         )
     }
 
+    // Payable with EGLD for cross chain calls gas
     #[payable("EGLD")]
     #[endpoint(linkToken)]
     fn link_token(
@@ -336,7 +321,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
 
         let gas_value = self.call_value().egld_value().clone_value();
 
-        self.its_link_token(
+        self.link_token_raw(
             deploy_salt,
             destination_chain,
             destination_token_address,
@@ -380,7 +365,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
     }
 
     fn check_token_minter(&self, token_id: &Hash<Self::Api>, minter: &ManagedAddress) {
-        let token_manager = self.its_invalid_token_manager_address(token_id);
+        let token_manager = self.invalid_token_manager_address(token_id);
 
         require!(
             !token_manager.is_zero() && self.token_manager_is_minter(token_manager, minter),
@@ -389,7 +374,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
 
         // Sanity check to prevent accidental use of the current ITS address as the destination minter
         require!(
-            minter != &self.interchain_token_service().get(),
+            minter != &self.blockchain().get_sc_address(),
             "Invalid minter"
         );
     }
@@ -402,20 +387,20 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         sender: ManagedAddress,
     ) -> TokenId<Self::Api> {
         // Ensure that a token is registered locally for the tokenId before allowing a remote deployment
-        let expected_token_id = self.its_interchain_token_id(&deploy_salt);
-        let token_identifier = self.its_registered_token_identifier(&expected_token_id);
+        let expected_token_id = self.interchain_token_id_raw(&deploy_salt);
+        let token_identifier = self.registered_token_identifier(&expected_token_id);
 
         let gas_value = self.call_value().egld_value().clone_value();
 
         // We can only fetch token properties from esdt contract if it is not EGLD token
         if token_identifier.is_egld() {
-            self.its_deploy_interchain_token(
+            self.deploy_interchain_token_raw(
                 deploy_salt,
                 destination_chain,
                 token_identifier.clone().into_name(),
                 token_identifier.into_name(),
                 18, // EGLD token has 18 decimals
-                &destination_minter,
+                destination_minter,
                 gas_value,
             );
 
@@ -429,12 +414,12 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
             .unwrap();
 
         self.esdt_get_token_properties(
-            token_identifier,
-            self.callbacks().deploy_remote_token_callback(
+            token_identifier.unwrap_esdt(),
+            <Self as FactoryModule>::callbacks(self).deploy_remote_token_callback(
                 deploy_salt,
                 destination_chain,
                 token_symbol,
-                &destination_minter,
+                destination_minter,
                 gas_value,
                 sender,
             ),
@@ -509,7 +494,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
     ) -> TokenId<Self::Api> {
         let deploy_salt = self.interchain_token_deploy_salt(deployer, salt);
 
-        self.its_interchain_token_id(&deploy_salt)
+        self.interchain_token_id_raw(&deploy_salt)
     }
 
     #[view(canonicalInterchainTokenId)]
@@ -519,7 +504,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
     ) -> TokenId<Self::Api> {
         let deploy_salt = self.canonical_interchain_token_deploy_salt(token_identifier);
 
-        self.its_interchain_token_id(&deploy_salt)
+        self.interchain_token_id_raw(&deploy_salt)
     }
 
     #[view(linkedTokenId)]
@@ -530,7 +515,7 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
     ) -> TokenId<Self::Api> {
         let deploy_salt = self.linked_token_deploy_salt(deployer, salt);
 
-        self.its_interchain_token_id(&deploy_salt)
+        self.interchain_token_id_raw(&deploy_salt)
     }
 
     #[view(chainNameHash)]
@@ -543,4 +528,59 @@ pub trait InterchainTokenFactoryContract: proxy::ProxyModule + events::EventsMod
         &self,
         approval_key: &Hash<Self::Api>,
     ) -> SingleValueMapper<Hash<Self::Api>>;
+
+    // This was tested on devnet and worked fine
+    #[callback]
+    fn deploy_remote_token_callback(
+        &self,
+        deploy_salt: Hash<Self::Api>,
+        destination_chain: ManagedBuffer,
+        token_symbol: ManagedBuffer,
+        destination_minter: ManagedBuffer,
+        gas_value: BigUint,
+        caller: ManagedAddress,
+        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
+    ) {
+        match result {
+            ManagedAsyncCallResult::Ok(values) => {
+                let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
+
+                let token_name = vec
+                    .get(ESDT_PROPERTIES_TOKEN_NAME_INDEX)
+                    .clone_value();
+                let token_type = vec.get(ESDT_PROPERTIES_TOKEN_TYPE_INDEX);
+                let decimals_buffer_ref =
+                    vec.get(ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX);
+
+                if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
+                    // Send back paid cross chain gas value to initial caller if token is non fungible
+                    self.send().direct_non_zero_egld(&caller, &gas_value);
+
+                    return;
+                }
+
+                let decimals_buffer = decimals_buffer_ref.deref();
+                // num decimals is in format string NumDecimals-DECIMALS
+                // skip `NumDecimals-` part and convert to number
+                let token_decimals_buf: ManagedBuffer = decimals_buffer
+                    .copy_slice(12, decimals_buffer.len() - 12)
+                    .unwrap();
+                let token_decimals = token_decimals_buf.ascii_to_u8();
+
+                self.deploy_interchain_token_raw(
+                    deploy_salt,
+                    destination_chain,
+                    token_name,
+                    token_symbol,
+                    token_decimals,
+                    destination_minter,
+                    gas_value,
+                );
+            }
+            ManagedAsyncCallResult::Err(_) => {
+                // Send back paid gas value to initial caller
+                self.send().direct_non_zero_egld(&caller, &gas_value);
+            }
+        }
+    }
 }

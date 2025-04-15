@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           35
+// Endpoints:                           46
 // Async Callback:                       1
 // Promise callbacks:                    1
-// Total number of exported functions:  39
+// Total number of exported functions:  50
 
 #![no_std]
 
@@ -21,17 +21,11 @@ multiversx_sc_wasm_adapter::endpoints! {
     (
         init => init
         upgrade => upgrade
-        setInterchainTokenFactory => set_interchain_token_factory
         setFlowLimits => set_flow_limits
         execute => execute
         registerTokenMetadata => register_token_metadata
-        registerCustomToken => register_custom_token
-        linkToken => link_token
-        deployInterchainToken => deploy_interchain_token
         interchainTransfer => interchain_transfer
         callContractWithInterchainToken => call_contract_with_interchain_token
-        interchainTokenId => interchain_token_id
-        interchainTokenFactory => interchain_token_factory
         transferOperatorship => transfer_operatorship
         proposeOperatorship => propose_operatorship
         acceptOperatorship => accept_operatorship
@@ -53,6 +47,23 @@ multiversx_sc_wasm_adapter::endpoints! {
         tokenManagerAddress => token_manager_address
         transferWithDataLock => transfer_with_data_lock
         tokenManagerImplementation => token_manager
+        deployInterchainToken => deploy_interchain_token
+        approveDeployRemoteInterchainToken => approve_deploy_remote_interchain_token
+        revokeDeployRemoteInterchainToken => revoke_deploy_remote_interchain_token
+        deployRemoteInterchainToken => deploy_remote_interchain_token
+        deployRemoteInterchainTokenWithMinter => deploy_remote_interchain_token_with_minter
+        registerCanonicalInterchainToken => register_canonical_interchain_token
+        deployRemoteCanonicalInterchainToken => deploy_remote_canonical_interchain_token
+        registerCustomToken => register_custom_token
+        linkToken => link_token
+        interchainTokenDeploySalt => interchain_token_deploy_salt
+        canonicalInterchainTokenDeploySalt => canonical_interchain_token_deploy_salt
+        linkedTokenDeploySalt => linked_token_deploy_salt
+        interchainTokenId => interchain_token_id
+        canonicalInterchainTokenId => canonical_interchain_token_id
+        linkedTokenId => linked_token_id
+        chainNameHash => chain_name_hash
+        approvedDestinationMinters => approved_destination_minters
         pause => pause_endpoint
         unpause => unpause_endpoint
         isPaused => paused_status

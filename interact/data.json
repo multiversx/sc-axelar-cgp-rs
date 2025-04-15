@@ -3,7 +3,6 @@
   "codeGasService": "file:gas-service/output/gas-service.wasm",
   "codeBaseTokenManager": "file:token-manager/output/token-manager.wasm",
   "codeIts": "file:interchain-token-service/output/interchain-token-service.wasm",
-  "codeInterchainTokenFactory": "file:interchain-token-factory/output/interchain-token-factory.wasm",
   "codePingPongInterchain": "file:ping-pong-interchain/output/ping-ping-interchain.wasm",
   "codeGovernance": "file:governance/output/governance.wasm",
   "codeHelloWorld": "file:interact/hello-world.wasm",
@@ -114,10 +113,6 @@
   },
   "addressIts": {
     "devnet": "erd1qqqqqqqqqqqqqpgqc5ypvy2d6z52fwscsfnrwcdkdh2fnthfkkls7kcn9j",
-    "mainnet": ""
-  },
-  "addressInterchainTokenFactory": {
-    "devnet": "erd1qqqqqqqqqqqqqpgqtunku9ve7wet2cw57l3fqjyw7dnqel0vkkls7zz82t",
     "mainnet": ""
   },
   "addressGovernance": {

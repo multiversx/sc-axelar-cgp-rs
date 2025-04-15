@@ -11,7 +11,7 @@ import {
 import {
   deployContracts,
   gasService,
-  its,
+  its, itsRegisterCanonicalToken,
   itsRegisterCustomTokenLockUnlock,
   LATEST_METADATA_VERSION,
 } from '../itsHelpers';
@@ -413,7 +413,7 @@ describe('Interchain transfer', () => {
   });
 
   test('Gas token egld', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCanonicalToken(
       world,
       user,
       false,
@@ -802,7 +802,7 @@ describe('Call contract with interchain token', () => {
   });
 
   test('Gas token egld', async () => {
-    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCustomTokenLockUnlock(
+    const { computedTokenId, tokenManager, baseTokenManagerKvs } = await itsRegisterCanonicalToken(
       world,
       user,
       false,

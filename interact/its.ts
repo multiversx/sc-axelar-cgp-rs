@@ -61,42 +61,17 @@ const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
   return result;
 };
 
-const deployInterchainTokenFactory = async (deployer: Wallet, its: string) => {
-  console.log('Deploying ITS Factory...');
-
-  const result = await deployer.deployContract({
-    code: data.codeInterchainTokenFactory,
-    codeMetadata: ['upgradeable'],
-    gasLimit: 200_000_000,
-    codeArgs: [e.Addr(its)],
-  });
-  console.log('Result Interchain Token Factory:', result);
-
-  // Set interchain token factory contract on its
-  await deployer.callContract({
-    callee: e.Addr(its),
-    funcName: 'setInterchainTokenFactory',
-    funcArgs: [e.Addr(result.address)],
-    gasLimit: 10_000_000,
-  });
-  console.log('Set interchain token factory contract on ITS:', result);
-
-  return result;
-};
-
 export const setupITSCommands = (program: Command) => {
-  setupInterchainTokenFactoryCommands(program);
+  setupITSFactoryCommands(program);
 
   program.command('deployIts').action(async () => {
     const wallet = await loadWallet();
 
     const resultBaseTokenManager = await deployBaseTokenManager(wallet);
     const resultIts = await deployIts(wallet, resultBaseTokenManager.address);
-    const resultInterchainTokenFactory = await deployInterchainTokenFactory(wallet, resultIts.address);
 
     console.log('Deployed Base Token Manager Contract:', resultBaseTokenManager.address);
     console.log('Deployed Interchain Token Service Contract:', resultIts.address);
-    console.log('Deployed Interchain Token Factory Contract:', resultInterchainTokenFactory.address);
   });
 
   program.command('deployPingPong').action(async () => {
@@ -156,15 +131,6 @@ export const setupITSCommands = (program: Command) => {
       codeArgs: [],
     });
     console.log('Result ITS:', result);
-
-    result = await wallet.upgradeContract({
-      callee: envChain.select(data.addressInterchainTokenFactory),
-      code: data.codeInterchainTokenFactory,
-      codeMetadata: ['upgradeable'],
-      gasLimit: 300_000_000,
-      codeArgs: [],
-    });
-    console.log('Result Interchain Token Factory:', result);
   });
 
   program.command('upgradeBaseTokenManager').action(async () => {
@@ -280,7 +246,7 @@ export const setupITSCommands = (program: Command) => {
     });
 };
 
-const setupInterchainTokenFactoryCommands = (program: Command) => {
+const setupITSFactoryCommands = (program: Command) => {
   // Needs to be called 3 times to fully finish the token deployment!
   program
     .command('itsDeployInterchainToken')
@@ -298,7 +264,7 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
         const wallet = await loadWallet();
 
         const result = await wallet.callContract({
-          callee: envChain.select(data.addressInterchainTokenFactory),
+          callee: envChain.select(data.addressIts),
           funcName: 'deployInterchainToken',
           gasLimit: 150_000_000,
           // value: BigInt('50000000000000000'), // 0.05 EGLD, to pay for ESDT issue cost (only on 2nd transaction)
@@ -324,7 +290,7 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
-        callee: envChain.select(data.addressInterchainTokenFactory),
+        callee: envChain.select(data.addressIts),
         funcName: 'deployRemoteInterchainToken',
         gasLimit: 100_000_000,
         value: BigInt('5000000000000000'), // 0.005 EGLD, to pay for cross chain gas
@@ -341,7 +307,7 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
-        callee: envChain.select(data.addressInterchainTokenFactory),
+        callee: envChain.select(data.addressIts),
         funcName: 'registerCanonicalInterchainToken',
         gasLimit: 30_000_000,
         funcArgs: [e.Str(tokenIdentifier)],
@@ -360,7 +326,7 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
       const wallet = await loadWallet();
 
       const result = await wallet.callContract({
-        callee: envChain.select(data.addressInterchainTokenFactory),
+        callee: envChain.select(data.addressIts),
         funcName: 'deployRemoteCanonicalInterchainToken',
         gasLimit: 100_000_000,
         value: BigInt('5000000000000000'), // 0.005 EGLD, to pay for cross chain gas
@@ -383,7 +349,7 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
         const wallet = await loadWallet();
 
         const result = await wallet.callContract({
-          callee: envChain.select(data.addressInterchainTokenFactory),
+          callee: envChain.select(data.addressIts),
           funcName: 'registerCustomToken',
           gasLimit: 150_000_000,
           funcArgs: [
@@ -412,7 +378,7 @@ const setupInterchainTokenFactoryCommands = (program: Command) => {
         const wallet = await loadWallet();
 
         const result = await wallet.callContract({
-          callee: envChain.select(data.addressInterchainTokenFactory),
+          callee: envChain.select(data.addressIts),
           funcName: 'linkToken',
           gasLimit: 150_000_000,
           funcArgs: [

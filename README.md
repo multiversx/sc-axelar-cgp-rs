@@ -31,7 +31,6 @@ It is based on the Axelar ITS Solidity implementation available at the time of w
 
 It consists of the following contracts:
 - [Interchain Token Service](/interchain-token-service) - main contract which handles transferring of tokens, registering & deploying of token managers
-- [Interchain Token Factory](/interchain-token-factory) - a wrapper over the Interchain Token Service which allows easier deployment of interchain tokens
 - [Token Manager](/token-manager) - Token Manager implementation which either locks/unlocks tokens from the contract or mints/burns them directly
 
 There is also a module used by the Token Manager & Interchain Token Service contracts:
