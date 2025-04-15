@@ -68,7 +68,7 @@
       "avalanche-fuji": "hub",
       "eth-sepolia": "hub",
       "optimism-sepolia": "hub",
-      "sui-test2": "hub",
+      "sui-2": "hub",
       "stacks": "hub"
     },
     "mainnet": {}

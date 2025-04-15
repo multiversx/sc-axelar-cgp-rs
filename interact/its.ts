@@ -152,6 +152,27 @@ export const setupITSCommands = (program: Command) => {
   });
 
   program
+    .command('itsSetTrustedAddresses')
+    .action(async () => {
+      const wallet = await loadWallet();
+
+      for (const [key, value] of Object.entries(envChain.select(data.itsTrustedAddresses))) {
+        console.log(`Setting trusted address ${key} = ${value}`);
+
+        await wallet.callContract({
+          callee: envChain.select(data.addressIts),
+          funcName: 'setTrustedAddress',
+          gasLimit: 20_000_000,
+          funcArgs: [
+            e.Str(key),
+            e.Str(value),
+          ]
+        });
+      }
+      console.log('Set all trusted addresses!');
+    });
+
+  program
     .command('itsInterchainTransfer')
     .argument('tokenIdentifier')
     .argument('amount')
