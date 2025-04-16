@@ -112,3 +112,11 @@ pub struct DeployApproval<M: ManagedTypeApi> {
     pub token_id: TokenId<M>,
     pub destination_chain: ManagedBuffer<M>,
 }
+
+#[derive(TypeAbi, TopEncode, TopDecode, PartialEq)]
+pub enum InterchainTokenStatus {
+    None, // Needed because the first value from an enum is also encoded as an empty storage
+    NoMint,
+    NeedsMint,
+    AlreadyMinted,
+}

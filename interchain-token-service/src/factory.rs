@@ -1,13 +1,17 @@
 use core::ops::Deref;
 
-use token_manager::constants::TokenManagerType;
+use token_manager::constants::{ManagedBufferAscii as _, TokenManagerType};
 
 use crate::constants::{
-    DeployApproval, Hash, ManagedBufferAscii, TokenId, PREFIX_CANONICAL_TOKEN_SALT,
-    PREFIX_CUSTOM_TOKEN_SALT, PREFIX_DEPLOY_APPROVAL, PREFIX_INTERCHAIN_TOKEN_SALT,
+    DeployApproval, Hash, InterchainTokenStatus, ManagedBufferAscii, TokenId,
+    PREFIX_CANONICAL_TOKEN_SALT, PREFIX_CUSTOM_TOKEN_SALT, PREFIX_DEPLOY_APPROVAL,
+    PREFIX_INTERCHAIN_TOKEN_SALT,
+};
+use crate::proxy_its::{
+    ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX, ESDT_PROPERTIES_TOKEN_NAME_INDEX,
+    ESDT_PROPERTIES_TOKEN_TYPE_INDEX,
 };
 use crate::{address_tracker, events, executable, proxy_gmp, proxy_its, remote, user_functions};
-use crate::proxy_its::{ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX, ESDT_PROPERTIES_TOKEN_NAME_INDEX, ESDT_PROPERTIES_TOKEN_TYPE_INDEX};
 
 multiversx_sc::imports!();
 
@@ -23,7 +27,7 @@ pub trait FactoryModule:
     + executable::ExecutableModule
 {
     // Needs to be payable because it issues ESDT token through the TokenManager
-    #[payable("*")]
+    #[payable("EGLD")]
     #[endpoint(deployInterchainToken)]
     fn deploy_interchain_token(
         &self,
@@ -34,25 +38,53 @@ pub trait FactoryModule:
         initial_supply: BigUint,
         minter: ManagedAddress,
     ) -> TokenId<Self::Api> {
+        self.require_not_paused();
+
+        require!(
+            name == name.to_normalized_token_name(),
+            "Invalid token name"
+        );
+        require!(
+            symbol == symbol.to_normalized_token_ticker(),
+            "Invalid token symbol"
+        );
+
         let sender = self.blockchain().get_caller();
         let deploy_salt = self.interchain_token_deploy_salt(&sender, &salt);
-        let current_chain = ManagedBuffer::new();
 
+        let token_id = self.interchain_token_id_raw(&deploy_salt);
+
+        // If initial supply == 0, token doesn't need any mint but can be retrying if ESDT issue fails
+        // If initial supply > 0, token can only be minted once and ESDT issue can be retried
+        require!(
+            self.interchain_token_status(&token_id).is_empty()
+                || (initial_supply == 0
+                    && self.interchain_token_status(&token_id).get()
+                        == InterchainTokenStatus::NoMint)
+                || self.interchain_token_status(&token_id).get()
+                    == InterchainTokenStatus::NeedsMint,
+            "Token already initialized"
+        );
+
+        let current_chain = ManagedBuffer::new();
         let own_address = self.blockchain().get_sc_address();
 
-        let minter_bytes;
+        let minter_bytes = if initial_supply > 0 {
+            self.interchain_token_status(&token_id)
+                .set(InterchainTokenStatus::NeedsMint);
 
-        if initial_supply > 0 {
-            minter_bytes = own_address.as_managed_buffer()
+            own_address.as_managed_buffer()
         } else if !minter.is_zero() {
             require!(minter != own_address, "Invalid minter");
 
-            minter_bytes = minter.as_managed_buffer()
+            self.interchain_token_status(&token_id)
+                .set(InterchainTokenStatus::NoMint);
+
+            minter.as_managed_buffer()
         } else {
             sc_panic!("Zero supply token");
-        }
+        };
 
-        let token_id = self.interchain_token_id_raw(&deploy_salt);
         let token_manager = self.invalid_token_manager_address(&token_id);
 
         let egld_value = self.call_value().egld_value();
@@ -105,6 +137,9 @@ pub trait FactoryModule:
             self.token_manager_add_flow_limiter(token_manager.clone(), minter.clone());
 
             self.token_manager_transfer_operatorship(token_manager, minter);
+
+            self.interchain_token_status(&token_id)
+                .set(InterchainTokenStatus::AlreadyMinted);
         }
 
         token_id
@@ -199,6 +234,8 @@ pub trait FactoryModule:
         destination_chain: ManagedBuffer,
         destination_minter: OptionalValue<ManagedBuffer>,
     ) -> TokenId<Self::Api> {
+        self.require_not_paused();
+
         let sender = self.blockchain().get_caller();
         let deploy_salt = self.interchain_token_deploy_salt(&sender, &salt);
 
@@ -263,6 +300,8 @@ pub trait FactoryModule:
         original_token_identifier: EgldOrEsdtTokenIdentifier,
         destination_chain: ManagedBuffer,
     ) -> TokenId<Self::Api> {
+        self.require_not_paused();
+
         require!(
             original_token_identifier.is_valid(),
             "Invalid token identifier"
@@ -531,6 +570,13 @@ pub trait FactoryModule:
         approval_key: &Hash<Self::Api>,
     ) -> SingleValueMapper<Hash<Self::Api>>;
 
+    #[view(interchainTokenStatus)]
+    #[storage_mapper("interchain_token_status")]
+    fn interchain_token_status(
+        &self,
+        token_id: &TokenId<Self::Api>,
+    ) -> SingleValueMapper<InterchainTokenStatus>;
+
     // This was tested on devnet and worked fine
     #[callback]
     fn deploy_remote_token_callback(
@@ -547,12 +593,9 @@ pub trait FactoryModule:
             ManagedAsyncCallResult::Ok(values) => {
                 let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
 
-                let token_name = vec
-                    .get(ESDT_PROPERTIES_TOKEN_NAME_INDEX)
-                    .clone_value();
+                let token_name = vec.get(ESDT_PROPERTIES_TOKEN_NAME_INDEX).clone_value();
                 let token_type = vec.get(ESDT_PROPERTIES_TOKEN_TYPE_INDEX);
-                let decimals_buffer_ref =
-                    vec.get(ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX);
+                let decimals_buffer_ref = vec.get(ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX);
 
                 if token_type.deref() != EsdtTokenType::Fungible.as_type_name() {
                     // Send back paid cross chain gas value to initial caller if token is non fungible

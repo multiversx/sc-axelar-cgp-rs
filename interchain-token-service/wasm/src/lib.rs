@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           46
+// Endpoints:                           47
 // Async Callback:                       1
 // Promise callbacks:                    1
-// Total number of exported functions:  50
+// Total number of exported functions:  51
 
 #![no_std]
 
@@ -64,6 +64,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         linkedTokenId => linked_token_id
         chainNameHash => chain_name_hash
         approvedDestinationMinters => approved_destination_minters
+        interchainTokenStatus => interchain_token_status
         pause => pause_endpoint
         unpause => unpause_endpoint
         isPaused => paused_status

@@ -127,8 +127,8 @@ const deployNewEsdt = async () => {
     gasLimit: 100_000_000,
     funcArgs: [
       e.TopBuffer(TOKEN_SALT),
-      e.Str('Token Name'),
-      e.Str('TOKEN-SYMBOL'),
+      e.Str('TokenName'),
+      e.Str('SYMBOL'),
       e.U8(18),
       e.U(10n ** 18n),
       e.Addr(ADDRESS_ZERO),
@@ -147,8 +147,8 @@ const deployNewEsdt = async () => {
     value: 50000000000000000n,
     funcArgs: [
       e.TopBuffer(TOKEN_SALT),
-      e.Str('Token Name'),
-      e.Str('TOKEN-SYMBOL'),
+      e.Str('TokenName'),
+      e.Str('SYMBOL'),
       e.U8(18),
       e.U(10n ** 18n),
       e.Addr(ADDRESS_ZERO),
@@ -162,8 +162,8 @@ const deployNewEsdt = async () => {
     gasLimit: 200_000_000,
     funcArgs: [
       e.TopBuffer(TOKEN_SALT),
-      e.Str('Token Name'),
-      e.Str('TOKEN-SYMBOL'),
+      e.Str('TokenName'),
+      e.Str('SYMBOL'),
       e.U8(18),
       e.U(10n ** 18n),
       e.Addr(ADDRESS_ZERO),
@@ -320,7 +320,7 @@ test(
           MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
           Buffer.from(computedTokenId, 'hex'),
           'TokenName',
-          'TOKENSYMBO',
+          'SYMBOL',
           18,
           Buffer.from(''),
         ]
@@ -372,7 +372,7 @@ test(
           MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
           Buffer.from(computedTokenId, 'hex'),
           'TokenName',
-          'TOKENSYMBO',
+          'SYMBOL',
           18,
           Buffer.from(''),
         ]
@@ -403,8 +403,8 @@ test(
       gasLimit: 100_000_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
+        e.Str('TokenName'),
+        e.Str('SYMBOL'),
         e.U8(18),
         e.U(1_000),
         e.Addr(ADDRESS_ZERO),
@@ -424,8 +424,8 @@ test(
       value: 50000000000000000n,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
+        e.Str('TokenName'),
+        e.Str('SYMBOL'),
         e.U8(18),
         e.U(1_000),
         e.Addr(ADDRESS_ZERO),

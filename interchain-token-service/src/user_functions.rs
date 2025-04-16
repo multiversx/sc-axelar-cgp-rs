@@ -139,8 +139,6 @@ pub trait UserFunctionsModule:
         egld_value: BigUint,
         initial_caller: ManagedAddress,
     ) -> TokenId<Self::Api> {
-        self.require_not_paused();
-
         let token_id = self.interchain_token_id_raw(&deploy_salt);
 
         self.interchain_token_id_claimed_event(&token_id, &deploy_salt);
