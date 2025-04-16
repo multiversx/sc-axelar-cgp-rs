@@ -300,6 +300,14 @@ test(
   async () => {
     await deployContracts();
 
+    // Trust chain
+    await deployer.callContract({
+      callee: fsIts,
+      funcName: 'setTrustedAddress',
+      gasLimit: 10_000_000,
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
+    });
+
     const computedTokenId = await deployNewEsdt();
 
     const { hash } = await user.callContract({
@@ -313,7 +321,7 @@ test(
     let callContractLogData = await getCallContractDataFromEsdtAsync(hash);
 
     // Assert call contract was made with correct ABI encoded payload
-    let expectedAbiPayload = AbiCoder.defaultAbiCoder()
+    let innerAbiPayload = AbiCoder.defaultAbiCoder()
       .encode(
         ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
         [
@@ -324,6 +332,13 @@ test(
           18,
           Buffer.from(''),
         ]
+      )
+      .substring(2);
+
+    let expectedAbiPayload = AbiCoder.defaultAbiCoder()
+      .encode(
+        ['uint256', 'string', 'bytes'],
+        [MESSAGE_TYPE_SEND_TO_HUB, OTHER_CHAIN_NAME, Buffer.from(innerAbiPayload, 'hex')]
       )
       .substring(2);
 

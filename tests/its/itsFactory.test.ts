@@ -31,7 +31,7 @@ import {
   TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
   TOKEN_MANAGER_TYPE_MINT_BURN,
-  tokenManager,
+  tokenManager, ITS_HUB_ROUTING_IDENTIFIER,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -712,6 +712,14 @@ describe('Deploy remote interchain token', () => {
   test('ESDT with no minter', async () => {
     await deployAndMockTokenManagerInterchainToken(true);
 
+    // Trust chain
+    await deployer.callContract({
+      callee: its,
+      funcName: 'setTrustedAddress',
+      gasLimit: 10_000_000,
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
+    });
+
     await user.callContract({
       callee: its,
       funcName: 'deployRemoteInterchainToken',
@@ -724,6 +732,8 @@ describe('Deploy remote interchain token', () => {
       balance: 100_000_000n,
       hasKvs: [
         ...baseItsKvs(deployer),
+
+        e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
 
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs.Mapper('CB_CLOSURE................................').Value(
@@ -808,6 +818,14 @@ describe('Deploy remote interchain token with minter', () => {
   test('With no destination minter but with minter', async () => {
     const { computedTokenId } = await deployAndMockTokenManagerInterchainToken(true, user);
 
+    // Trust chain
+    await deployer.callContract({
+      callee: its,
+      funcName: 'setTrustedAddress',
+      gasLimit: 10_000_000,
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
+    });
+
     await user.callContract({
       callee: its,
       funcName: 'deployRemoteInterchainTokenWithMinter',
@@ -820,6 +838,8 @@ describe('Deploy remote interchain token with minter', () => {
       balance: 100_000_000n,
       hasKvs: [
         ...baseItsKvs(deployer, computedTokenId, TOKEN_MANAGER_ADDRESS_3),
+
+        e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
 
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs.Mapper('CB_CLOSURE................................').Value(
@@ -881,6 +901,14 @@ describe('Deploy remote interchain token with minter', () => {
       })
       .assertFail({ code: 4, message: 'Remote deployment not approved' });
 
+    // Trust chain
+    await deployer.callContract({
+      callee: its,
+      funcName: 'setTrustedAddress',
+      gasLimit: 10_000_000,
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
+    });
+
     await user.callContract({
       callee: its,
       funcName: 'deployRemoteInterchainTokenWithMinter',
@@ -898,6 +926,8 @@ describe('Deploy remote interchain token with minter', () => {
       balance: 100_000_000n,
       hasKvs: [
         ...baseItsKvs(deployer),
+
+        e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
 
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs.Mapper('CB_CLOSURE................................').Value(
@@ -1097,6 +1127,14 @@ describe('Deploy remote canonical interchain token', () => {
   test('ESDT token', async () => {
     await deployAndMockTokenManagerLockUnlock(TOKEN_ID, CANONICAL_INTERCHAIN_TOKEN_ID);
 
+    // Trust chain
+    await deployer.callContract({
+      callee: its,
+      funcName: 'setTrustedAddress',
+      gasLimit: 10_000_000,
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
+    });
+
     await user.callContract({
       callee: its,
       funcName: 'deployRemoteCanonicalInterchainToken',
@@ -1109,6 +1147,8 @@ describe('Deploy remote canonical interchain token', () => {
       balance: 100_000_000n,
       hasKvs: [
         ...baseItsKvs(deployer),
+
+        e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(ITS_HUB_ROUTING_IDENTIFIER)),
 
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs.Mapper('CB_CLOSURE................................').Value(
