@@ -172,7 +172,7 @@ test('Only issue esdt', async () => {
       // Async call tested in itsCrossChainCalls.test.ts file
       e.kvs
         .Mapper('CB_CLOSURE................................')
-        .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+        .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
     ],
   });
   assertAccount(await user.getAccount(), {

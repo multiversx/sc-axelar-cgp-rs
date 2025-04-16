@@ -1,5 +1,6 @@
 #![no_std]
 
+use core::ops::Deref;
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
 
 use constants::{DeployTokenManagerParams, TokenManagerType};
@@ -73,22 +74,8 @@ pub trait TokenManagerLockUnlockContract:
         }
     }
 
-    // Upgrade endpoint needed because this is called when ITS deploys this contract from source
     #[upgrade]
-    fn upgrade(
-        &self,
-        interchain_token_service: ManagedAddress,
-        implementation_type: TokenManagerType,
-        interchain_token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
-        params: DeployTokenManagerParams<Self::Api>,
-    ) {
-        self.init(
-            interchain_token_service,
-            implementation_type,
-            interchain_token_id,
-            params,
-        )
-    }
+    fn upgrade(&self) {}
 
     #[endpoint(addFlowLimiter)]
     fn add_flow_limiter(&self, flow_limiter: ManagedAddress) {
@@ -168,7 +155,22 @@ pub trait TokenManagerLockUnlockContract:
         amount
     }
 
-    /// Mint/burn type only functions
+    /// Lock/unlock type only functions
+
+    #[payable("*")]
+    #[endpoint(donateTokens)]
+    fn donate_tokens(&self) {
+        require!(
+            self.implementation_type().get() == TokenManagerType::LockUnlock,
+            "Not lock/unlock token manager"
+        );
+
+        let _ = self.require_correct_token();
+
+        // Nothing else to do, tokens will be left in the contract
+    }
+
+    /// NativeInterchainToken type only functions
 
     // Somewhat equivalent to Axelar InterchainToken init method
     #[payable("EGLD")]
@@ -179,6 +181,7 @@ pub trait TokenManagerLockUnlockContract:
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
+        initial_caller: OptionalValue<ManagedAddress>,
     ) {
         require!(
             self.implementation_type().get() == TokenManagerType::NativeInterchainToken,
@@ -212,6 +215,11 @@ pub trait TokenManagerLockUnlockContract:
 
         let issue_cost = BigUint::from(DEFAULT_ESDT_ISSUE_COST);
 
+        require!(
+            self.call_value().egld_value().deref() == &issue_cost,
+            "Invalid esdt issue cost"
+        );
+
         self.send()
             .esdt_system_sc_proxy()
             .issue_and_set_all_roles(
@@ -221,7 +229,13 @@ pub trait TokenManagerLockUnlockContract:
                 EsdtTokenType::Fungible,
                 decimals as usize,
             )
-            .with_callback(self.callbacks().deploy_token_callback())
+            .with_callback(
+                self.callbacks().deploy_token_callback(
+                    initial_caller
+                        .into_option()
+                        .unwrap_or(self.blockchain().get_caller()),
+                ),
+            )
             .async_call_and_exit();
     }
 
@@ -347,8 +361,8 @@ pub trait TokenManagerLockUnlockContract:
         }
     }
 
-    #[view(invalidTokenIdentifier)]
-    fn invalid_token_identifier(&self) -> Option<EgldOrEsdtTokenIdentifier> {
+    #[view(optTokenIdentifier)]
+    fn get_opt_token_identifier(&self) -> Option<EgldOrEsdtTokenIdentifier> {
         let token_identifier_mapper = self.token_identifier();
 
         if token_identifier_mapper.is_empty() {
@@ -377,6 +391,7 @@ pub trait TokenManagerLockUnlockContract:
     #[callback]
     fn deploy_token_callback(
         &self,
+        user: ManagedAddress,
         #[call_result] result: ManagedAsyncCallResult<TokenIdentifier>,
     ) {
         match result {
@@ -393,7 +408,7 @@ pub trait TokenManagerLockUnlockContract:
             ManagedAsyncCallResult::Err(_) => {
                 self.interchain_token_deployment_failed();
 
-                // Leave issue cost egld payment in contract for use when retrying deployInterchainToken
+                self.send().direct_egld(&user, self.call_value().egld_value().deref());
             }
         }
     }

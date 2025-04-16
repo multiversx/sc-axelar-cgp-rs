@@ -275,7 +275,7 @@ describe('Deploy interchain token', () => {
         value: 0,
         funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.U(1_000), user],
       })
-      .assertFail({ code: 10, message: 'failed transfer (insufficient funds)' });
+      .assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
     // Insufficient funds for issuing ESDT
     await user.callContract({
@@ -304,7 +304,7 @@ describe('Deploy interchain token', () => {
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
-          .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+          .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
       ],
     });
     assertAccount(await user.getAccount(), {
@@ -350,7 +350,7 @@ describe('Deploy interchain token', () => {
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
-          .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+          .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
       ],
     });
     assertAccount(await user.getAccount(), {
@@ -396,7 +396,7 @@ describe('Deploy interchain token', () => {
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
-          .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+          .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
       ],
     });
     assertAccount(await user.getAccount(), {
@@ -1092,7 +1092,7 @@ describe('Deploy remote canonical interchain token', () => {
 
     await tokenManager.setAccount({
       ...(await tokenManager.getAccount()),
-      kvs: [...baseTokenManagerKvs, e.kvs.Mapper('token_identifier').Value('')],
+      kvs: [...baseTokenManagerKvs, e.kvs.Mapper('token_identifier').Value(e.Str(''))],
     });
 
     // No token identifier

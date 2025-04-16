@@ -61,7 +61,7 @@ pub trait FactoryModule:
         // 2nd transaction - deploy token
         if token_manager.is_zero()
             || self
-                .token_manager_invalid_token_identifier(token_manager.clone())
+                .token_manager_get_opt_token_identifier(token_manager.clone())
                 .is_none()
         {
             let egld_transfer_value = if token_manager.is_zero() {
@@ -83,6 +83,7 @@ pub trait FactoryModule:
                 decimals,
                 minter_bytes.clone(),
                 egld_transfer_value,
+                sender,
             );
 
             return token_id;
@@ -402,6 +403,7 @@ pub trait FactoryModule:
                 18, // EGLD token has 18 decimals
                 destination_minter,
                 gas_value,
+                sender,
             );
 
             return expected_token_id;
@@ -575,6 +577,7 @@ pub trait FactoryModule:
                     token_decimals,
                     destination_minter,
                     gas_value,
+                    caller,
                 );
             }
             ManagedAsyncCallResult::Err(_) => {

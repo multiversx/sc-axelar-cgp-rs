@@ -6,9 +6,9 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           31
+// Endpoints:                           32
 // Async Callback:                       1
-// Total number of exported functions:  34
+// Total number of exported functions:  35
 
 #![no_std]
 
@@ -26,13 +26,14 @@ multiversx_sc_wasm_adapter::endpoints! {
         setFlowLimit => set_flow_limit
         giveToken => give_token
         takeToken => take_token
+        donateTokens => donate_tokens
         deployInterchainToken => deploy_interchain_token
         mint => mint
         burn => burn
         getImplementationTypeAndTokenIdentifier => get_implementation_type_and_token_identifier
         isFlowLimiter => is_flow_limiter
         params => params
-        invalidTokenIdentifier => invalid_token_identifier
+        optTokenIdentifier => get_opt_token_identifier
         interchainTokenService => interchain_token_service
         implementationType => implementation_type
         interchainTokenId => interchain_token_id

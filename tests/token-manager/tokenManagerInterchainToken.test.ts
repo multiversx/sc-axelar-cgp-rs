@@ -378,7 +378,7 @@ describe('Deploy interchain token', () => {
       funcName: 'deployInterchainToken',
       gasLimit: 200_000_000,
       value: BigInt('50000000000000000'),
-      funcArgs: [e.Option(user), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18)],
+      funcArgs: [e.Option(user), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), user],
     });
 
     const kvs = await tokenManager.getAccount();
@@ -393,7 +393,7 @@ describe('Deploy interchain token', () => {
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
-          .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+          .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
       ],
     });
   });
@@ -401,7 +401,6 @@ describe('Deploy interchain token', () => {
   test('Errors', async () => {
     const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, user);
 
-    // Not sent enough EGLD funds for ESDT issue
     await user
       .callContract({
         callee: tokenManager,
@@ -410,7 +409,7 @@ describe('Deploy interchain token', () => {
         value: BigInt('1'),
         funcArgs: [e.Option(user), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18)],
       })
-      .assertFail({ code: 7, message: 'failed transfer (insufficient funds)' });
+      .assertFail({ code: 4, message: 'Invalid esdt issue cost' });
 
     await deployer
       .callContract({

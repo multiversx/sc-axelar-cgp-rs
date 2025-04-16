@@ -15,13 +15,12 @@ import {
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   TOKEN_ID,
-  TOKEN_MANAGER_ADDRESS, TOKEN_MANAGER_ADDRESS_3,
+  TOKEN_MANAGER_ADDRESS,
   TOKEN_SALT,
 } from './helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { Kvs } from 'xsuite/dist/data/kvs';
-import { EncodableKvs } from 'xsuite/dist/data/encoding';
 import { assert } from 'vitest';
 
 export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
@@ -510,7 +509,7 @@ export const computeLinkedTokenId = (user: Encodable, salt = TOKEN_SALT) => {
   const deploySaltLink = computeLinkedTokenDeploySalt(user, salt);
 
   return computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySaltLink);
-}
+};
 
 export const computeLinkedTokenDeploySalt = (user: Encodable, salt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_CUSTOM_TOKEN_SALT).digest('hex');

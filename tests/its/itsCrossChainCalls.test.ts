@@ -144,7 +144,7 @@ const deployNewEsdt = async () => {
     callee: fsIts,
     funcName: 'deployInterchainToken',
     gasLimit: 200_000_000,
-    value: 10n ** 17n,
+    value: 50000000000000000n,
     funcArgs: [
       e.TopBuffer(TOKEN_SALT),
       e.Str('Token Name'),
@@ -421,7 +421,7 @@ test(
       callee: fsIts,
       funcName: 'deployInterchainToken',
       gasLimit: 200_000_000,
-      value: 10n ** 17n,
+      value: 50000000000000000n,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
         e.Str('Token Name'),
@@ -561,7 +561,7 @@ test(
       callee: fsIts,
       funcName: 'execute',
       gasLimit: 600_000_000,
-      value: 10n ** 17n,
+      value: 50000000000000000n,
       funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
     });
 

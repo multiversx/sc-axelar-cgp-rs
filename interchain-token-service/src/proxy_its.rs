@@ -84,20 +84,21 @@ pub trait ProxyItsModule:
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
+        initial_caller: ManagedAddress,
     ) {
         self.token_manager_proxy(self.deployed_token_manager(token_id))
-            .deploy_interchain_token(minter, name, symbol, decimals)
+            .deploy_interchain_token(minter, name, symbol, decimals, OptionalValue::Some(initial_caller))
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_invalid_token_identifier(
+    fn token_manager_get_opt_token_identifier(
         &self,
         sc_address: ManagedAddress,
     ) -> Option<EgldOrEsdtTokenIdentifier> {
         self.token_manager_proxy(sc_address)
-            .invalid_token_identifier()
+            .get_opt_token_identifier()
             .execute_on_dest_context()
     }
 

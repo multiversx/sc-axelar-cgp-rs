@@ -3,6 +3,7 @@ import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import createKeccakHash from 'keccak';
 import { ADDRESS_ZERO, INTERCHAIN_TOKEN_ID, TOKEN_ID, TOKEN_ID2 } from '../helpers';
 import {
+  deployTokenManagerInterchainToken,
   deployTokenManagerLockUnlock,
   TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
@@ -1031,5 +1032,45 @@ describe('Operatorship', () => {
         funcArgs: [user],
       })
       .assertFail({ code: 4, message: 'Missing all roles' });
+  });
+});
+
+test('Donate tokens', async () => {
+  await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_ID);
+
+  await user
+    .callContract({
+      callee: tokenManager,
+      funcName: 'donateTokens',
+      gasLimit: 20_000_000,
+      funcArgs: [],
+      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+    })
+    .assertFail({ code: 4, message: 'Not lock/unlock token manager' });
+
+  const baseKvs = await deployTokenManagerLockUnlock(deployer);
+
+  await user
+    .callContract({
+      callee: tokenManager,
+      funcName: 'donateTokens',
+      gasLimit: 20_000_000,
+      funcArgs: [],
+      esdts: [{ id: TOKEN_ID2, amount: 1_000 }],
+    })
+    .assertFail({ code: 4, message: 'Wrong token sent' });
+
+  await user.callContract({
+    callee: tokenManager,
+    funcName: 'donateTokens',
+    gasLimit: 20_000_000,
+    funcArgs: [],
+    esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+  });
+
+  // Token Manager received tokens
+  assertAccount(await tokenManager.getAccount(), {
+    balance: 0n,
+    kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
   });
 });

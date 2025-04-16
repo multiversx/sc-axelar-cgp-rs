@@ -137,6 +137,7 @@ pub trait UserFunctionsModule:
         decimals: u8,
         minter: ManagedBuffer,
         egld_value: BigUint,
+        initial_caller: ManagedAddress,
     ) -> TokenId<Self::Api> {
         self.require_not_paused();
 
@@ -173,7 +174,14 @@ pub trait UserFunctionsModule:
                 )
             };
 
-            self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);
+            self.token_manager_deploy_interchain_token(
+                &token_id,
+                minter,
+                name,
+                symbol,
+                decimals,
+                initial_caller,
+            );
         } else {
             let gas_value = egld_value;
 
