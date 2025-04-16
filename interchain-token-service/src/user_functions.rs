@@ -6,10 +6,7 @@ use token_manager::constants::TokenManagerType;
 
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::LinkTokenPayload;
-use crate::constants::{
-    Hash, MetadataVersion, TokenId, TransferAndGasTokens, ESDT_EGLD_IDENTIFIER,
-    MESSAGE_TYPE_LINK_TOKEN, PREFIX_INTERCHAIN_TOKEN_ID,
-};
+use crate::constants::{Hash, MetadataVersion, TokenId, TransferAndGasTokens, EGLD_DECIMALS, ESDT_EGLD_IDENTIFIER, MESSAGE_TYPE_LINK_TOKEN, PREFIX_INTERCHAIN_TOKEN_ID};
 use crate::{address_tracker, events, executable, proxy_gmp, proxy_its, remote};
 
 #[multiversx_sc::module]
@@ -24,15 +21,21 @@ pub trait UserFunctionsModule:
 {
     #[payable("EGLD")]
     #[endpoint(registerTokenMetadata)]
-    fn register_token_metadata(&self, token_identifier: TokenIdentifier) {
+    fn register_token_metadata(&self, token_identifier: EgldOrEsdtTokenIdentifier) {
         require!(
-            token_identifier.is_valid_esdt_identifier(),
+            token_identifier.is_valid(),
             "Invalid token identifier"
         );
 
         let gas_value = self.call_value().egld_value().clone_value();
 
-        self.register_token_metadata_async_call(token_identifier, gas_value);
+        if token_identifier.is_egld() {
+            self.register_token_metadata_raw(token_identifier, EGLD_DECIMALS, gas_value);
+
+            return;
+        }
+
+        self.register_token_metadata_async_call(token_identifier.unwrap_esdt(), gas_value);
     }
 
     fn register_custom_token_raw(

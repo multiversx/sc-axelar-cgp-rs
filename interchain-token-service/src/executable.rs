@@ -148,17 +148,17 @@ pub trait ExecutableModule:
         );
 
         // Support only ESDT tokens for custom linking of tokens
-        let token_identifier = TokenIdentifier::from(link_token_payload.destination_token_address);
+        let token_identifier = EgldOrEsdtTokenIdentifier::parse(link_token_payload.destination_token_address);
 
         require!(
-            token_identifier.is_valid_esdt_identifier(),
+            token_identifier.is_valid(),
             "Invalid token identifier"
         );
 
         self.deploy_token_manager_raw(
             &link_token_payload.token_id,
             link_token_payload.token_manager_type,
-            Some(EgldOrEsdtTokenIdentifier::esdt(token_identifier)),
+            Some(token_identifier),
             link_token_payload.link_params,
         );
     }

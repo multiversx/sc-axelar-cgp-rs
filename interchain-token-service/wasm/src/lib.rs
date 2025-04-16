@@ -43,7 +43,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         flowInAmount => flow_in_amount
         deployedTokenManager => deployed_token_manager
         registeredTokenIdentifier => registered_token_identifier
-        invalidTokenManagerAddress => invalid_token_manager_address
+        invalidTokenManagerAddress => get_opt_token_manager_address
         tokenManagerAddress => token_manager_address
         transferWithDataLock => transfer_with_data_lock
         tokenManagerImplementation => token_manager

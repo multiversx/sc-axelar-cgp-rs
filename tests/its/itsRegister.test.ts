@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import { TOKEN_ID, TOKEN_ID2 } from '../helpers';
-import { baseItsKvs, deployContracts, its } from '../itsHelpers';
+import { baseItsKvs, deployContracts, gasService, its, ITS_HUB_CHAIN_ADDRESS, ITS_HUB_CHAIN_NAME } from '../itsHelpers';
 
 let world: LSWorld;
 let deployer: LSWallet;
@@ -82,6 +82,35 @@ describe('Register token metadata', () => {
             )
           ),
       ],
+    });
+  });
+
+  test('Register token metadata egld', async () => {
+    // Trust ITS Hub chain
+    await deployer.callContract({
+      callee: its,
+      funcName: 'setTrustedAddress',
+      gasLimit: 10_000_000,
+      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(ITS_HUB_CHAIN_ADDRESS)],
+    });
+
+    await user.callContract({
+      callee: its,
+      funcName: 'registerTokenMetadata',
+      gasLimit: 100_000_000,
+      funcArgs: [e.Str('EGLD')],
+      value: 100,
+    });
+
+    let kvs = await its.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      hasKvs: [...baseItsKvs(deployer)],
+    });
+
+    // Cross chain call was done
+    assertAccount(await gasService.getAccount(), {
+      balance: 100n,
     });
   });
 

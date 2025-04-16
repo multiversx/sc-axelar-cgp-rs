@@ -85,18 +85,14 @@ pub trait ManagedBufferAscii<M: ManagedTypeApi> {
 impl<M: ManagedTypeApi> ManagedBufferAscii<M> for ManagedBuffer<M> {
     fn ascii_to_u8(&self) -> u8 {
         let mut result: u8 = 0;
+        let mut byte_array = [0u8; 2];
 
-        self.for_each_batch::<32, _>(|batch| {
-            for &byte in batch {
-                if byte == 0 {
-                    break;
-                }
-
-                result *= 10;
-                result += (byte as char).to_digit(16).unwrap() as u8;
-            }
-        });
-
+        let _ = self.load_slice(0, &mut byte_array);
+        for byte in byte_array {
+            result *= 10;
+            result += (byte as char).to_digit(16).unwrap() as u8;
+        }
+        
         result
     }
 }
@@ -120,3 +116,5 @@ pub enum InterchainTokenStatus {
     NeedsMint,
     AlreadyMinted,
 }
+
+pub const EGLD_DECIMALS: u8 = 18;

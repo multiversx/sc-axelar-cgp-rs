@@ -21,7 +21,7 @@ import {
   itsRegisterCustomTokenLockUnlock,
   MESSAGE_TYPE_LINK_TOKEN,
   mockGatewayMessageApproved,
-  TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
+  TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN, TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
   TOKEN_MANAGER_TYPE_MINT_BURN,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
@@ -169,6 +169,42 @@ test('Execute with operator', async () => {
       e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
       e.kvs.Mapper('interchain_token_service').Value(its),
       e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
+      e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
+    ],
+  });
+
+  // Gateway message was marked as executed
+  assertAccount(await gateway.getAccount(), {
+    kvs: [...baseGatewayKvs(deployer), e.kvs.Mapper('messages', crossChainId).Value(e.Str('1'))],
+  });
+});
+
+test('Execute egld', async () => {
+  const { payload, crossChainId } = await mockGatewayCall(INTERCHAIN_TOKEN_ID, TOKEN_MANAGER_TYPE_LOCK_UNLOCK, Buffer.from(''), 'EGLD');
+
+  await user.callContract({
+    callee: its,
+    funcName: 'execute',
+    gasLimit: 50_000_000,
+    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+  });
+
+  const kvs = await its.getAccount();
+  assertAccount(kvs, {
+    balance: 0n,
+    kvs: [...baseItsKvs(deployer, INTERCHAIN_TOKEN_ID)],
+  });
+
+  const tokenManager = world.newContract(TOKEN_MANAGER_ADDRESS);
+  const tokenManagerKvs = await tokenManager.getAccount();
+  assertAccount(tokenManagerKvs, {
+    balance: 0,
+    kvs: [
+      e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
+      e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
+      e.kvs.Mapper('token_identifier').Value(e.Str('EGLD')),
+      e.kvs.Mapper('interchain_token_service').Value(its),
+      e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit and operator roles
       e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
     ],
   });

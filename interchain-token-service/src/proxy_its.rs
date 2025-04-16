@@ -59,7 +59,11 @@ pub trait ProxyItsModule:
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_set_flow_limit(&self, token_id: &TokenId<Self::Api>, flow_limit: Option<BigUint>) {
+    fn token_manager_set_flow_limit(
+        &self,
+        token_id: &TokenId<Self::Api>,
+        flow_limit: Option<BigUint>,
+    ) {
         self.token_manager_proxy(self.deployed_token_manager(token_id))
             .set_flow_limit(flow_limit)
             .execute_on_dest_context::<()>();
@@ -87,7 +91,13 @@ pub trait ProxyItsModule:
         initial_caller: ManagedAddress,
     ) {
         self.token_manager_proxy(self.deployed_token_manager(token_id))
-            .deploy_interchain_token(minter, name, symbol, decimals, OptionalValue::Some(initial_caller))
+            .deploy_interchain_token(
+                minter,
+                name,
+                symbol,
+                decimals,
+                OptionalValue::Some(initial_caller),
+            )
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
             .execute_on_dest_context::<()>();
@@ -290,14 +300,14 @@ pub trait ProxyItsModule:
     }
 
     #[view(invalidTokenManagerAddress)]
-    fn invalid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
+    fn get_opt_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> Option<ManagedAddress> {
         let token_manager_address_mapper = self.token_manager_address(token_id);
 
         if token_manager_address_mapper.is_empty() {
-            return ManagedAddress::zero();
+            return None;
         }
 
-        token_manager_address_mapper.get()
+        Some(token_manager_address_mapper.get())
     }
 
     #[view(tokenManagerAddress)]
@@ -392,7 +402,11 @@ pub trait ProxyItsModule:
                     .unwrap();
                 let token_decimals = token_decimals_buf.ascii_to_u8();
 
-                self.register_token_metadata_raw(token_identifier, token_decimals, gas_value);
+                self.register_token_metadata_raw(
+                    EgldOrEsdtTokenIdentifier::esdt(token_identifier),
+                    token_decimals,
+                    gas_value,
+                );
             }
             ManagedAsyncCallResult::Err(_) => {
                 // Send back paid gas value to initial caller
@@ -403,7 +417,7 @@ pub trait ProxyItsModule:
 
     fn register_token_metadata_raw(
         &self,
-        token_identifier: TokenIdentifier,
+        token_identifier: EgldOrEsdtTokenIdentifier,
         decimals: u8,
         gas_value: BigUint,
     ) {
@@ -411,7 +425,7 @@ pub trait ProxyItsModule:
 
         let data = RegisterTokenMetadataPayload {
             message_type: BigUint::from(MESSAGE_TYPE_REGISTER_TOKEN_METADATA),
-            token_identifier: token_identifier.into_managed_buffer(),
+            token_identifier: token_identifier.into_name(),
             decimals,
         };
 
