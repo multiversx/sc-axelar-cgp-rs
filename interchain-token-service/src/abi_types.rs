@@ -152,6 +152,42 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for SendToHubPayload<M> {
     }
 }
 
+pub struct ReceiveFromHubPayload<M: ManagedTypeApi> {
+    pub message_type: BigUint<M>,
+    pub original_source_chain: ManagedBuffer<M>,
+    pub payload: ManagedBuffer<M>,
+}
+
+impl<M: ManagedTypeApi> AbiEncodeDecode<M> for ReceiveFromHubPayload<M> {
+    fn abi_encode(self) -> ManagedBuffer<M> {
+        Self::raw_abi_encode(&[
+            Token::Uint256(self.message_type),
+            Token::String(self.original_source_chain),
+            Token::Bytes(self.payload),
+        ])
+    }
+
+    fn abi_decode(payload: ManagedBuffer<M>) -> Self {
+        let mut result = ArrayVec::<Token<M>, 3>::new();
+
+        Self::raw_abi_decode(
+            &[ParamType::Uint256, ParamType::String, ParamType::Bytes],
+            &payload,
+            &mut result,
+        );
+
+        let payload = result.pop().unwrap().into_managed_buffer();
+        let original_source_chain = result.pop().unwrap().into_managed_buffer();
+        let message_type = result.pop().unwrap().into_biguint();
+
+        ReceiveFromHubPayload {
+            message_type,
+            original_source_chain,
+            payload,
+        }
+    }
+}
+
 pub struct RegisterTokenMetadataPayload<M: ManagedTypeApi> {
     pub message_type: BigUint<M>,
     pub token_identifier: ManagedBuffer<M>,

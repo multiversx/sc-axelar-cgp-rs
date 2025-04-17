@@ -7,7 +7,8 @@ use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
 use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::abi_types::{
-    DeployInterchainTokenPayload, InterchainTransferPayload, LinkTokenPayload, SendToHubPayload,
+    DeployInterchainTokenPayload, InterchainTransferPayload, LinkTokenPayload,
+    ReceiveFromHubPayload,
 };
 use crate::constants::{Hash, TokenId, MESSAGE_TYPE_RECEIVE_FROM_HUB};
 use crate::{address_tracker, events, proxy_gmp, proxy_its};
@@ -31,18 +32,18 @@ pub trait ExecutableModule:
             "Invalid message type"
         );
 
-        let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
+        let data = ReceiveFromHubPayload::<Self::Api>::abi_decode(payload);
 
         // Check whether the original source chain is expected to be routed via the ITS Hub
         require!(
-            self.is_trusted_chain(&data.destination_chain),
+            self.is_trusted_chain(&data.original_source_chain),
             "Untrusted chain"
         );
 
         let message_type = self.get_message_type(&data.payload);
 
         // Return original message type, source chain and payload
-        (message_type, data.destination_chain, data.payload)
+        (message_type, data.original_source_chain, data.payload)
     }
 
     fn process_interchain_transfer_payload(

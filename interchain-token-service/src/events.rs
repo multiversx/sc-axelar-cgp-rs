@@ -31,15 +31,6 @@ pub struct LinkTokenStartedEventData<'a, M: ManagedTypeApi> {
 }
 
 #[derive(TypeAbi, TopEncode)]
-pub struct StandardizedTokenDeployedEventData<M: ManagedTypeApi> {
-    name: ManagedBuffer<M>,
-    symbol: ManagedBuffer<M>,
-    decimals: u8,
-    mint_amount: BigUint<M>,
-    mint_to: ManagedAddress<M>,
-}
-
-#[derive(TypeAbi, TopEncode)]
 pub struct InterchainTransferEventData<M: ManagedTypeApi> {
     destination_chain: ManagedBuffer<M>,
     destination_address: ManagedBuffer<M>,
@@ -105,27 +96,6 @@ pub trait EventsModule {
         self.link_token_started_event(token_id, data);
     }
 
-    fn emit_standardized_token_deployed_event(
-        &self,
-        token_id: &TokenId<Self::Api>,
-        minter: ManagedAddress,
-        name: ManagedBuffer,
-        symbol: ManagedBuffer,
-        decimals: u8,
-        mint_amount: BigUint,
-        mint_to: ManagedAddress,
-    ) {
-        let data = StandardizedTokenDeployedEventData {
-            name,
-            symbol,
-            decimals,
-            mint_amount,
-            mint_to,
-        };
-
-        self.standardized_token_deployed_event(token_id, minter, data);
-    }
-
     fn emit_interchain_transfer_event(
         &self,
         token_id: TokenId<Self::Api>,
@@ -177,14 +147,6 @@ pub trait EventsModule {
         &self,
         #[indexed] token_id: &TokenId<Self::Api>,
         data: LinkTokenStartedEventData<Self::Api>,
-    );
-
-    #[event("standardized_token_deployed_event")]
-    fn standardized_token_deployed_event(
-        &self,
-        #[indexed] token_id: &TokenId<Self::Api>,
-        #[indexed] minter: ManagedAddress,
-        data: StandardizedTokenDeployedEventData<Self::Api>,
     );
 
     #[event("interchain_transfer_event")]

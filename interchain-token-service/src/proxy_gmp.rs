@@ -69,16 +69,6 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
             .execute_on_dest_context::<bool>()
     }
 
-    fn gateway_is_message_executed(
-        &self,
-        source_chain: &ManagedBuffer,
-        message_id: &ManagedBuffer,
-    ) -> bool {
-        self.gateway_proxy(self.gateway().get())
-            .is_message_executed(source_chain, message_id)
-            .execute_on_dest_context::<bool>()
-    }
-
     fn route_message_through_its_hub(
         &self,
         destination_chain: ManagedBuffer,
