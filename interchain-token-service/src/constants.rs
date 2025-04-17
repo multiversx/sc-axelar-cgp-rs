@@ -69,7 +69,6 @@ impl<M: ManagedTypeApi> TopDecode for Metadata<M> {
 pub struct TransferAndGasTokens<M: ManagedTypeApi> {
     pub transfer_token: EgldOrEsdtTokenIdentifier<M>,
     pub transfer_amount: BigUint<M>,
-    pub gas_token: EgldOrEsdtTokenIdentifier<M>,
     pub gas_amount: BigUint<M>,
 }
 

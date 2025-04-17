@@ -434,11 +434,6 @@ pub trait ProxyItsModule:
 
         let payload = data.abi_encode();
 
-        self.call_contract_its_hub(
-            payload,
-            MetadataVersion::ContractCall,
-            EgldOrEsdtTokenIdentifier::egld(),
-            gas_value,
-        );
+        self.call_contract_its_hub(payload, MetadataVersion::ContractCall, gas_value);
     }
 }

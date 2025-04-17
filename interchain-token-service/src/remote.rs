@@ -27,7 +27,6 @@ pub trait RemoteModule:
         decimals: u8,
         minter: ManagedBuffer,
         destination_chain: ManagedBuffer,
-        gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
         require!(!name.is_empty(), "Empty token name");
@@ -50,7 +49,6 @@ pub trait RemoteModule:
             destination_chain.clone(),
             payload,
             MetadataVersion::ContractCall,
-            gas_token,
             gas_value,
         );
 
@@ -98,7 +96,6 @@ pub trait RemoteModule:
             destination_chain.clone(),
             payload,
             metadata_version,
-            transfer_and_gas_tokens.gas_token,
             transfer_and_gas_tokens.gas_amount,
         );
 
