@@ -7,7 +7,7 @@ use token_manager::constants::TokenManagerType;
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::LinkTokenPayload;
 use crate::constants::{
-    Hash, MetadataVersion, TokenId, TransferAndGasTokens, EGLD_DECIMALS, ESDT_EGLD_IDENTIFIER,
+    Hash, TokenId, TransferAndGasTokens, EGLD_DECIMALS, ESDT_EGLD_IDENTIFIER,
     MESSAGE_TYPE_LINK_TOKEN, PREFIX_INTERCHAIN_TOKEN_ID,
 };
 use crate::{address_tracker, events, executable, proxy_gmp, proxy_its, remote};
@@ -123,7 +123,6 @@ pub trait UserFunctionsModule:
         self.route_message_through_its_hub(
             destination_chain,
             payload,
-            MetadataVersion::ContractCall,
             gas_value,
         );
 
@@ -211,46 +210,11 @@ pub trait UserFunctionsModule:
         token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
-        metadata: ManagedBuffer,
-        gas_value: BigUint,
-    ) {
-        self.require_not_paused();
-
-        let transfer_and_gas_tokens = self.get_transfer_and_gas_tokens(gas_value);
-
-        self.token_manager_take_token(
-            &token_id,
-            transfer_and_gas_tokens.transfer_token.clone(),
-            transfer_and_gas_tokens.transfer_amount.clone(),
-        );
-
-        let (metadata_version, data) = self.decode_metadata(metadata);
-
-        self.transmit_interchain_transfer_raw(
-            token_id,
-            self.blockchain().get_caller(),
-            destination_chain,
-            destination_address,
-            transfer_and_gas_tokens,
-            metadata_version,
-            data,
-        );
-    }
-
-    #[payable("*")]
-    #[endpoint(callContractWithInterchainToken)]
-    fn call_contract_with_interchain_token(
-        &self,
-        token_id: TokenId<Self::Api>,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
         data: ManagedBuffer,
         gas_value: BigUint,
     ) {
         self.require_not_paused();
 
-        require!(!data.is_empty(), "Empty data");
-
         let transfer_and_gas_tokens = self.get_transfer_and_gas_tokens(gas_value);
 
         self.token_manager_take_token(
@@ -265,7 +229,6 @@ pub trait UserFunctionsModule:
             destination_chain,
             destination_address,
             transfer_and_gas_tokens,
-            MetadataVersion::ContractCall,
             data,
         );
     }

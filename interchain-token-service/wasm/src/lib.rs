@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           48
+// Endpoints:                           47
 // Async Callback:                       1
 // Promise callbacks:                    1
-// Total number of exported functions:  52
+// Total number of exported functions:  51
 
 #![no_std]
 
@@ -25,7 +25,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         execute => execute
         registerTokenMetadata => register_token_metadata
         interchainTransfer => interchain_transfer
-        callContractWithInterchainToken => call_contract_with_interchain_token
         transferOperatorship => transfer_operatorship
         proposeOperatorship => propose_operatorship
         acceptOperatorship => accept_operatorship

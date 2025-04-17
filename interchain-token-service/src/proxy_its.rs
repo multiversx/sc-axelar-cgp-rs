@@ -7,7 +7,7 @@ use token_manager::ProxyTrait as _;
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::RegisterTokenMetadataPayload;
 use crate::constants::{
-    Hash, ManagedBufferAscii, MetadataVersion, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS,
+    Hash, ManagedBufferAscii, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS,
     KEEP_EXTRA_GAS, MESSAGE_TYPE_REGISTER_TOKEN_METADATA,
 };
 use crate::{address_tracker, events, proxy_gmp};
@@ -434,6 +434,6 @@ pub trait ProxyItsModule:
 
         let payload = data.abi_encode();
 
-        self.call_contract_its_hub(payload, MetadataVersion::ContractCall, gas_value);
+        self.call_contract_its_hub(payload, gas_value);
     }
 }

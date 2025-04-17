@@ -240,7 +240,7 @@ test(
         e.TopBuffer(computedTokenId),
         e.Str(OTHER_CHAIN_NAME),
         e.Str('otherChainUser'),
-        e.Buffer(''), // No metadata, uses default
+        e.Buffer(''), // No data
         e.U(10n ** 16n),
       ],
       esdts: [

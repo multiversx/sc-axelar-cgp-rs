@@ -1,7 +1,7 @@
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::SendToHubPayload;
 use crate::address_tracker;
-use crate::constants::{Hash, MetadataVersion, ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB};
+use crate::constants::{Hash, ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB};
 use gas_service::ProxyTrait as _;
 use gateway::ProxyTrait as _;
 
@@ -83,7 +83,6 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         &self,
         destination_chain: ManagedBuffer,
         payload: ManagedBuffer,
-        metadata_version: MetadataVersion,
         gas_value: BigUint,
     ) {
         // Prevent sending directly to the ITS Hub chain. This is not supported yet, so fail early to prevent the user from having their funds stuck.
@@ -99,27 +98,20 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         // Send wrapped message to ITS Hub chain and to ITS Hub true address
         let payload = data.abi_encode();
 
-        self.call_contract_its_hub(payload, metadata_version, gas_value);
+        self.call_contract_its_hub(payload, gas_value);
     }
 
-    fn call_contract_its_hub(
-        &self,
-        payload: ManagedBuffer,
-        metadata_version: MetadataVersion,
-        gas_value: BigUint,
-    ) {
+    fn call_contract_its_hub(&self, payload: ManagedBuffer, gas_value: BigUint) {
         let its_hub_chain_name = ManagedBuffer::from(ITS_HUB_CHAIN_NAME);
         let its_hub_address = self.its_hub_address().get();
 
         if gas_value > 0 {
-            match metadata_version {
-                MetadataVersion::ContractCall => self.gas_service_pay_native_gas_for_contract_call(
-                    &its_hub_chain_name,
-                    &its_hub_address,
-                    &payload,
-                    gas_value,
-                ),
-            }
+            self.gas_service_pay_native_gas_for_contract_call(
+                &its_hub_chain_name,
+                &its_hub_address,
+                &payload,
+                gas_value,
+            );
         }
 
         self.gateway_call_contract(&its_hub_chain_name, &its_hub_address, &payload);

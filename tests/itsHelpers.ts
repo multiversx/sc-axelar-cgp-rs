@@ -39,8 +39,6 @@ export const MESSAGE_TYPE_REGISTER_TOKEN_METADATA = 6;
 export const ITS_HUB_CHAIN = 'axelar';
 export const ITS_HUB_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
 
-export const LATEST_METADATA_VERSION = 0;
-
 export const TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN = 0;
 export const TOKEN_MANAGER_TYPE_LOCK_UNLOCK = 2;
 export const TOKEN_MANAGER_TYPE_MINT_BURN = 4;

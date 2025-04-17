@@ -1,5 +1,4 @@
 use multiversx_sc::api::KECCAK256_RESULT_LEN;
-use multiversx_sc::codec::{NestedDecodeInput, TopDecodeInput};
 
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
@@ -22,49 +21,10 @@ pub const ITS_HUB_CHAIN_NAME: &[u8] = b"axelar";
 pub const EXECUTE_WITH_TOKEN_CALLBACK_GAS: u64 = 20_000_000; // This is overkill, but the callback should be prevented from failing at all costs
 pub const KEEP_EXTRA_GAS: u64 = 15_000_000; // Extra gas to keep in contract before registering async promise. This needs to be a somewhat larger value
 
-pub enum MetadataVersion {
-    ContractCall,
-}
-
-impl From<u32> for MetadataVersion {
-    fn from(value: u32) -> Self {
-        match value {
-            0 => MetadataVersion::ContractCall,
-            _ => panic!("Unsupported metadata version"),
-        }
-    }
-}
-
-pub const LATEST_METADATA_VERSION: u32 = 0;
-
 pub type Hash<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 
 pub const ESDT_EGLD_IDENTIFIER: &str = "EGLD-000000";
-
-#[derive(TypeAbi)]
-pub struct Metadata<M: ManagedTypeApi> {
-    pub version: u32,
-    pub data: ManagedBuffer<M>,
-}
-
-impl<M: ManagedTypeApi> TopDecode for Metadata<M> {
-    fn top_decode<I>(input: I) -> Result<Self, DecodeError>
-    where
-        I: TopDecodeInput,
-    {
-        let mut buffer = input.into_nested_buffer();
-
-        let version = u32::dep_decode(&mut buffer)?;
-        let data = if !buffer.is_depleted() {
-            ManagedBuffer::dep_decode(&mut buffer)?
-        } else {
-            ManagedBuffer::new()
-        };
-
-        Ok(Metadata { version, data })
-    }
-}
 
 pub struct TransferAndGasTokens<M: ManagedTypeApi> {
     pub transfer_token: EgldOrEsdtTokenIdentifier<M>,

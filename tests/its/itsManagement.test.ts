@@ -411,21 +411,6 @@ describe('Pause unpause', () => {
     await user
       .callContract({
         callee: its,
-        funcName: 'callContractWithInterchainToken',
-        gasLimit: 20_000_000,
-        funcArgs: [
-          e.TopBuffer(INTERCHAIN_TOKEN_ID),
-          e.Str(OTHER_CHAIN_NAME),
-          e.Str(OTHER_CHAIN_ADDRESS),
-          e.Buffer(''),
-          e.U(0),
-        ],
-      })
-      .assertFail({ code: 4, message: 'Contract is paused' });
-
-    await user
-      .callContract({
-        callee: its,
         funcName: 'execute',
         gasLimit: 50_000_000,
         funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), e.Buffer('')],

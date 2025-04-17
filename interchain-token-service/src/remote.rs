@@ -3,9 +3,8 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::{DeployInterchainTokenPayload, InterchainTransferPayload};
 use crate::constants::{
-    Metadata, MetadataVersion, TokenId, TransferAndGasTokens, ITS_HUB_CHAIN_NAME,
-    LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-    MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    TokenId, TransferAndGasTokens, ITS_HUB_CHAIN_NAME,
+    MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
 use crate::{address_tracker, events, proxy_gmp, proxy_its};
 
@@ -45,12 +44,7 @@ pub trait RemoteModule:
 
         let payload = data.abi_encode();
 
-        self.route_message_through_its_hub(
-            destination_chain.clone(),
-            payload,
-            MetadataVersion::ContractCall,
-            gas_value,
-        );
+        self.route_message_through_its_hub(destination_chain.clone(), payload, gas_value);
 
         self.emit_interchain_token_deployment_started_event(
             token_id,
@@ -69,7 +63,6 @@ pub trait RemoteModule:
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
         transfer_and_gas_tokens: TransferAndGasTokens<Self::Api>,
-        metadata_version: MetadataVersion,
         data: ManagedBuffer,
     ) {
         require!(!destination_address.is_empty(), "Empty destination address");
@@ -95,7 +88,6 @@ pub trait RemoteModule:
         self.route_message_through_its_hub(
             destination_chain.clone(),
             payload,
-            metadata_version,
             transfer_and_gas_tokens.gas_amount,
         );
 
@@ -107,24 +99,6 @@ pub trait RemoteModule:
             transfer_and_gas_tokens.transfer_amount,
             data_hash,
         );
-    }
-
-    #[allow(clippy::absurd_extreme_comparisons)]
-    fn decode_metadata(&self, raw_metadata: ManagedBuffer) -> (MetadataVersion, ManagedBuffer) {
-        let decoded_metadata = Metadata::<Self::Api>::top_decode(raw_metadata);
-
-        if decoded_metadata.is_err() {
-            return (MetadataVersion::ContractCall, ManagedBuffer::new());
-        }
-
-        let metadata: Metadata<Self::Api> = decoded_metadata.unwrap();
-
-        require!(
-            metadata.version <= LATEST_METADATA_VERSION,
-            "Invalid metadata version"
-        );
-
-        (MetadataVersion::from(metadata.version), metadata.data)
     }
 
     fn only_its_hub(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
