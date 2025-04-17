@@ -1,10 +1,7 @@
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::SendToHubPayload;
 use crate::address_tracker;
-use crate::constants::{
-    Hash, MetadataVersion, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER,
-    MESSAGE_TYPE_SEND_TO_HUB,
-};
+use crate::constants::{Hash, MetadataVersion, ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB};
 use gas_service::ProxyTrait as _;
 use gateway::ProxyTrait as _;
 
@@ -117,7 +114,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
             .execute_on_dest_context::<bool>()
     }
 
-    fn route_message(
+    fn route_message_through_its_hub(
         &self,
         destination_chain: ManagedBuffer,
         payload: ManagedBuffer,
@@ -125,12 +122,20 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
-        let (destination_chain, destination_address, payload) =
-            self.get_call_params(destination_chain, payload);
+        // Prevent sending directly to the ITS Hub chain. This is not supported yet, so fail early to prevent the user from having their funds stuck.
+        require!(destination_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
+        require!(self.is_trusted_chain(&destination_chain), "Untrusted chain");
 
-        self.call_contract(
+        let data = SendToHubPayload::<Self::Api> {
+            message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
             destination_chain,
-            destination_address,
+            payload,
+        };
+
+        // Send wrapped message to ITS Hub chain and to ITS Hub true address
+        let payload = data.abi_encode();
+
+        self.call_contract_its_hub(
             payload,
             metadata_version,
             gas_token,
@@ -138,23 +143,21 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
         );
     }
 
-    fn call_contract(
+    fn call_contract_its_hub(
         &self,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
         payload: ManagedBuffer,
         metadata_version: MetadataVersion,
         gas_token: EgldOrEsdtTokenIdentifier,
         gas_value: BigUint,
     ) {
-        // Check whether no trusted address was set for the destination chain
-        require!(!destination_address.is_empty(), "Untrusted chain");
+        let its_hub_chain_name = ManagedBuffer::from(ITS_HUB_CHAIN_NAME);
+        let its_hub_address = self.its_hub_address().get();
 
         if gas_value > 0 {
             match metadata_version {
                 MetadataVersion::ContractCall => self.gas_service_pay_gas_for_contract_call(
-                    &destination_chain,
-                    &destination_address,
+                    &its_hub_chain_name,
+                    &its_hub_address,
                     &payload,
                     gas_token,
                     gas_value,
@@ -162,48 +165,7 @@ pub trait ProxyGmpModule: address_tracker::AddressTracker {
             }
         }
 
-        self.gateway_call_contract(&destination_chain, &destination_address, &payload);
-    }
-
-    fn get_call_params(
-        &self,
-        destination_chain: ManagedBuffer,
-        payload: ManagedBuffer,
-    ) -> (ManagedBuffer, ManagedBuffer, ManagedBuffer) {
-        // Prevent sending directly to the ITS Hub chain. This is not supported yet, so fail early to prevent the user from having their funds stuck.
-        require!(destination_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
-
-        // Check whether no trusted address was set for the destination chain
-        let destination_address = self.trusted_address(&destination_chain);
-        require!(!destination_address.is_empty(), "Untrusted chain");
-        let destination_address = destination_address.get();
-
-        // Check whether the ITS call should be routed via ITS hub for this destination chain
-        if destination_address == *ITS_HUB_ROUTING_IDENTIFIER {
-            // Wrap ITS message in an ITS Hub message
-            let new_destination_address_mapper =
-                self.trusted_address(&ManagedBuffer::from(ITS_HUB_CHAIN_NAME));
-            require!(
-                !new_destination_address_mapper.is_empty(),
-                "Untrusted chain"
-            );
-            let new_destination_address = new_destination_address_mapper.get();
-
-            let data = SendToHubPayload::<Self::Api> {
-                message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
-                destination_chain,
-                payload,
-            };
-
-            // Send wrapped message to ITS Hub chain and to ITS Hub true address
-            return (
-                ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
-                new_destination_address,
-                data.abi_encode(),
-            );
-        }
-
-        (destination_chain, destination_address, payload)
+        self.gateway_call_contract(&its_hub_chain_name, &its_hub_address, &payload);
     }
 
     #[view]

@@ -4,14 +4,16 @@ import {
   INTERCHAIN_TOKEN_ID,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
-  TOKEN_ID,
-  TOKEN_ID2,
-  TOKEN_ID_EGLD,
+  TOKEN_IDENTIFIER,
+  TOKEN_IDENTIFIER2,
+  TOKEN_IDENTIFIER_EGLD,
 } from '../helpers';
 import {
   deployContracts,
   gasService,
-  its, itsRegisterCanonicalToken,
+  its,
+  ITS_HUB_CHAIN,
+  itsRegisterCanonicalToken,
   itsRegisterCustomTokenLockUnlock,
   LATEST_METADATA_VERSION,
 } from '../itsHelpers';
@@ -34,11 +36,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -49,11 +51,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -82,7 +84,7 @@ describe('Interchain transfer', () => {
         e.Buffer(''), // No metadata, uses default
         e.U(0),
       ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     // Assert NO gas was paid for cross chain call
@@ -98,7 +100,7 @@ describe('Interchain transfer', () => {
       kvs: [
         ...baseTokenManagerKvs,
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
       ],
     });
 
@@ -120,7 +122,7 @@ describe('Interchain transfer', () => {
         e.Tuple(e.U32(LATEST_METADATA_VERSION), e.Str('sth')),
         e.U(0),
       ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     // Assert NO gas was paid for cross chain call
@@ -133,7 +135,7 @@ describe('Interchain transfer', () => {
     const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
@@ -152,7 +154,7 @@ describe('Interchain transfer', () => {
         e.Tuple(e.U32(LATEST_METADATA_VERSION)),
         e.U(0),
       ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     // Assert NO gas was paid for cross chain call
@@ -165,7 +167,7 @@ describe('Interchain transfer', () => {
     const tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
@@ -220,7 +222,7 @@ describe('Interchain transfer', () => {
           ),
           e.U(0),
         ],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Invalid metadata version' });
 
@@ -236,10 +238,11 @@ describe('Interchain transfer', () => {
           e.Buffer(''), // No metadata
           e.U(0),
         ],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Untrusted chain' });
 
+    // Chain is not trusted
     await user
       .callContract({
         callee: its,
@@ -255,7 +258,7 @@ describe('Interchain transfer', () => {
           ),
           e.U(0),
         ],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Untrusted chain' });
 
@@ -271,9 +274,26 @@ describe('Interchain transfer', () => {
           e.Buffer(''), // No metadata
           e.U(0),
         ],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Empty destination address' });
+
+    // Can not send directly to ITS Hub chain
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'interchainTransfer',
+        gasLimit: 20_000_000,
+        funcArgs: [
+          e.TopBuffer(computedTokenId),
+          e.Str(ITS_HUB_CHAIN),
+          e.Str(OTHER_CHAIN_ADDRESS),
+          e.Buffer(''), // No metadata, uses default
+          e.U(0),
+        ],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
   });
 
   test('Gas token errors', async () => {
@@ -312,8 +332,8 @@ describe('Interchain transfer', () => {
       balance: BigInt('10000000000000000'),
       kvs: [
         e.kvs.Esdts([
-          { id: TOKEN_ID, amount: 100_000 },
-          { id: TOKEN_ID2, amount: 10_000 },
+          { id: TOKEN_IDENTIFIER, amount: 100_000 },
+          { id: TOKEN_IDENTIFIER2, amount: 10_000 },
           { id: 'TOKEN3-987654', amount: 10_000 },
           { id: 'NFT-123456', amount: 1, nonce: 1 },
         ]),
@@ -332,8 +352,8 @@ describe('Interchain transfer', () => {
           e.U(0),
         ],
         esdts: [
-          { id: TOKEN_ID, amount: 1_000 },
-          { id: TOKEN_ID2, amount: 1_000 },
+          { id: TOKEN_IDENTIFIER, amount: 1_000 },
+          { id: TOKEN_IDENTIFIER2, amount: 1_000 },
           { id: 'TOKEN3-987654', amount: 1_000 },
         ],
       })
@@ -368,7 +388,7 @@ describe('Interchain transfer', () => {
           e.Buffer(''),
           e.U(1_000),
         ],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Invalid gas value' });
 
@@ -386,7 +406,7 @@ describe('Interchain transfer', () => {
           e.U(0),
         ],
         esdts: [
-          { id: TOKEN_ID, amount: 1_000 },
+          { id: TOKEN_IDENTIFIER, amount: 1_000 },
           { id: 'NFT-123456', amount: 1, nonce: 1 },
         ],
       })
@@ -405,8 +425,8 @@ describe('Interchain transfer', () => {
           e.U(0),
         ],
         esdts: [
-          { id: TOKEN_ID, amount: 1_000 },
-          { id: TOKEN_ID2, amount: 100 },
+          { id: TOKEN_IDENTIFIER, amount: 1_000 },
+          { id: TOKEN_IDENTIFIER2, amount: 100 },
         ],
       })
       .assertFail({ code: 4, message: 'Invalid gas value' });
@@ -462,7 +482,7 @@ describe('Interchain transfer', () => {
         e.Buffer(''),
         e.U(20),
       ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     // Assert ESDT gas was paid for cross chain call
@@ -472,14 +492,14 @@ describe('Interchain transfer', () => {
       kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 20 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 20 }]),
       ],
     });
 
     let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 980 }])],
+      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 980 }])],
     });
   });
 
@@ -498,8 +518,8 @@ describe('Interchain transfer', () => {
         e.U(100),
       ],
       esdts: [
-        { id: TOKEN_ID, amount: 1_000 },
-        { id: TOKEN_ID2, amount: 100 },
+        { id: TOKEN_IDENTIFIER, amount: 1_000 },
+        { id: TOKEN_IDENTIFIER2, amount: 100 },
       ],
     });
 
@@ -510,14 +530,14 @@ describe('Interchain transfer', () => {
       kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
-        e.kvs.Esdts([{ id: TOKEN_ID2, amount: 100 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER2, amount: 100 }]),
       ],
     });
 
     let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
@@ -536,8 +556,8 @@ describe('Interchain transfer', () => {
         e.U(100),
       ],
       esdts: [
-        { id: TOKEN_ID, amount: 1_000 },
-        { id: TOKEN_ID_EGLD, amount: 100 },
+        { id: TOKEN_IDENTIFIER, amount: 1_000 },
+        { id: TOKEN_IDENTIFIER_EGLD, amount: 100 },
       ],
     });
 
@@ -551,7 +571,7 @@ describe('Interchain transfer', () => {
     let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 });
@@ -571,7 +591,7 @@ describe('Call contract with interchain token', () => {
         e.Str('sth'),
         e.U(0),
       ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     // Assert NO gas was paid for cross chain call
@@ -587,7 +607,7 @@ describe('Call contract with interchain token', () => {
       kvs: [
         ...baseTokenManagerKvs,
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }]), // Lock/Unlock token manager holds tokens in the contract
       ],
     });
 
@@ -610,7 +630,7 @@ describe('Call contract with interchain token', () => {
           e.Buffer(''), // No data
           e.U(0),
         ],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Empty data' });
 
@@ -660,7 +680,7 @@ describe('Call contract with interchain token', () => {
           e.Str('sth'),
           e.U(0),
         ],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Untrusted chain' });
   });
@@ -701,8 +721,8 @@ describe('Call contract with interchain token', () => {
       balance: BigInt('10000000000000000'),
       kvs: [
         e.kvs.Esdts([
-          { id: TOKEN_ID, amount: 100_000 },
-          { id: TOKEN_ID2, amount: 10_000 },
+          { id: TOKEN_IDENTIFIER, amount: 100_000 },
+          { id: TOKEN_IDENTIFIER2, amount: 10_000 },
           { id: 'TOKEN3-987654', amount: 10_000 },
           { id: 'NFT-123456', amount: 1, nonce: 1 },
         ]),
@@ -721,8 +741,8 @@ describe('Call contract with interchain token', () => {
           e.U(0),
         ],
         esdts: [
-          { id: TOKEN_ID, amount: 1_000 },
-          { id: TOKEN_ID2, amount: 1_000 },
+          { id: TOKEN_IDENTIFIER, amount: 1_000 },
+          { id: TOKEN_IDENTIFIER2, amount: 1_000 },
           { id: 'TOKEN3-987654', amount: 1_000 },
         ],
       })
@@ -757,7 +777,7 @@ describe('Call contract with interchain token', () => {
           e.Str('sth'),
           e.U(1_000),
         ],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Invalid gas value' });
 
@@ -775,7 +795,7 @@ describe('Call contract with interchain token', () => {
           e.U(0),
         ],
         esdts: [
-          { id: TOKEN_ID, amount: 1_000 },
+          { id: TOKEN_IDENTIFIER, amount: 1_000 },
           { id: 'NFT-123456', amount: 1, nonce: 1 },
         ],
       })
@@ -794,8 +814,8 @@ describe('Call contract with interchain token', () => {
           e.U(0),
         ],
         esdts: [
-          { id: TOKEN_ID, amount: 1_000 },
-          { id: TOKEN_ID2, amount: 100 },
+          { id: TOKEN_IDENTIFIER, amount: 1_000 },
+          { id: TOKEN_IDENTIFIER2, amount: 100 },
         ],
       })
       .assertFail({ code: 4, message: 'Invalid gas value' });
@@ -851,7 +871,7 @@ describe('Call contract with interchain token', () => {
         e.Str('sth'),
         e.U(20),
       ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     // Assert ESDT gas was paid for cross chain call
@@ -861,14 +881,14 @@ describe('Call contract with interchain token', () => {
       kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 20 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 20 }]),
       ],
     });
 
     let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 980 }])],
+      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 980 }])],
     });
   });
 
@@ -887,8 +907,8 @@ describe('Call contract with interchain token', () => {
         e.U(100),
       ],
       esdts: [
-        { id: TOKEN_ID, amount: 1_000 },
-        { id: TOKEN_ID2, amount: 100 },
+        { id: TOKEN_IDENTIFIER, amount: 1_000 },
+        { id: TOKEN_IDENTIFIER2, amount: 100 },
       ],
     });
 
@@ -899,14 +919,14 @@ describe('Call contract with interchain token', () => {
       kvs: [
         e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString())),
 
-        e.kvs.Esdts([{ id: TOKEN_ID2, amount: 100 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER2, amount: 100 }]),
       ],
     });
 
     let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
@@ -925,8 +945,8 @@ describe('Call contract with interchain token', () => {
         e.U(100),
       ],
       esdts: [
-        { id: TOKEN_ID, amount: 1_000 },
-        { id: TOKEN_ID_EGLD, amount: 100 },
+        { id: TOKEN_IDENTIFIER, amount: 1_000 },
+        { id: TOKEN_IDENTIFIER_EGLD, amount: 100 },
       ],
     });
 
@@ -940,7 +960,7 @@ describe('Call contract with interchain token', () => {
     let tokenManagerKvs = await tokenManager.getAccount();
     assertAccount(tokenManagerKvs, {
       balance: 0n,
-      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 });

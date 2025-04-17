@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           47
+// Endpoints:                           48
 // Async Callback:                       1
 // Promise callbacks:                    1
-// Total number of exported functions:  51
+// Total number of exported functions:  52
 
 #![no_std]
 
@@ -32,10 +32,11 @@ multiversx_sc_wasm_adapter::endpoints! {
         isOperator => is_operator
         getAccountRoles => account_roles
         getProposedRoles => proposed_roles
-        setTrustedAddress => set_trusted_address
-        removeTrustedAddress => remove_trusted_address
+        setTrustedChain => set_trusted_chain
+        removeTrustedChain => remove_trusted_chain
         chainName => chain_name
-        trustedAddress => trusted_address
+        trustedChains => trusted_chains
+        itsHubAddress => its_hub_address
         gateway => gateway
         gasService => gas_service
         flowLimit => flow_limit

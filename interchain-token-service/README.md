@@ -49,9 +49,9 @@ It also includes merges the **Interchain Token Factory** contract from Solidity 
 The owner of the ITS contract can set flow limits for all token manager contracts that have the operator the ITS contract:
 - **setFlowLimits** (token_ids, flow_limits) - set flow limits for multiple token ids at a time
 
-The owner can also add or remove other ITS addresses for other chains as trusted:
-- **setTrustedAddress** (chain, address)
-- **removeTrustedAddress** (source_chain)
+The owner can also add or remove other ITS chains as trusted:
+- **setTrustedChain** (chain)
+- **removeTrustedChain** (chain)
 
 ## Execute endpoint
 

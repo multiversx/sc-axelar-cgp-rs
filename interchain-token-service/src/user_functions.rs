@@ -120,7 +120,7 @@ pub trait UserFunctionsModule:
         };
         let payload = data.abi_encode();
 
-        self.route_message(
+        self.route_message_through_its_hub(
             destination_chain,
             payload,
             MetadataVersion::ContractCall,

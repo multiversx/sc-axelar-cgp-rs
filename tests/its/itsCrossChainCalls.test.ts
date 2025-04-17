@@ -2,22 +2,22 @@ import { assert, beforeEach, test } from 'vitest';
 import { assertAccount, d, e, FSContract, FSWallet, FSWorld } from 'xsuite';
 import {
   baseGatewayKvs,
-  computeLinkedTokenId,
   computeInterchainTokenDeploySalt,
   computeInterchainTokenIdRaw,
+  computeLinkedTokenId,
   defaultWeightedSigners,
   ESDT_SYSTEM_CONTRACT,
-  ITS_HUB_CHAIN_ADDRESS,
-  ITS_HUB_CHAIN_NAME,
-  ITS_HUB_ROUTING_IDENTIFIER,
+  ITS_HUB_ADDRESS,
+  ITS_HUB_CHAIN,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   MESSAGE_TYPE_LINK_TOKEN,
   MESSAGE_TYPE_REGISTER_TOKEN_METADATA,
-  MESSAGE_TYPE_SEND_TO_HUB,
   TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
   TOKEN_MANAGER_TYPE_MINT_BURN,
+  wrapFromItsHubPayload,
+  wrapToItsHubPayload,
 } from '../itsHelpers';
 import {
   ADDRESS_ZERO,
@@ -30,7 +30,7 @@ import {
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   OTHER_CHAIN_TOKEN_ADDRESS,
-  TOKEN_ID_EGLD,
+  TOKEN_IDENTIFIER_EGLD,
   TOKEN_SALT,
 } from '../helpers';
 import { AbiCoder } from 'ethers';
@@ -107,14 +107,10 @@ const deployContracts = async () => {
 
       deployer,
       e.Str(CHAIN_NAME),
+      e.Str(ITS_HUB_ADDRESS),
 
-      e.U32(2),
+      e.U32(1),
       e.Str(OTHER_CHAIN_NAME),
-      e.Str(ITS_HUB_CHAIN_NAME), // Set trusted address for ITS hub
-
-      e.U32(2),
-      e.Str(OTHER_CHAIN_ADDRESS),
-      e.Str(ITS_HUB_CHAIN_ADDRESS),
     ],
   }));
 };
@@ -135,7 +131,7 @@ const deployNewEsdt = async () => {
     ],
   });
   const deploySalt = computeInterchainTokenDeploySalt(user);
-  const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
+  const computedTokenId = computeInterchainTokenIdRaw(deploySalt);
 
   assert(result.returnData[0] === computedTokenId);
 
@@ -176,8 +172,8 @@ const deployNewEsdt = async () => {
 async function mockFSGatewayMessageApproved(
   payload: string,
   operator: FSWallet,
-  sourceChain: string = OTHER_CHAIN_NAME,
-  sourceAddress: string = OTHER_CHAIN_ADDRESS
+  sourceChain: string = ITS_HUB_CHAIN,
+  sourceAddress: string = ITS_HUB_ADDRESS
 ) {
   const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
 
@@ -201,19 +197,19 @@ async function mockFSGatewayMessageApproved(
 }
 
 const mockDeployInterchainTokenGatewayCall = async () => {
-  const payload = AbiCoder.defaultAbiCoder()
-    .encode(
-      ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
-      [
-        MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-        Buffer.from(INTERCHAIN_TOKEN_ID, 'hex'),
-        'TokenName',
-        'SYMBOL',
-        18,
-        Buffer.from(user.toTopU8A()), // minter
-      ]
-    )
-    .substring(2);
+  const originalPayload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
+    [
+      MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+      Buffer.from(INTERCHAIN_TOKEN_ID, 'hex'),
+      'TokenName',
+      'SYMBOL',
+      18,
+      Buffer.from(user.toTopU8A()), // minter
+    ]
+  );
+
+  const payload = wrapFromItsHubPayload(originalPayload);
 
   const { crossChainId, messageHash } = await mockFSGatewayMessageApproved(payload, deployer);
 
@@ -249,7 +245,7 @@ test(
       ],
       esdts: [
         { id: tokenIdentifier, amount: 10n ** 17n },
-        { id: TOKEN_ID_EGLD, amount: 10n ** 16n },
+        { id: TOKEN_IDENTIFIER_EGLD, amount: 10n ** 16n },
       ],
     });
 
@@ -265,23 +261,23 @@ test(
 
     assert(topics[0].toString() == 'contract_call_event');
     assert(topics[1].toString('hex') == fsIts.toTopHex());
-    assert(topics[2].toString() == OTHER_CHAIN_NAME);
-    assert(topics[3].toString() == OTHER_CHAIN_ADDRESS);
+    assert(topics[2].toString() == ITS_HUB_CHAIN);
+    assert(topics[3].toString() == ITS_HUB_ADDRESS);
 
     // Assert call contract was made with correct ABI encoded payload
-    let expectedAbiPayload = AbiCoder.defaultAbiCoder()
-      .encode(
-        ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
-        [
-          MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-          Buffer.from(computedTokenId, 'hex'),
-          user.toTopU8A(),
-          Buffer.from('otherChainUser'),
-          10n ** 17n,
-          Buffer.from(''),
-        ]
-      )
-      .substring(2);
+    const innerAbiPayload = AbiCoder.defaultAbiCoder().encode(
+      ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
+      [
+        MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+        Buffer.from(computedTokenId, 'hex'),
+        user.toTopU8A(),
+        Buffer.from('otherChainUser'),
+        10n ** 17n,
+        Buffer.from(''),
+      ]
+    );
+
+    const expectedAbiPayload = wrapToItsHubPayload(innerAbiPayload);
 
     assert(Buffer.from(relevantEvent.data, 'base64').toString('hex') === expectedAbiPayload);
 
@@ -300,14 +296,6 @@ test(
   async () => {
     await deployContracts();
 
-    // Trust chain
-    await deployer.callContract({
-      callee: fsIts,
-      funcName: 'setTrustedAddress',
-      gasLimit: 10_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
-    });
-
     const computedTokenId = await deployNewEsdt();
 
     const { hash } = await user.callContract({
@@ -318,29 +306,22 @@ test(
       funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(OTHER_CHAIN_NAME)],
     });
 
-    let callContractLogData = await getCallContractDataFromEsdtAsync(hash);
+    const callContractLogData = await getCallContractDataFromEsdtAsync(hash);
 
     // Assert call contract was made with correct ABI encoded payload
-    let innerAbiPayload = AbiCoder.defaultAbiCoder()
-      .encode(
-        ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
-        [
-          MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-          Buffer.from(computedTokenId, 'hex'),
-          'TokenName',
-          'SYMBOL',
-          18,
-          Buffer.from(''),
-        ]
-      )
-      .substring(2);
+    const innerAbiPayload = AbiCoder.defaultAbiCoder().encode(
+      ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
+      [
+        MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+        Buffer.from(computedTokenId, 'hex'),
+        'TokenName',
+        'SYMBOL',
+        18,
+        Buffer.from(''),
+      ]
+    );
 
-    let expectedAbiPayload = AbiCoder.defaultAbiCoder()
-      .encode(
-        ['uint256', 'string', 'bytes'],
-        [MESSAGE_TYPE_SEND_TO_HUB, OTHER_CHAIN_NAME, Buffer.from(innerAbiPayload, 'hex')]
-      )
-      .substring(2);
+    const expectedAbiPayload = wrapToItsHubPayload(innerAbiPayload);
 
     assert(callContractLogData === expectedAbiPayload);
   },
@@ -354,21 +335,6 @@ test(
 
     const computedTokenId = await deployNewEsdt();
 
-    // Route original chain through ITS Hub
-    await deployer.callContract({
-      callee: fsIts,
-      funcName: 'setTrustedAddress',
-      gasLimit: 10_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(ITS_HUB_ROUTING_IDENTIFIER)],
-    });
-    // Trust ITS Hub chain
-    await deployer.callContract({
-      callee: fsIts,
-      funcName: 'setTrustedAddress',
-      gasLimit: 10_000_000,
-      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(ITS_HUB_CHAIN_ADDRESS)],
-    });
-
     const { hash } = await user.callContract({
       callee: fsIts,
       funcName: 'deployRemoteInterchainToken',
@@ -377,10 +343,10 @@ test(
       funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(OTHER_CHAIN_NAME)],
     });
 
-    let callContractLogData = await getCallContractDataFromEsdtAsync(hash);
+    const callContractLogData = await getCallContractDataFromEsdtAsync(hash);
 
     // Assert call contract was made with correct ABI encoded payload
-    let innerAbiPayload = AbiCoder.defaultAbiCoder()
+    const innerAbiPayload = AbiCoder.defaultAbiCoder()
       .encode(
         ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
         [
@@ -391,15 +357,9 @@ test(
           18,
           Buffer.from(''),
         ]
-      )
-      .substring(2);
+      );
 
-    let expectedAbiPayload = AbiCoder.defaultAbiCoder()
-      .encode(
-        ['uint256', 'string', 'bytes'],
-        [MESSAGE_TYPE_SEND_TO_HUB, OTHER_CHAIN_NAME, Buffer.from(innerAbiPayload, 'hex')]
-      )
-      .substring(2);
+    const expectedAbiPayload = wrapToItsHubPayload(innerAbiPayload);
 
     assert(callContractLogData === expectedAbiPayload);
   },
@@ -427,7 +387,7 @@ test(
     });
 
     const deploySalt = computeInterchainTokenDeploySalt(user);
-    const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
+    const computedTokenId = computeInterchainTokenIdRaw(deploySalt);
 
     assert(result.returnData[0] === computedTokenId);
 
@@ -511,7 +471,7 @@ test(
     result = await user.callContract({
       callee: fsIts,
       funcName: 'linkToken',
-      gasLimit: 20_000_000,
+      gasLimit: 30_000_000,
       value: 100_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
@@ -532,19 +492,19 @@ test(
     ).toString('hex');
 
     // Assert call contract was made with correct ABI encoded payload
-    expectedAbiPayload = AbiCoder.defaultAbiCoder()
-      .encode(
-        ['uint256', 'bytes32', 'uint256', 'bytes', 'bytes', 'bytes'],
-        [
-          MESSAGE_TYPE_LINK_TOKEN,
-          Buffer.from(result.returnData[0], 'hex'),
-          TOKEN_MANAGER_TYPE_MINT_BURN,
-          Buffer.from(tokenIdentifier),
-          Buffer.from(OTHER_CHAIN_TOKEN_ADDRESS),
-          Buffer.from(linkParams, 'hex'),
-        ]
-      )
-      .substring(2);
+    const innerAbiPayload = AbiCoder.defaultAbiCoder().encode(
+      ['uint256', 'bytes32', 'uint256', 'bytes', 'bytes', 'bytes'],
+      [
+        MESSAGE_TYPE_LINK_TOKEN,
+        Buffer.from(result.returnData[0], 'hex'),
+        TOKEN_MANAGER_TYPE_MINT_BURN,
+        Buffer.from(tokenIdentifier),
+        Buffer.from(OTHER_CHAIN_TOKEN_ADDRESS),
+        Buffer.from(linkParams, 'hex'),
+      ]
+    );
+
+    expectedAbiPayload = wrapToItsHubPayload(innerAbiPayload);
 
     assert(callContractLogData === expectedAbiPayload);
 
@@ -568,7 +528,7 @@ test(
       callee: fsIts,
       funcName: 'execute',
       gasLimit: 600_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     });
 
     // Second deploys a new token manager contract
@@ -577,7 +537,7 @@ test(
       funcName: 'execute',
       gasLimit: 600_000_000,
       value: 50000000000000000n,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     });
 
     const tx = await world.proxy.getTx(hash);
@@ -587,7 +547,7 @@ test(
     const topics = relevantEvent.topics.map((topic: any) => Buffer.from(topic, 'base64').toString());
 
     assert(topics[0] == 'message_executed_event');
-    assert(topics[1] == OTHER_CHAIN_NAME);
+    assert(topics[1] == ITS_HUB_CHAIN);
     assert(topics[2] == MESSAGE_ID);
   },
   { timeout: 60_000 }

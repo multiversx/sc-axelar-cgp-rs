@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
-import { TOKEN_ID, TOKEN_ID2 } from '../helpers';
-import { baseItsKvs, deployContracts, gasService, its, ITS_HUB_CHAIN_ADDRESS, ITS_HUB_CHAIN_NAME } from '../itsHelpers';
+import { TOKEN_IDENTIFIER, TOKEN_IDENTIFIER2 } from '../helpers';
+import { baseItsKvs, deployContracts, gasService, its } from '../itsHelpers';
 
 let world: LSWorld;
 let deployer: LSWallet;
@@ -21,11 +21,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -36,11 +36,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -60,7 +60,7 @@ describe('Register token metadata', () => {
       callee: its,
       funcName: 'registerTokenMetadata',
       gasLimit: 100_000_000,
-      funcArgs: [e.Str(TOKEN_ID)],
+      funcArgs: [e.Str(TOKEN_IDENTIFIER)],
       value: 100,
     });
 
@@ -76,7 +76,7 @@ describe('Register token metadata', () => {
             e.Tuple(
               e.Str('register_token_metadata_callback'),
               e.TopBuffer('00000003'),
-              e.Buffer(e.Str(TOKEN_ID).toTopU8A()),
+              e.Buffer(e.Str(TOKEN_IDENTIFIER).toTopU8A()),
               e.U(100),
               e.Buffer(user.toTopU8A())
             )
@@ -86,14 +86,6 @@ describe('Register token metadata', () => {
   });
 
   test('Register token metadata egld', async () => {
-    // Trust ITS Hub chain
-    await deployer.callContract({
-      callee: its,
-      funcName: 'setTrustedAddress',
-      gasLimit: 10_000_000,
-      funcArgs: [e.Str(ITS_HUB_CHAIN_NAME), e.Str(ITS_HUB_CHAIN_ADDRESS)],
-    });
-
     await user.callContract({
       callee: its,
       funcName: 'registerTokenMetadata',

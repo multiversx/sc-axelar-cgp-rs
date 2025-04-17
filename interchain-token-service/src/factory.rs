@@ -4,8 +4,8 @@ use token_manager::constants::{ManagedBufferAscii as _, TokenManagerType};
 
 use crate::constants::{
     DeployApproval, Hash, InterchainTokenStatus, ManagedBufferAscii, TokenId, EGLD_DECIMALS,
-    ITS_HUB_ROUTING_IDENTIFIER, PREFIX_CANONICAL_TOKEN_SALT, PREFIX_CUSTOM_TOKEN_SALT,
-    PREFIX_DEPLOY_APPROVAL, PREFIX_INTERCHAIN_TOKEN_SALT,
+    PREFIX_CANONICAL_TOKEN_SALT, PREFIX_CUSTOM_TOKEN_SALT, PREFIX_DEPLOY_APPROVAL,
+    PREFIX_INTERCHAIN_TOKEN_SALT,
 };
 use crate::proxy_its::{
     ESDT_PROPERTIES_DECIMALS_BUFFER_INDEX, ESDT_PROPERTIES_TOKEN_NAME_INDEX,
@@ -174,7 +174,7 @@ pub trait FactoryModule:
         self.check_token_minter(&token_id, &minter);
 
         require!(
-            !self.trusted_address(&destination_chain).is_empty(),
+            self.is_trusted_chain(&destination_chain),
             "Invalid chain name"
         );
 
@@ -469,13 +469,7 @@ pub trait FactoryModule:
             self.chain_name().get() != destination_chain,
             "Cannot deploy remotely to self",
         );
-        require!(
-            self.is_trusted_address(
-                &destination_chain,
-                &ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER)
-            ),
-            "Untrusted chain"
-        );
+        require!(self.is_trusted_chain(&destination_chain), "Untrusted chain");
 
         self.esdt_get_token_properties(
             token_identifier,

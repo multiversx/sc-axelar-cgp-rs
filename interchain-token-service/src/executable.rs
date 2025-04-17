@@ -9,9 +9,7 @@ use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::abi_types::{
     DeployInterchainTokenPayload, InterchainTransferPayload, LinkTokenPayload, SendToHubPayload,
 };
-use crate::constants::{
-    Hash, TokenId, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER, MESSAGE_TYPE_RECEIVE_FROM_HUB,
-};
+use crate::constants::{Hash, TokenId, MESSAGE_TYPE_RECEIVE_FROM_HUB};
 use crate::{address_tracker, events, proxy_gmp, proxy_its};
 
 multiversx_sc::imports!();
@@ -25,38 +23,26 @@ pub trait ExecutableModule:
     + address_tracker::AddressTracker
 {
     // Returns (message_type, original_source_chain, payload)
-    fn get_execute_params(
-        &self,
-        source_chain: ManagedBuffer,
-        payload: ManagedBuffer,
-    ) -> (u64, ManagedBuffer, ManagedBuffer) {
+    fn get_execute_params(&self, payload: ManagedBuffer) -> (u64, ManagedBuffer, ManagedBuffer) {
         let message_type = self.get_message_type(&payload);
 
-        // Unwrap ITS message if coming from ITS hub
-        if message_type == MESSAGE_TYPE_RECEIVE_FROM_HUB {
-            require!(source_chain == *ITS_HUB_CHAIN_NAME, "Untrusted chain");
+        require!(
+            message_type == MESSAGE_TYPE_RECEIVE_FROM_HUB,
+            "Invalid message type"
+        );
 
-            let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
+        let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
 
-            // Check whether the original source chain is expected to be routed via the ITS Hub
-            require!(
-                self.is_trusted_address(
-                    &data.destination_chain,
-                    &ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER)
-                ),
-                "Untrusted chain"
-            );
+        // Check whether the original source chain is expected to be routed via the ITS Hub
+        require!(
+            self.is_trusted_chain(&data.destination_chain),
+            "Untrusted chain"
+        );
 
-            let message_type = self.get_message_type(&data.payload);
+        let message_type = self.get_message_type(&data.payload);
 
-            // Return original message type, source chain and payload
-            return (message_type, data.destination_chain, data.payload);
-        }
-
-        // Prevent receiving a direct message from the ITS Hub. This is not supported yet.
-        require!(source_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
-
-        (message_type, source_chain, payload)
+        // Return original message type, source chain and payload
+        (message_type, data.destination_chain, data.payload)
     }
 
     fn process_interchain_transfer_payload(
@@ -148,12 +134,10 @@ pub trait ExecutableModule:
         );
 
         // Support only ESDT tokens for custom linking of tokens
-        let token_identifier = EgldOrEsdtTokenIdentifier::parse(link_token_payload.destination_token_address);
+        let token_identifier =
+            EgldOrEsdtTokenIdentifier::parse(link_token_payload.destination_token_address);
 
-        require!(
-            token_identifier.is_valid(),
-            "Invalid token identifier"
-        );
+        require!(token_identifier.is_valid(), "Invalid token identifier");
 
         self.deploy_token_manager_raw(
             &link_token_payload.token_id,

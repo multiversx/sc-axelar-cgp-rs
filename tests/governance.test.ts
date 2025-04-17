@@ -1,6 +1,6 @@
 import { afterEach, assert, beforeEach, describe, test } from 'vitest';
 import { assertAccount, d, e, Encodable, LSContract, LSWallet, LSWorld } from 'xsuite';
-import { ADDRESS_ZERO, getKeccak256Hash, getMessageHash, MESSAGE_ID, PAYLOAD_HASH, TOKEN_ID } from './helpers';
+import { ADDRESS_ZERO, getKeccak256Hash, getMessageHash, MESSAGE_ID, TOKEN_IDENTIFIER } from './helpers';
 import fs from 'fs';
 import { baseGatewayKvs, deployGatewayContract, gateway } from './itsHelpers';
 import { Buffer } from 'buffer';
@@ -22,9 +22,7 @@ beforeEach(async () => {
 
   deployer = await world.createWallet({
     balance: 10_000_000_000n,
-    kvs: [
-      e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
-    ],
+    kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }])],
   });
 });
 
@@ -49,13 +47,7 @@ const deployContract = async () => {
     code: 'file:governance/output/governance.wasm',
     codeMetadata: ['upgradeable'],
     gasLimit: 100_000_000,
-    codeArgs: [
-      gateway,
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(GOVERNANCE_ADDRESS),
-      e.U64(10),
-      deployer,
-    ],
+    codeArgs: [gateway, e.Str(GOVERNANCE_CHAIN), e.Str(GOVERNANCE_ADDRESS), e.U64(10), deployer],
   }));
 
   let kvs = await contract.getAccount();
@@ -66,7 +58,7 @@ const deployContract = async () => {
 
   // Change owner of gateway to governance contract so it can upgrade
   await gateway.setAccount({
-    ...await gateway.getAccount(),
+    ...(await gateway.getAccount()),
     owner: contract,
   });
 };
@@ -80,7 +72,7 @@ const mockCallApprovedByGateway = async (payload: Encodable) => {
 
   // Mock call approved by gateway
   await gateway.setAccount({
-    ...await gateway.getAccount(),
+    ...(await gateway.getAccount()),
     codeMetadata: ['payable'],
     kvs: [
       ...baseGatewayKvs(deployer),
@@ -91,11 +83,7 @@ const mockCallApprovedByGateway = async (payload: Encodable) => {
   });
 };
 
-const getProposalHash = (
-  target: Encodable,
-  callDataTopBuffer: Encodable,
-  nativeValue: Encodable,
-): Encodable => {
+const getProposalHash = (target: Encodable, callDataTopBuffer: Encodable, nativeValue: Encodable): Encodable => {
   const hashData = Buffer.concat([
     target.toTopU8A(),
     e.Buffer(callDataTopBuffer.toTopU8A()).toNestU8A(),
@@ -108,87 +96,69 @@ const getProposalHash = (
 test('Init errors', async () => {
   await deployGatewayContract(deployer);
 
-  await deployer.deployContract({
-    code: 'file:governance/output/governance.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      e.Addr(ADDRESS_ZERO),
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(GOVERNANCE_ADDRESS),
-      e.U64(10),
-      e.Addr(ADDRESS_ZERO),
-    ],
-  }).assertFail({ code: 4, message: 'Invalid address' });
+  await deployer
+    .deployContract({
+      code: 'file:governance/output/governance.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [
+        e.Addr(ADDRESS_ZERO),
+        e.Str(GOVERNANCE_CHAIN),
+        e.Str(GOVERNANCE_ADDRESS),
+        e.U64(10),
+        e.Addr(ADDRESS_ZERO),
+      ],
+    })
+    .assertFail({ code: 4, message: 'Invalid address' });
 
-  await deployer.deployContract({
-    code: 'file:governance/output/governance.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      gateway,
-      e.Str(''),
-      e.Str(GOVERNANCE_ADDRESS),
-      e.U64(10),
-      e.Addr(ADDRESS_ZERO),
-    ],
-  }).assertFail({ code: 4, message: 'Invalid address' });
+  await deployer
+    .deployContract({
+      code: 'file:governance/output/governance.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [gateway, e.Str(''), e.Str(GOVERNANCE_ADDRESS), e.U64(10), e.Addr(ADDRESS_ZERO)],
+    })
+    .assertFail({ code: 4, message: 'Invalid address' });
 
-  await deployer.deployContract({
-    code: 'file:governance/output/governance.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      gateway,
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(''),
-      e.U64(10),
-      e.Addr(ADDRESS_ZERO),
-    ],
-  }).assertFail({ code: 4, message: 'Invalid address' });
+  await deployer
+    .deployContract({
+      code: 'file:governance/output/governance.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [gateway, e.Str(GOVERNANCE_CHAIN), e.Str(''), e.U64(10), e.Addr(ADDRESS_ZERO)],
+    })
+    .assertFail({ code: 4, message: 'Invalid address' });
 
-  await deployer.deployContract({
-    code: 'file:governance/output/governance.wasm',
-    codeMetadata: ['upgradeable'],
-    gasLimit: 100_000_000,
-    codeArgs: [
-      gateway,
-      e.Str(GOVERNANCE_CHAIN),
-      e.Str(GOVERNANCE_ADDRESS),
-      e.U64(10),
-      e.Addr(ADDRESS_ZERO),
-    ],
-  }).assertFail({ code: 4, message: 'Invalid address' });
+  await deployer
+    .deployContract({
+      code: 'file:governance/output/governance.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [gateway, e.Str(GOVERNANCE_CHAIN), e.Str(GOVERNANCE_ADDRESS), e.U64(10), e.Addr(ADDRESS_ZERO)],
+    })
+    .assertFail({ code: 4, message: 'Invalid address' });
 });
 
 describe('Execute proposal', () => {
   test('Errors', async () => {
     await deployContract();
 
-    const wrongCallData = e.TopBuffer(e.Tuple(
-      e.Str('endpoint'),
-    ).toTopU8A());
+    const wrongCallData = e.TopBuffer(e.Tuple(e.Str('endpoint')).toTopU8A());
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Proposal is not submitted' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Proposal is not submitted' });
 
-    const proposalHash = getProposalHash(
-      gateway,
-      wrongCallData,
-      e.U(0),
-    );
+    const proposalHash = getProposalHash(gateway, wrongCallData, e.U(0));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -197,34 +167,30 @@ describe('Execute proposal', () => {
       ],
     });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Time lock not ready' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Time lock not ready' });
 
     // Increase timestamp so finalize_time_lock passes
     await world.setCurrentBlockInfo({ timestamp: 1 });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Could not decode call data' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Could not decode call data' });
 
     // Mock proposal being executed
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -234,16 +200,14 @@ describe('Execute proposal', () => {
       ],
     });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Proposal is being executed' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Proposal is being executed' });
   });
 
   test('Esdt transfer', async () => {
@@ -251,23 +215,27 @@ describe('Execute proposal', () => {
 
     const user = await world.createWallet();
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('MultiESDTNFTTransfer'),
-      e.List(
-        e.Buffer(user.toTopU8A()),
-        e.Buffer(e.U32(1).toTopU8A()),
-        e.Str(TOKEN_ID),
-        e.Buffer(e.U64(1).toTopU8A()),
-        e.Buffer(e.U(1_000).toTopU8A()),
-      ), // arguments to MultiESDTNFTTransfer function
-      e.U64(10_000_000), // min gas limit
-    ).toTopU8A());
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('MultiESDTNFTTransfer'),
+          e.List(
+            e.Buffer(user.toTopU8A()),
+            e.Buffer(e.U32(1).toTopU8A()),
+            e.Str(TOKEN_IDENTIFIER),
+            e.Buffer(e.U64(1).toTopU8A()),
+            e.Buffer(e.U(1_000).toTopU8A())
+          ), // arguments to MultiESDTNFTTransfer function
+          e.U64(10_000_000) // min gas limit
+        )
+        .toTopU8A()
+    );
 
     const proposalHash = getProposalHash(contract, callData, e.U(0));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -283,11 +251,7 @@ describe('Execute proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'executeProposal',
-      funcArgs: [
-        contract,
-        callData,
-        e.U(0),
-      ],
+      funcArgs: [contract, callData, e.U(0)],
     });
 
     // Time lock eta was NOT deleted
@@ -303,9 +267,7 @@ describe('Execute proposal', () => {
 
     // Assert deployer still has the tokens
     assertAccount(await deployer.getAccount(), {
-      kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
-      ],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }])],
     });
 
     // Deployer needs to send correct tokens
@@ -313,12 +275,8 @@ describe('Execute proposal', () => {
       callee: contract,
       gasLimit: 200_000_000,
       funcName: 'executeProposal',
-      funcArgs: [
-        contract,
-        callData,
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
+      funcArgs: [contract, callData, e.U(0)],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }],
     });
 
     // Time lock eta was deleted
@@ -329,9 +287,7 @@ describe('Execute proposal', () => {
 
     // Assert user received tokens
     assertAccount(await user.getAccount(), {
-      kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
-      ],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }])],
     });
   });
 
@@ -342,25 +298,25 @@ describe('Execute proposal', () => {
 
     const newOperator = await world.createWallet();
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('upgradeContract'),
-      e.List(
-        e.Buffer(gatewayCode), // code
-        e.Buffer('0100'), // upgrade metadata (upgradable)
-        e.Buffer(newOperator.toTopU8A()), // Arguments to upgrade function fo Gateway
-      ),
-      e.U64(20_000_000), // min gas limit
-    ).toTopU8A());
-
-    const proposalHash = getProposalHash(
-      gateway,
-      callData,
-      e.U(0),
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('upgradeContract'),
+          e.List(
+            e.Buffer(gatewayCode), // code
+            e.Buffer('0100'), // upgrade metadata (upgradable)
+            e.Buffer(newOperator.toTopU8A()) // Arguments to upgrade function fo Gateway
+          ),
+          e.U64(20_000_000) // min gas limit
+        )
+        .toTopU8A()
     );
+
+    const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -371,26 +327,20 @@ describe('Execute proposal', () => {
     // Increase timestamp so finalize_time_lock passes
     await world.setCurrentBlockInfo({ timestamp: 1 });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 50_000_000,
-      funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 50_000_000,
+        funcName: 'executeProposal',
+        funcArgs: [gateway, callData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Insufficient gas for execution' });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 200_000_000,
       funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
+      funcArgs: [gateway, callData, e.U(0)],
     });
 
     // Time lock eta was deleted
@@ -410,21 +360,25 @@ describe('Execute proposal', () => {
 
     const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('upgradeContract'),
-      e.List(
-        e.Buffer(gatewayCode), // code
-        e.Buffer('0100'), // upgrade metadata (upgradable)
-        e.Str('wrongArgs'),
-      ),
-      e.U64(1_000_000), // min gas limit
-    ).toTopU8A());
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('upgradeContract'),
+          e.List(
+            e.Buffer(gatewayCode), // code
+            e.Buffer('0100'), // upgrade metadata (upgradable)
+            e.Str('wrongArgs')
+          ),
+          e.U64(1_000_000) // min gas limit
+        )
+        .toTopU8A()
+    );
 
     const proposalHash = getProposalHash(gateway, callData, e.U(1_000));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -440,11 +394,7 @@ describe('Execute proposal', () => {
       gasLimit: 50_000_000,
       funcName: 'executeProposal',
       value: 1_000, // also send egld
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(1_000),
-      ],
+      funcArgs: [gateway, callData, e.U(1_000)],
     }); // async call actually fails
 
     // Time lock eta was NOT deleted and refund token was created
@@ -465,9 +415,7 @@ describe('Execute proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'withdrawRefundToken',
-      funcArgs: [
-        e.Tuple(e.Str('EGLD'), e.U64(0)),
-      ],
+      funcArgs: [e.Tuple(e.Str('EGLD'), e.U64(0))],
     });
 
     assertAccount(await deployer.getAccount(), {
@@ -480,25 +428,25 @@ describe('Execute proposal', () => {
 
     const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('upgradeContract'),
-      e.List(
-        e.Buffer(gatewayCode), // code
-        e.Buffer('0100'), // upgrade metadata (upgradable)
-        e.Str('wrongArgs'),
-      ),
-      e.U64(1_000_000), // min gas limit
-    ).toTopU8A());
-
-    const proposalHash = getProposalHash(
-      gateway,
-      callData,
-      e.U(0),
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('upgradeContract'),
+          e.List(
+            e.Buffer(gatewayCode), // code
+            e.Buffer('0100'), // upgrade metadata (upgradable)
+            e.Str('wrongArgs')
+          ),
+          e.U64(1_000_000) // min gas limit
+        )
+        .toTopU8A()
     );
+
+    const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -509,27 +457,22 @@ describe('Execute proposal', () => {
     // Increase timestamp so finalize_time_lock passes
     await world.setCurrentBlockInfo({ timestamp: 1 });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 47_000_000,
-      funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
-    }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 47_000_000,
+        funcName: 'executeProposal',
+        funcArgs: [gateway, callData, e.U(0)],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }],
+      })
+      .assertFail({ code: 4, message: 'Insufficient gas for execution' });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ], esdts: [{ id: TOKEN_ID, amount: 500, nonce: 1 }],
+      funcArgs: [gateway, callData, e.U(0)],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 500, nonce: 1 }],
     }); // async call actually fails
 
     // Time lock eta was NOT deleted and refund token was created
@@ -541,9 +484,9 @@ describe('Execute proposal', () => {
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
         e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
-        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(500)),
+        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))).Value(e.U(500)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 500, nonce: 1 }]), // esdt still in contract
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 500, nonce: 1 }]), // esdt still in contract
       ],
     });
 
@@ -552,12 +495,8 @@ describe('Execute proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'executeProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 500, nonce: 1 }],
+      funcArgs: [gateway, callData, e.U(0)],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 500, nonce: 1 }],
     }); // async call actually fails
 
     // Amount was added to refund token
@@ -568,9 +507,9 @@ describe('Execute proposal', () => {
 
         e.kvs.Mapper('time_lock_eta', proposalHash).Value(e.U64(1)),
         e.kvs.Mapper('time_lock_proposals_submitted', proposalHash).Value(e.Bool(true)),
-        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(1_000)),
+        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))).Value(e.U(1_000)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }]),
       ],
     });
 
@@ -579,15 +518,13 @@ describe('Execute proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'withdrawRefundToken',
-      funcArgs: [
-        e.Tuple(e.Str(TOKEN_ID), e.U64(1)),
-      ],
+      funcArgs: [e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))],
     });
 
     assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n,
       kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]), // got esdt back
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }]), // got esdt back
       ],
     });
   });
@@ -600,9 +537,7 @@ describe('Execute proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'withdrawRefundToken',
-      funcArgs: [
-        e.Tuple(e.Str(TOKEN_ID), e.U64(1)),
-      ],
+      funcArgs: [e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))],
     });
 
     // Nothing has changed
@@ -621,10 +556,10 @@ describe('Execute proposal', () => {
       kvs: [
         ...baseKvs(),
 
-        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(1_000)),
+        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))).Value(e.U(1_000)),
         e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }]),
       ],
     });
 
@@ -632,39 +567,30 @@ describe('Execute proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'withdrawRefundToken',
-      funcArgs: [
-        e.Tuple(e.Str(TOKEN_ID), e.U64(1)),
-      ],
+      funcArgs: [e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))],
     });
 
     assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n,
       kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 2_000, nonce: 1 }]), // got esdt back
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 2_000, nonce: 1 }]), // got esdt back
       ],
     });
     assertAccount(await contract.getAccount(), {
       balance: 1_000n,
-      kvs: [
-        ...baseKvs(),
-
-        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000)),
-      ],
+      kvs: [...baseKvs(), e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str('EGLD'), e.U64(0))).Value(e.U(1_000))],
     });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'withdrawRefundToken',
-      funcArgs: [
-        e.Tuple(e.Str('EGLD'), e.U64(0))],
+      funcArgs: [e.Tuple(e.Str('EGLD'), e.U64(0))],
     });
 
     assertAccount(await deployer.getAccount(), {
       balance: 10_000_001_000n, // got egld back
-      kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 2_000, nonce: 1 }]),
-      ],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 2_000, nonce: 1 }])],
     });
     assertAccount(await contract.getAccount(), {
       balance: 0,
@@ -677,63 +603,47 @@ describe('Execute operator proposal', () => {
   test('Errors', async () => {
     await deployContract();
 
-    const wrongCallData = e.TopBuffer(e.Tuple(
-      e.Str('endpoint'),
-    ).toTopU8A());
+    const wrongCallData = e.TopBuffer(e.Tuple(e.Str('endpoint')).toTopU8A());
 
     const user = await world.createWallet();
 
-    await user.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Not authorized' });
+    await user
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeOperatorProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Not authorized' });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Proposal is not submitted' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeOperatorProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Proposal is not submitted' });
 
-    const proposalHash = getProposalHash(
-      gateway,
-      wrongCallData,
-      e.U(0),
-    );
+    const proposalHash = getProposalHash(gateway, wrongCallData, e.U(0));
 
     await contract.setAccount({
-      ...await contract.getAccount(),
-      kvs: [
-        ...baseKvs(),
-
-        e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
-      ],
+      ...(await contract.getAccount()),
+      kvs: [...baseKvs(), e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true))],
     });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Not approved' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeOperatorProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Not approved' });
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -742,20 +652,18 @@ describe('Execute operator proposal', () => {
       ],
     });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Could not decode call data' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeOperatorProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Could not decode call data' });
 
     // Mock proposal being executed
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -765,16 +673,14 @@ describe('Execute operator proposal', () => {
       ],
     });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 100_000_000,
-      funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        wrongCallData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Proposal is being executed' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 100_000_000,
+        funcName: 'executeOperatorProposal',
+        funcArgs: [gateway, wrongCallData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Proposal is being executed' });
   });
 
   test('Esdt transfer', async () => {
@@ -782,23 +688,27 @@ describe('Execute operator proposal', () => {
 
     const user = await world.createWallet();
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('MultiESDTNFTTransfer'),
-      e.List(
-        e.Buffer(user.toTopU8A()),
-        e.Buffer(e.U32(1).toTopU8A()),
-        e.Str(TOKEN_ID),
-        e.Buffer(e.U64(1).toTopU8A()),
-        e.Buffer(e.U(1_000).toTopU8A()),
-      ), // arguments to MultiESDTNFTTransfer function
-      e.U64(10_000_000), // min gas limit
-    ).toTopU8A());
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('MultiESDTNFTTransfer'),
+          e.List(
+            e.Buffer(user.toTopU8A()),
+            e.Buffer(e.U32(1).toTopU8A()),
+            e.Str(TOKEN_IDENTIFIER),
+            e.Buffer(e.U64(1).toTopU8A()),
+            e.Buffer(e.U(1_000).toTopU8A())
+          ), // arguments to MultiESDTNFTTransfer function
+          e.U64(10_000_000) // min gas limit
+        )
+        .toTopU8A()
+    );
 
     const proposalHash = getProposalHash(contract, callData, e.U(0));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -812,11 +722,7 @@ describe('Execute operator proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'executeOperatorProposal',
-      funcArgs: [
-        contract,
-        callData,
-        e.U(0),
-      ],
+      funcArgs: [contract, callData, e.U(0)],
     });
 
     // Operator approval was NOT deleted
@@ -832,9 +738,7 @@ describe('Execute operator proposal', () => {
 
     // Assert deployer still has the tokens
     assertAccount(await deployer.getAccount(), {
-      kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
-      ],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }])],
     });
 
     // Deployer needs to send correct tokens
@@ -842,12 +746,8 @@ describe('Execute operator proposal', () => {
       callee: contract,
       gasLimit: 200_000_000,
       funcName: 'executeOperatorProposal',
-      funcArgs: [
-        contract,
-        callData,
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
+      funcArgs: [contract, callData, e.U(0)],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }],
     });
 
     // Operator apporval was deleted
@@ -858,9 +758,7 @@ describe('Execute operator proposal', () => {
 
     // Assert user received tokens
     assertAccount(await user.getAccount(), {
-      kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
-      ],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }])],
     });
   });
 
@@ -871,21 +769,25 @@ describe('Execute operator proposal', () => {
 
     const newOperator = await world.createWallet();
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('upgradeContract'),
-      e.List(
-        e.Buffer(gatewayCode), // code
-        e.Buffer('0100'), // upgrade metadata (upgradable)
-        e.Buffer(newOperator.toTopU8A()), // Arguments to upgrade function fo Gateway
-      ),
-      e.U64(20_000_000), // min gas limit
-    ).toTopU8A());
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('upgradeContract'),
+          e.List(
+            e.Buffer(gatewayCode), // code
+            e.Buffer('0100'), // upgrade metadata (upgradable)
+            e.Buffer(newOperator.toTopU8A()) // Arguments to upgrade function fo Gateway
+          ),
+          e.U64(20_000_000) // min gas limit
+        )
+        .toTopU8A()
+    );
 
     const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -894,26 +796,20 @@ describe('Execute operator proposal', () => {
       ],
     });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 50_000_000,
-      funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
-    }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 50_000_000,
+        funcName: 'executeOperatorProposal',
+        funcArgs: [gateway, callData, e.U(0)],
+      })
+      .assertFail({ code: 4, message: 'Insufficient gas for execution' });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 200_000_000,
       funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
+      funcArgs: [gateway, callData, e.U(0)],
     });
 
     // Operator approval was deleted
@@ -933,21 +829,25 @@ describe('Execute operator proposal', () => {
 
     const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('upgradeContract'),
-      e.List(
-        e.Buffer(gatewayCode), // code
-        e.Buffer('0100'), // upgrade metadata (upgradable)
-        e.Str('wrongArgs'),
-      ),
-      e.U64(1_000_000), // min gas limit
-    ).toTopU8A());
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('upgradeContract'),
+          e.List(
+            e.Buffer(gatewayCode), // code
+            e.Buffer('0100'), // upgrade metadata (upgradable)
+            e.Str('wrongArgs')
+          ),
+          e.U64(1_000_000) // min gas limit
+        )
+        .toTopU8A()
+    );
 
     const proposalHash = getProposalHash(gateway, callData, e.U(1_000));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -961,11 +861,7 @@ describe('Execute operator proposal', () => {
       gasLimit: 50_000_000,
       funcName: 'executeOperatorProposal',
       value: 1_000,
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(1_000),
-      ],
+      funcArgs: [gateway, callData, e.U(1_000)],
     }); // async call actually fails
 
     // Operator approval NOT deleted and refund token was created
@@ -986,9 +882,7 @@ describe('Execute operator proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'withdrawRefundToken',
-      funcArgs: [
-        e.Tuple(e.Str('EGLD'), e.U64(0)),
-      ],
+      funcArgs: [e.Tuple(e.Str('EGLD'), e.U64(0))],
     });
 
     assertAccount(await deployer.getAccount(), {
@@ -1001,25 +895,25 @@ describe('Execute operator proposal', () => {
 
     const gatewayCode = fs.readFileSync('gateway/output/gateway.wasm');
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('upgradeContract'),
-      e.List(
-        e.Buffer(gatewayCode), // code
-        e.Buffer('0100'), // upgrade metadata (upgradable)
-        e.Str('wrongArgs'),
-      ),
-      e.U64(1_000_000), // min gas limit
-    ).toTopU8A());
-
-    const proposalHash = getProposalHash(
-      gateway,
-      callData,
-      e.U(0),
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('upgradeContract'),
+          e.List(
+            e.Buffer(gatewayCode), // code
+            e.Buffer('0100'), // upgrade metadata (upgradable)
+            e.Str('wrongArgs')
+          ),
+          e.U64(1_000_000) // min gas limit
+        )
+        .toTopU8A()
     );
+
+    const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -1028,27 +922,22 @@ describe('Execute operator proposal', () => {
       ],
     });
 
-    await deployer.callContract({
-      callee: contract,
-      gasLimit: 47_000_000,
-      funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 1_000, nonce: 1 }],
-    }).assertFail({ code: 4, message: 'Insufficient gas for execution' });
+    await deployer
+      .callContract({
+        callee: contract,
+        gasLimit: 47_000_000,
+        funcName: 'executeOperatorProposal',
+        funcArgs: [gateway, callData, e.U(0)],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }],
+      })
+      .assertFail({ code: 4, message: 'Insufficient gas for execution' });
 
     await deployer.callContract({
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ], esdts: [{ id: TOKEN_ID, amount: 500, nonce: 1 }],
+      funcArgs: [gateway, callData, e.U(0)],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 500, nonce: 1 }],
     }); // async call actually fails
 
     // Operator approval was NOT deleted and refund token was created
@@ -1060,9 +949,9 @@ describe('Execute operator proposal', () => {
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
         e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
-        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(500)),
+        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))).Value(e.U(500)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 500, nonce: 1 }]), // esdt still in contract
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 500, nonce: 1 }]), // esdt still in contract
       ],
     });
 
@@ -1071,12 +960,8 @@ describe('Execute operator proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'executeOperatorProposal',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
-      esdts: [{ id: TOKEN_ID, amount: 500, nonce: 1 }],
+      funcArgs: [gateway, callData, e.U(0)],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 500, nonce: 1 }],
     }); // async call actually fails
 
     // Amount was added to refund token
@@ -1087,9 +972,9 @@ describe('Execute operator proposal', () => {
 
         e.kvs.Mapper('operator_approvals', proposalHash).Value(e.Bool(true)),
         e.kvs.Mapper('operator_proposals_submitted', proposalHash).Value(e.Bool(true)),
-        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_ID), e.U64(1))).Value(e.U(1_000)),
+        e.kvs.Mapper('refund_token', deployer, e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))).Value(e.U(1_000)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }]),
       ],
     });
 
@@ -1098,15 +983,13 @@ describe('Execute operator proposal', () => {
       callee: contract,
       gasLimit: 50_000_000,
       funcName: 'withdrawRefundToken',
-      funcArgs: [
-        e.Tuple(e.Str(TOKEN_ID), e.U64(1)),
-      ],
+      funcArgs: [e.Tuple(e.Str(TOKEN_IDENTIFIER), e.U64(1))],
     });
 
     assertAccount(await deployer.getAccount(), {
       balance: 10_000_000_000n,
       kvs: [
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000, nonce: 1 }]), // got esdt back
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000, nonce: 1 }]), // got esdt back
       ],
     });
   });
@@ -1116,19 +999,23 @@ describe('Execute operator proposal', () => {
 
     const newOperator = await world.createWallet();
 
-    const callData = e.TopBuffer(e.Tuple(
-      e.Str('transferOperatorship'),
-      e.List(
-        e.Buffer(newOperator.toTopU8A()), // Arguments to transferOperator function
-      ),
-      e.U64(0),
-    ).toTopU8A());
+    const callData = e.TopBuffer(
+      e
+        .Tuple(
+          e.Str('transferOperatorship'),
+          e.List(
+            e.Buffer(newOperator.toTopU8A()) // Arguments to transferOperator function
+          ),
+          e.U64(0)
+        )
+        .toTopU8A()
+    );
 
     const proposalHash = getProposalHash(contract, callData, e.U(0));
 
     // Mock hash
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -1141,21 +1028,13 @@ describe('Execute operator proposal', () => {
       callee: contract,
       gasLimit: 200_000_000,
       funcName: 'executeOperatorProposal',
-      funcArgs: [
-        contract,
-        callData,
-        e.U(0),
-      ],
+      funcArgs: [contract, callData, e.U(0)],
     });
 
     // Operator approval was deleted and operator was changed
     assertAccount(await contract.getAccount(), {
       balance: 0n,
-      kvs: [
-        ...baseKvs(),
-
-        e.kvs.Mapper('operator').Value(newOperator),
-      ],
+      kvs: [...baseKvs(), e.kvs.Mapper('operator').Value(newOperator)],
     });
   });
 });
@@ -1163,31 +1042,31 @@ describe('Execute operator proposal', () => {
 test('Withdraw', async () => {
   await deployContract();
 
-  await deployer.callContract({
-    callee: contract,
-    funcName: 'withdraw',
-    gasLimit: 10_000_000,
-    funcArgs: [
-      deployer,
-      e.U(100),
-    ],
-  }).assertFail({ code: 4, message: 'Not self' });
+  await deployer
+    .callContract({
+      callee: contract,
+      funcName: 'withdraw',
+      gasLimit: 10_000_000,
+      funcArgs: [deployer, e.U(100)],
+    })
+    .assertFail({ code: 4, message: 'Not self' });
 
   // Need to call withdraw through executeProposal
-  const callData = e.TopBuffer(e.Tuple(
-    e.Str('withdraw'),
-    e.List(
-      e.Buffer(deployer.toNestU8A()),
-      e.U(100),
-    ),
-    e.U64(1_000_000), // min gas limit
-  ).toTopU8A());
+  const callData = e.TopBuffer(
+    e
+      .Tuple(
+        e.Str('withdraw'),
+        e.List(e.Buffer(deployer.toNestU8A()), e.U(100)),
+        e.U64(1_000_000) // min gas limit
+      )
+      .toTopU8A()
+  );
 
   const proposalHash = getProposalHash(contract, callData, e.U(0));
 
   // Mock hash & balance
   await contract.setAccount({
-    ...await contract.getAccount(),
+    ...(await contract.getAccount()),
     balance: 100,
     kvs: [
       ...baseKvs(),
@@ -1203,20 +1082,14 @@ test('Withdraw', async () => {
     callee: contract,
     gasLimit: 50_000_000,
     funcName: 'executeProposal',
-    funcArgs: [
-      contract,
-      callData,
-      e.U(0),
-    ],
+    funcArgs: [contract, callData, e.U(0)],
   });
 
   // Time lock eta was deleted and amount was sent to deployer
   let kvs = await contract.getAccount();
   assertAccount(kvs, {
     balance: 0n,
-    kvs: [
-      ...baseKvs(),
-    ],
+    kvs: [...baseKvs()],
   });
 
   kvs = await deployer.getAccount();
@@ -1230,51 +1103,37 @@ test('Transfer operatorship', async () => {
 
   const user = await world.createWallet();
 
-  await user.callContract({
-    callee: contract,
-    funcName: 'transferOperatorship',
-    gasLimit: 10_000_000,
-    funcArgs: [
-      user,
-    ],
-  }).assertFail({ code: 4, message: 'Not authorized' });
+  await user
+    .callContract({
+      callee: contract,
+      funcName: 'transferOperatorship',
+      gasLimit: 10_000_000,
+      funcArgs: [user],
+    })
+    .assertFail({ code: 4, message: 'Not authorized' });
 
   await deployer.callContract({
     callee: contract,
     funcName: 'transferOperatorship',
     gasLimit: 10_000_000,
-    funcArgs: [
-      user,
-    ],
+    funcArgs: [user],
   });
 
   // Operator was changed
   assertAccount(await contract.getAccount(), {
-    kvs: [
-      ...baseKvs(),
-
-      e.kvs.Mapper('operator').Value(user),
-    ],
+    kvs: [...baseKvs(), e.kvs.Mapper('operator').Value(user)],
   });
 
   // Need to call transferOperatorship through executeProposal
-  const callData = e.TopBuffer(e.Tuple(
-    e.Str('transferOperatorship'),
-    e.List(
-      e.Buffer(deployer.toNestU8A()),
-    ),
-    e.U64(0),
-  ).toTopU8A());
-
-  const proposalHash = getProposalHash(
-    contract,
-    callData,
-    e.U(0),
+  const callData = e.TopBuffer(
+    e.Tuple(e.Str('transferOperatorship'), e.List(e.Buffer(deployer.toNestU8A())), e.U64(0)).toTopU8A()
   );
+
+  const proposalHash = getProposalHash(contract, callData, e.U(0));
 
   // Mock hash
   await contract.setAccount({
-    ...await contract.getAccount(),
+    ...(await contract.getAccount()),
     kvs: [
       ...baseKvs(),
 
@@ -1289,122 +1148,94 @@ test('Transfer operatorship', async () => {
     callee: contract,
     gasLimit: 50_000_000,
     funcName: 'executeProposal',
-    funcArgs: [
-      contract,
-      callData,
-      e.U(0),
-    ],
+    funcArgs: [contract, callData, e.U(0)],
   });
 
   // Time lock eta was deleted and operator was set back to deployer
   let kvs = await contract.getAccount();
   assertAccount(kvs, {
-    kvs: [
-      ...baseKvs(),
-    ],
+    kvs: [...baseKvs()],
   });
 });
 
-describe("Execute", () => {
+describe('Execute', () => {
   test('Execute errors', async () => {
     await deployContract();
 
-    await deployer.callContract({
-      callee: contract,
-      funcName: 'execute',
-      gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str('otherChain'),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        e.TopBuffer(''),
-      ],
-    }).assertFail({ code: 4, message: 'Not governance' });
+    await deployer
+      .callContract({
+        callee: contract,
+        funcName: 'execute',
+        gasLimit: 10_000_000,
+        funcArgs: [e.Str('otherChain'), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), e.TopBuffer('')],
+      })
+      .assertFail({ code: 4, message: 'Not governance' });
 
-    await deployer.callContract({
-      callee: contract,
-      funcName: 'execute',
-      gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str('otherAddress'),
-        e.TopBuffer(''),
-      ],
-    }).assertFail({ code: 4, message: 'Not governance' });
+    await deployer
+      .callContract({
+        callee: contract,
+        funcName: 'execute',
+        gasLimit: 10_000_000,
+        funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str('otherAddress'), e.TopBuffer('')],
+      })
+      .assertFail({ code: 4, message: 'Not governance' });
 
-    await deployer.callContract({
-      callee: contract,
-      funcName: 'execute',
-      gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        e.TopBuffer(''),
-      ],
-    }).assertFail({ code: 4, message: 'Not approved by gateway' });
+    await deployer
+      .callContract({
+        callee: contract,
+        funcName: 'execute',
+        gasLimit: 10_000_000,
+        funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), e.TopBuffer('')],
+      })
+      .assertFail({ code: 4, message: 'Not approved by gateway' });
 
     let payload = e.TopBuffer('');
     await mockCallApprovedByGateway(payload);
 
-    await deployer.callContract({
-      callee: contract,
-      funcName: 'execute',
-      gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
-    }).assertFail({ code: 4, message: 'Could not decode execute payload' });
+    await deployer
+      .callContract({
+        callee: contract,
+        funcName: 'execute',
+        gasLimit: 10_000_000,
+        funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
+      })
+      .assertFail({ code: 4, message: 'Could not decode execute payload' });
 
-    payload = e.TopBuffer(e.Tuple(
-      e.U8(0),
-      e.Addr(ADDRESS_ZERO),
-      e.Buffer(''),
-      e.U(0),
-      e.U64(0),
-    ).toTopU8A());
+    payload = e.TopBuffer(e.Tuple(e.U8(0), e.Addr(ADDRESS_ZERO), e.Buffer(''), e.U(0), e.U64(0)).toTopU8A());
     await mockCallApprovedByGateway(payload);
 
-    await deployer.callContract({
-      callee: contract,
-      funcName: 'execute',
-      gasLimit: 10_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
-    }).assertFail({ code: 4, message: 'Invalid target' });
+    await deployer
+      .callContract({
+        callee: contract,
+        funcName: 'execute',
+        gasLimit: 10_000_000,
+        funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
+      })
+      .assertFail({ code: 4, message: 'Invalid target' });
   });
 
   test('Execute schedule time lock proposal min eta', async () => {
     await deployContract();
 
     const callData = e.Buffer('');
-    const payload = e.TopBuffer(e.Tuple(
-      e.U8(0),
-      gateway,
-      callData,
-      e.U(0),
-      e.U64(1), // will use min eta instead
-    ).toTopU8A());
+    const payload = e.TopBuffer(
+      e
+        .Tuple(
+          e.U8(0),
+          gateway,
+          callData,
+          e.U(0),
+          e.U64(1) // will use min eta instead
+        )
+        .toTopU8A()
+    );
     await mockCallApprovedByGateway(payload);
 
     await deployer.callContract({
       callee: contract,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
+      funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
     });
 
     const proposalHash = getProposalHash(gateway, callData, e.U(0));
@@ -1425,25 +1256,14 @@ describe("Execute", () => {
     await deployContract();
 
     const callData = e.Buffer('');
-    const payload = e.TopBuffer(e.Tuple(
-      e.U8(0),
-      gateway,
-      callData,
-      e.U(0),
-      e.U64(11),
-    ).toTopU8A());
+    const payload = e.TopBuffer(e.Tuple(e.U8(0), gateway, callData, e.U(0), e.U64(11)).toTopU8A());
     await mockCallApprovedByGateway(payload);
 
     await deployer.callContract({
       callee: contract,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
+      funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
     });
 
     const proposalHash = getProposalHash(gateway, callData, e.U(0));
@@ -1460,26 +1280,19 @@ describe("Execute", () => {
     });
 
     await mockCallApprovedByGateway(payload);
-    await deployer.callContract({
-      callee: contract,
-      funcName: 'execute',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
-    }).assertFail({ code: 4, message: 'Proposal was already submitted' });
+    await deployer
+      .callContract({
+        callee: contract,
+        funcName: 'execute',
+        gasLimit: 20_000_000,
+        funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
+      })
+      .assertFail({ code: 4, message: 'Proposal was already submitted' });
 
     const result = await world.query({
       callee: contract,
       funcName: 'getProposalEta',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
+      funcArgs: [gateway, callData, e.U(0)],
     });
     assert(d.U64().topDecode(result.returnData[0]) === 11n);
   });
@@ -1488,20 +1301,14 @@ describe("Execute", () => {
     await deployContract();
 
     const callData = e.Buffer('');
-    const payload = e.TopBuffer(e.Tuple(
-      e.U8(1),
-      gateway,
-      callData,
-      e.U(0),
-      e.U64(0),
-    ).toTopU8A());
+    const payload = e.TopBuffer(e.Tuple(e.U8(1), gateway, callData, e.U(0), e.U64(0)).toTopU8A());
     await mockCallApprovedByGateway(payload);
 
     // Mock time lock era set
     const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -1514,12 +1321,7 @@ describe("Execute", () => {
       callee: contract,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
+      funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
     });
 
     // Time lock eta and proposal submitted was removed
@@ -1534,25 +1336,14 @@ describe("Execute", () => {
     await deployContract();
 
     const callData = e.Buffer('');
-    const payload = e.TopBuffer(e.Tuple(
-      e.U8(2),
-      gateway,
-      callData,
-      e.U(0),
-      e.U64(11),
-    ).toTopU8A());
+    const payload = e.TopBuffer(e.Tuple(e.U8(2), gateway, callData, e.U(0), e.U64(11)).toTopU8A());
     await mockCallApprovedByGateway(payload);
 
     await deployer.callContract({
       callee: contract,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
+      funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
     });
 
     const proposalHash = getProposalHash(gateway, callData, e.U(0));
@@ -1569,26 +1360,19 @@ describe("Execute", () => {
     });
 
     await mockCallApprovedByGateway(payload);
-    await deployer.callContract({
-      callee: contract,
-      funcName: 'execute',
-      gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
-    }).assertFail({ code: 4, message: 'Proposal was already submitted' });
+    await deployer
+      .callContract({
+        callee: contract,
+        funcName: 'execute',
+        gasLimit: 20_000_000,
+        funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
+      })
+      .assertFail({ code: 4, message: 'Proposal was already submitted' });
 
     const result = await world.query({
       callee: contract,
       funcName: 'isOperatorProposalApproved',
-      funcArgs: [
-        gateway,
-        callData,
-        e.U(0),
-      ],
+      funcArgs: [gateway, callData, e.U(0)],
     });
     assert(result.returnData[0] === '01');
   });
@@ -1597,20 +1381,14 @@ describe("Execute", () => {
     await deployContract();
 
     const callData = e.Buffer('');
-    const payload = e.TopBuffer(e.Tuple(
-      e.U8(3),
-      gateway,
-      callData,
-      e.U(0),
-      e.U64(0),
-    ).toTopU8A());
+    const payload = e.TopBuffer(e.Tuple(e.U8(3), gateway, callData, e.U(0), e.U64(0)).toTopU8A());
     await mockCallApprovedByGateway(payload);
 
     // Mock operator proposal set
     const proposalHash = getProposalHash(gateway, callData, e.U(0));
 
     await contract.setAccount({
-      ...await contract.getAccount(),
+      ...(await contract.getAccount()),
       kvs: [
         ...baseKvs(),
 
@@ -1623,12 +1401,7 @@ describe("Execute", () => {
       callee: contract,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [
-        e.Str(GOVERNANCE_CHAIN),
-        e.Str(MESSAGE_ID),
-        e.Str(GOVERNANCE_ADDRESS),
-        payload,
-      ],
+      funcArgs: [e.Str(GOVERNANCE_CHAIN), e.Str(MESSAGE_ID), e.Str(GOVERNANCE_ADDRESS), payload],
     });
 
     // Time operator proposal was removed

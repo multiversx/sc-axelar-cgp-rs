@@ -3,8 +3,9 @@ use multiversx_sc::api::KECCAK256_RESULT_LEN;
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::{DeployInterchainTokenPayload, InterchainTransferPayload};
 use crate::constants::{
-    Metadata, MetadataVersion, TokenId, TransferAndGasTokens, LATEST_METADATA_VERSION,
-    MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN, MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+    Metadata, MetadataVersion, TokenId, TransferAndGasTokens, ITS_HUB_CHAIN_NAME,
+    LATEST_METADATA_VERSION, MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+    MESSAGE_TYPE_INTERCHAIN_TRANSFER,
 };
 use crate::{address_tracker, events, proxy_gmp, proxy_its};
 
@@ -45,7 +46,7 @@ pub trait RemoteModule:
 
         let payload = data.abi_encode();
 
-        self.route_message(
+        self.route_message_through_its_hub(
             destination_chain.clone(),
             payload,
             MetadataVersion::ContractCall,
@@ -93,7 +94,7 @@ pub trait RemoteModule:
 
         let payload = payload.abi_encode();
 
-        self.route_message(
+        self.route_message_through_its_hub(
             destination_chain.clone(),
             payload,
             metadata_version,
@@ -129,10 +130,11 @@ pub trait RemoteModule:
         (MetadataVersion::from(metadata.version), metadata.data)
     }
 
-    fn only_remote_service(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
+    fn only_its_hub(&self, source_chain: &ManagedBuffer, source_address: &ManagedBuffer) {
         require!(
-            self.is_trusted_address(source_chain, source_address),
-            "Not remote service"
+            source_chain == &ManagedBuffer::from(ITS_HUB_CHAIN_NAME)
+                && &self.its_hub_address().get() == source_address,
+            "Not its hub"
         );
     }
 }

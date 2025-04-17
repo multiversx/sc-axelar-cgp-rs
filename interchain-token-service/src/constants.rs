@@ -18,11 +18,6 @@ pub const MESSAGE_TYPE_REGISTER_TOKEN_METADATA: u64 = 6;
  * This is set as a constant, since the ITS Hub will exist on Axelar.
  */
 pub const ITS_HUB_CHAIN_NAME: &[u8] = b"axelar";
-/**
- * Special identifier that the trusted address for a chain should be set to, which indicates if the ITS call
- * for that chain should be routed via the ITS hub.
- */
-pub const ITS_HUB_ROUTING_IDENTIFIER: &[u8] = b"hub";
 
 pub const EXECUTE_WITH_TOKEN_CALLBACK_GAS: u64 = 20_000_000; // This is overkill, but the callback should be prevented from failing at all costs
 pub const KEEP_EXTRA_GAS: u64 = 15_000_000; // Extra gas to keep in contract before registering async promise. This needs to be a somewhat larger value
@@ -92,7 +87,7 @@ impl<M: ManagedTypeApi> ManagedBufferAscii<M> for ManagedBuffer<M> {
             result *= 10;
             result += (byte as char).to_digit(16).unwrap() as u8;
         }
-        
+
         result
     }
 }

@@ -8,7 +8,7 @@ use crate::abi::AbiEncodeDecode;
 use crate::abi_types::RegisterTokenMetadataPayload;
 use crate::constants::{
     Hash, ManagedBufferAscii, MetadataVersion, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS,
-    ITS_HUB_CHAIN_NAME, KEEP_EXTRA_GAS, MESSAGE_TYPE_REGISTER_TOKEN_METADATA,
+    KEEP_EXTRA_GAS, MESSAGE_TYPE_REGISTER_TOKEN_METADATA,
 };
 use crate::{address_tracker, events, proxy_gmp};
 
@@ -300,7 +300,10 @@ pub trait ProxyItsModule:
     }
 
     #[view(invalidTokenManagerAddress)]
-    fn get_opt_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> Option<ManagedAddress> {
+    fn get_opt_token_manager_address(
+        &self,
+        token_id: &TokenId<Self::Api>,
+    ) -> Option<ManagedAddress> {
         let token_manager_address_mapper = self.token_manager_address(token_id);
 
         if token_manager_address_mapper.is_empty() {
@@ -431,12 +434,7 @@ pub trait ProxyItsModule:
 
         let payload = data.abi_encode();
 
-        let its_hub_chain_name = ManagedBuffer::from(ITS_HUB_CHAIN_NAME);
-        let its_hub_address = self.trusted_address(&its_hub_chain_name).get();
-
-        self.call_contract(
-            its_hub_chain_name,
-            its_hub_address,
+        self.call_contract_its_hub(
             payload,
             MetadataVersion::ContractCall,
             EgldOrEsdtTokenIdentifier::egld(),
