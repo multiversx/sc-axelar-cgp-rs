@@ -170,20 +170,6 @@ pub trait EventsModule {
         amount: &BigUint,
     );
 
-    #[event("execute_with_interchain_token_success_event")]
-    fn execute_with_interchain_token_success_event(
-        &self,
-        #[indexed] source_chain: ManagedBuffer,
-        #[indexed] message_id: ManagedBuffer,
-    );
-
-    #[event("execute_with_interchain_token_failed_event")]
-    fn execute_with_interchain_token_failed_event(
-        &self,
-        #[indexed] source_chain: ManagedBuffer,
-        #[indexed] message_id: ManagedBuffer,
-    );
-
     #[event("deploy_remote_interchain_token_approval_event")]
     fn deploy_remote_interchain_token_approval_event(
         &self,

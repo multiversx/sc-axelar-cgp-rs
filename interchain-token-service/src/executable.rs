@@ -49,7 +49,6 @@ pub trait ExecutableModule:
     fn process_interchain_transfer_payload(
         &self,
         original_source_chain: ManagedBuffer,
-        source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
         payload: ManagedBuffer,
     ) {
@@ -93,7 +92,6 @@ pub trait ExecutableModule:
         self.executable_contract_execute_with_interchain_token(
             destination_address,
             original_source_chain,
-            source_chain,
             message_id,
             send_token_payload.source_address,
             send_token_payload.data,

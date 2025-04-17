@@ -229,6 +229,12 @@ pub trait PingPong {
         }
     }
 
+    #[only_owner]
+    #[endpoint(setInterchainTokenService)]
+    fn set_interchain_token_service(&self, interchain_token_service: ManagedAddress) {
+        self.interchain_token_service().set(interchain_token_service);
+    }
+
     /// Lists the addresses of all users that have `ping`-ed,
     /// in the order they have `ping`-ed
     #[view(getUserAddresses)]

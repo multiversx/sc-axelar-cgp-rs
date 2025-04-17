@@ -1,7 +1,8 @@
-import { assert, beforeEach, test } from 'vitest';
+import { assert, beforeEach, describe, test } from 'vitest';
 import { assertAccount, d, e, FSContract, FSWallet, FSWorld } from 'xsuite';
 import {
   baseGatewayKvs,
+  computeCanonicalInterchainTokenDeploySalt,
   computeInterchainTokenDeploySalt,
   computeInterchainTokenIdRaw,
   computeLinkedTokenId,
@@ -35,6 +36,7 @@ import {
 } from '../helpers';
 import { AbiCoder } from 'ethers';
 import { Buffer } from 'buffer';
+import { getAddressShard } from 'xsuite/dist/data/utils';
 
 let world: FSWorld;
 let deployer: FSWallet;
@@ -45,6 +47,7 @@ let fsGateway: FSContract;
 let fsGasService: FSContract;
 let fsTokenManager: FSContract;
 let fsIts: FSContract;
+let fsPingPong: FSContract;
 
 beforeEach(async () => {
   world = await FSWorld.start();
@@ -216,6 +219,30 @@ const mockDeployInterchainTokenGatewayCall = async () => {
   return { payload, crossChainId, messageHash };
 };
 
+const mockExecuteInterchainTransferWithDataGatewayCall = async (
+  tokenId: string,
+  contract: FSContract,
+  fnc = 'ping'
+) => {
+  const originalPayload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
+    [
+      MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+      Buffer.from(tokenId, 'hex'),
+      Buffer.from(OTHER_CHAIN_ADDRESS),
+      Buffer.from(contract.toTopU8A()),
+      1_000,
+      Buffer.from(e.Tuple(e.Str(fnc), collector).toTopU8A()), // data passed to contract
+    ]
+  );
+
+  const payload = wrapFromItsHubPayload(originalPayload);
+
+  const { crossChainId, messageHash } = await mockFSGatewayMessageApproved(payload, deployer);
+
+  return { payload, crossChainId, messageHash };
+};
+
 test(
   'Interchain transfer ABI payload',
   async () => {
@@ -346,18 +373,17 @@ test(
     const callContractLogData = await getCallContractDataFromEsdtAsync(hash);
 
     // Assert call contract was made with correct ABI encoded payload
-    const innerAbiPayload = AbiCoder.defaultAbiCoder()
-      .encode(
-        ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
-        [
-          MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-          Buffer.from(computedTokenId, 'hex'),
-          'TokenName',
-          'SYMBOL',
-          18,
-          Buffer.from(''),
-        ]
-      );
+    const innerAbiPayload = AbiCoder.defaultAbiCoder().encode(
+      ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
+      [
+        MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+        Buffer.from(computedTokenId, 'hex'),
+        'TokenName',
+        'SYMBOL',
+        18,
+        Buffer.from(''),
+      ]
+    );
 
     const expectedAbiPayload = wrapToItsHubPayload(innerAbiPayload);
 
@@ -552,3 +578,238 @@ test(
   },
   { timeout: 60_000 }
 );
+
+describe('Execute interchain transfer with data', () => {
+  const registerEgldCanonical = async () => {
+    // Register EGLD canonical token
+    const deploySalt = computeCanonicalInterchainTokenDeploySalt('EGLD');
+    const computedTokenId = computeInterchainTokenIdRaw(deploySalt);
+
+    const result = await user.callContract({
+      callee: fsIts,
+      funcName: 'registerCanonicalInterchainToken',
+      gasLimit: 20_000_000,
+      funcArgs: [e.Str('EGLD')],
+    });
+    assert(result.returnData[0] === computedTokenId);
+
+    // Do an interchain transfer first so Token Manager has enough funds
+    await user.callContract({
+      callee: fsIts,
+      funcName: 'interchainTransfer',
+      gasLimit: 20_000_000,
+      funcArgs: [
+        e.TopBuffer(computedTokenId),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str('otherChainUser'),
+        e.Buffer(''), // No data
+        e.U(10n ** 16n),
+      ],
+      value: 10n ** 18n,
+    });
+
+    return computedTokenId;
+  };
+
+  test(
+    'Same shard',
+    async () => {
+      await deployContracts();
+
+      // Deploy contract on same Shard
+      ({ contract: fsPingPong } = await deployer.deployContract({
+        code: 'file:ping-pong-interchain/output/ping-ping-interchain.wasm',
+        codeMetadata: ['upgradeable'],
+        gasLimit: 100_000_000,
+        codeArgs: [fsIts, e.U(1_000), e.U64(10), e.Option(null)],
+      }));
+
+      const computedTokenId = await registerEgldCanonical();
+
+      const { payload } = await mockExecuteInterchainTransferWithDataGatewayCall(computedTokenId, fsPingPong);
+
+      await user.callContract({
+        callee: fsIts,
+        funcName: 'execute',
+        gasLimit: 100_000_000,
+        funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
+      });
+
+      // Assert ping pong was successfully called with tokens
+      const pingPongKvs = await fsPingPong.getAccount();
+      assertAccount(pingPongKvs, {
+        balance: 1_000,
+        hasKvs: [
+          e.kvs.Mapper('interchain_token_service').Value(fsIts),
+          e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
+          e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+
+          // User mapper
+          e.kvs.Mapper('user_address_to_id', collector).Value(e.U32(1)),
+          e.kvs.Mapper('user_id_to_address', e.U32(1)).Value(collector),
+          e.kvs.Mapper('user_count').Value(e.U32(1)),
+
+          e.kvs.Mapper('userStatus', e.U32(1)).Value(e.U8(1)),
+        ],
+      });
+    },
+    { timeout: 60_000 }
+  );
+
+  test(
+    'Different shard async call not supported',
+    async () => {
+      await deployContracts();
+
+      // Make sure accounts are on different shards
+      assert(getAddressShard(deployer) != getAddressShard(user));
+
+      // Deploy contract on another Shard
+      ({ contract: fsPingPong } = await user.deployContract({
+        code: 'file:ping-pong-interchain/output/ping-ping-interchain.wasm',
+        codeMetadata: ['upgradeable'],
+        gasLimit: 100_000_000,
+        codeArgs: [fsIts, e.U(1_000), e.U64(10), e.Option(null)],
+      }));
+
+      const computedTokenId = await registerEgldCanonical();
+
+      const { payload } = await mockExecuteInterchainTransferWithDataGatewayCall(computedTokenId, fsPingPong);
+
+      await user
+        .callContract({
+          callee: fsIts,
+          funcName: 'execute',
+          gasLimit: 100_000_000,
+          funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
+        })
+        .assertFail({ code: 'signalError', message: 'sync execution request is not in the same shard' });
+    },
+    { timeout: 60_000 }
+  );
+
+  test(
+    'Different shard async call proxy',
+    async () => {
+      await deployContracts();
+
+      // Make sure accounts are on different shards
+      assert(getAddressShard(deployer) != getAddressShard(user));
+
+      // Deploy contract on another Shard
+      ({ contract: fsPingPong } = await user.deployContract({
+        code: 'file:ping-pong-interchain/output/ping-ping-interchain.wasm',
+        codeMetadata: ['upgradeable'],
+        gasLimit: 100_000_000,
+        codeArgs: [fsIts, e.U(1_000), e.U64(10), e.Option(null)],
+      }));
+
+      // Deploy proxy on same Shard
+      const { contract: fsProxyContract } = await deployer.deployContract({
+        code: 'file:interchain-token-service-proxy/output/interchain-token-service-proxy.wasm',
+        codeMetadata: ['upgradeable'],
+        gasLimit: 100_000_000,
+        codeArgs: [fsIts, fsPingPong],
+      });
+
+      // Make sure its and proxy is no same shard, and ping pong is on another shard
+      assert(getAddressShard(fsIts) == getAddressShard(fsProxyContract));
+      assert(getAddressShard(fsProxyContract) != getAddressShard(fsPingPong));
+
+      // Allow contract to be called by proxy
+      await user.callContract({
+        callee: fsPingPong,
+        funcName: 'setInterchainTokenService',
+        funcArgs: [fsProxyContract],
+        gasLimit: 10_000_000,
+      });
+
+      const computedTokenId = await registerEgldCanonical();
+
+      // Need to call proxy contract from other chain instead
+      const { payload } = await mockExecuteInterchainTransferWithDataGatewayCall(computedTokenId, fsProxyContract);
+
+      // ITS will sync call -> Proxy Contract async call -> Ping Pong contract
+      await user.callContract({
+        callee: fsIts,
+        funcName: 'execute',
+        gasLimit: 100_000_000,
+        funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
+      });
+
+      // Assert ping pong was successfully called with tokens
+      let pingPongKvs = await fsPingPong.getAccount();
+      assertAccount(pingPongKvs, {
+        balance: 1_000,
+        hasKvs: [
+          e.kvs.Mapper('interchain_token_service').Value(fsProxyContract),
+          e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
+          e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+
+          // User mapper
+          e.kvs.Mapper('user_address_to_id', collector).Value(e.U32(1)),
+          e.kvs.Mapper('user_id_to_address', e.U32(1)).Value(collector),
+          e.kvs.Mapper('user_count').Value(e.U32(1)),
+
+          e.kvs.Mapper('userStatus', e.U32(1)).Value(e.U8(1)),
+        ],
+      });
+
+      // Do another call for `ping` in the Ping Pong contract, which will fail and tokens will remain the in the proxy contract
+      const { payload: payloadAgain } = await mockExecuteInterchainTransferWithDataGatewayCall(
+        computedTokenId,
+        fsProxyContract
+      );
+
+      // Proxy async call will fail
+      // ITS will sync call -> Proxy Contract async call -> Ping Pong contract
+      await user.callContract({
+        callee: fsIts,
+        funcName: 'execute',
+        gasLimit: 100_000_000,
+        funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payloadAgain],
+      }).assertFail({ code: 'returnMessage', message: 'can only ping once' });
+
+      // Even if proxy async call failed, gateway message was still validated
+      await user.callContract({
+        callee: fsIts,
+        funcName: 'execute',
+        gasLimit: 100_000_000,
+        funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payloadAgain],
+      }).assertFail({ code: 'signalError', message: 'Not approved by gateway' });
+
+      // Assert ping pong kvs remain unchanged
+      pingPongKvs = await fsPingPong.getAccount();
+      assertAccount(pingPongKvs, {
+        balance: 1_000,
+        hasKvs: [
+          e.kvs.Mapper('interchain_token_service').Value(fsProxyContract),
+          e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
+          e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+
+          // User mapper
+          e.kvs.Mapper('user_address_to_id', collector).Value(e.U32(1)),
+          e.kvs.Mapper('user_id_to_address', e.U32(1)).Value(collector),
+          e.kvs.Mapper('user_count').Value(e.U32(1)),
+
+          e.kvs.Mapper('userStatus', e.U32(1)).Value(e.U8(1)),
+        ],
+      });
+
+      // Assert proxy contract has tokens because async call failed
+      const proxyKvs = await fsProxyContract.getAccount();
+      assertAccount(proxyKvs, {
+        balance: 1_000,
+        hasKvs: [
+          e.kvs.Mapper('interchain_token_service').Value(fsIts),
+          e.kvs.Mapper('contract_address').Value(fsPingPong),
+
+          e.kvs
+            .Mapper('failed_calls', e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID))
+            .Value(e.Tuple(e.Str('EGLD'), e.U(1_000))),
+        ],
+      });
+    },
+    { timeout: 60_000 }
+  );
+});

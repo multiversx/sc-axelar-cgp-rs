@@ -424,8 +424,7 @@ pub trait FactoryModule:
         let token_manager = self.get_opt_token_manager_address(token_id);
 
         require!(
-            !token_manager.is_none()
-                && self.token_manager_is_minter(token_manager.unwrap(), minter),
+            token_manager.is_some() && self.token_manager_is_minter(token_manager.unwrap(), minter),
             "Not minter"
         );
     }

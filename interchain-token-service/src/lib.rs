@@ -134,7 +134,6 @@ pub trait InterchainTokenServiceContract:
 
                 self.process_interchain_transfer_payload(
                     original_source_chain,
-                    source_chain,
                     message_id,
                     payload,
                 );

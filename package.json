@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "build": "npm run build:gateway && npm run build:gas-service && npm run build:its && npm run build:token-manager && npm run build:ping-pong && npm run build:governance",
+    "build": "npm run build:gateway && npm run build:gas-service && npm run build:its && npm run build:token-manager && npm run build:ping-pong && npm run build:governance && npm run build:its-proxy",
     "build:cgp": "npm run build:gateway && npm run build:gas-service",
     "build:gateway": "cd gateway && mxpy contract build",
     "build:gas-service": "cd gas-service && mxpy contract build",
@@ -9,6 +9,7 @@
     "build:token-manager": "cd token-manager && mxpy contract build",
     "build:governance": "cd governance && mxpy contract build",
     "build:ping-pong": "cd ping-pong-interchain && mxpy contract build",
+    "build:its-proxy": "cd interchain-token-service-proxy && mxpy contract build",
     "test": "vitest run",
     "test:cargo": "cargo test",
     "test:all": "npm run build && npm run test && npm run test:cargo",

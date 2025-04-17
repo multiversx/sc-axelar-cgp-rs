@@ -398,11 +398,11 @@ pub trait Governance: events::Events {
 
     fn approve_operator_proposal(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) {
         require!(
-            self.operator_proposals_submitted(&hash).is_empty(),
+            self.operator_proposals_submitted(hash).is_empty(),
             "Proposal was already submitted"
         );
         require!(
-            self.operator_proposals_being_executed(&hash).is_empty(),
+            self.operator_proposals_being_executed(hash).is_empty(),
             "Proposal is being executed"
         );
 

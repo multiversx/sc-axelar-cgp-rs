@@ -170,7 +170,6 @@ pub trait ProxyItsModule:
         &self,
         destination_address: ManagedAddress,
         original_source_chain: ManagedBuffer,
-        source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
         original_source_address: ManagedBuffer,
         data: ManagedBuffer,
@@ -188,8 +187,6 @@ pub trait ProxyItsModule:
             )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
             .execute_on_dest_context::<()>();
-
-        self.execute_with_interchain_token_success_event(source_chain, message_id);
     }
 
     fn register_token_metadata_async_call(
