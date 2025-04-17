@@ -8,25 +8,24 @@ import {
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   OTHER_CHAIN_TOKEN_ADDRESS,
-  TOKEN_ID,
-  TOKEN_ID2,
+  TOKEN_IDENTIFIER,
+  TOKEN_IDENTIFIER2,
   TOKEN_MANAGER_ADDRESS,
-  TOKEN_MANAGER_ADDRESS_2, TOKEN_MANAGER_ADDRESS_3,
+  TOKEN_MANAGER_ADDRESS_2,
   TOKEN_SALT,
   TOKEN_SALT2,
 } from '../helpers';
 import {
   baseItsKvs,
-  computeInterchainTokenIdRaw, computeLinkedTokenId,
+  computeLinkedTokenId,
   deployContracts,
-  deployIts,
   gasService,
   gateway,
   its,
+  ITS_HUB_ADDRESS,
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
   tokenManager,
 } from '../itsHelpers';
-import createKeccakHash from 'keccak';
 
 let world: LSWorld;
 let deployer: LSWallet;
@@ -47,11 +46,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -62,11 +61,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -93,12 +92,10 @@ test(
         tokenManager,
         deployer,
         e.Str(CHAIN_NAME),
+        e.Str(ITS_HUB_ADDRESS),
 
         e.U32(1),
         e.Str(OTHER_CHAIN_NAME),
-
-        e.U32(1),
-        e.Str(OTHER_CHAIN_ADDRESS),
       ];
 
       codeArgs[i] = e.Addr(ADDRESS_ZERO);
@@ -124,12 +121,10 @@ test(
           tokenManager,
           deployer,
           e.Str(''),
+          e.Str(ITS_HUB_ADDRESS),
 
           e.U32(1),
           e.Str(OTHER_CHAIN_NAME),
-
-          e.U32(1),
-          e.Str(OTHER_CHAIN_ADDRESS),
         ],
       })
       .assertFail({ code: 4, message: 'Invalid chain name' });
@@ -145,16 +140,13 @@ test(
           tokenManager,
           deployer,
           e.Str(CHAIN_NAME),
-
-          e.U32(2),
-          e.Str(OTHER_CHAIN_NAME),
-          e.Str(OTHER_CHAIN_NAME),
+          e.Str(''),
 
           e.U32(1),
-          e.Str(OTHER_CHAIN_ADDRESS),
+          e.Str(OTHER_CHAIN_NAME),
         ],
       })
-      .assertFail({ code: 4, message: 'Length mismatch' });
+      .assertFail({ code: 4, message: 'Invalid its hub address' });
 
     await deployer
       .deployContract({
@@ -167,12 +159,10 @@ test(
           tokenManager,
           deployer,
           e.Str(CHAIN_NAME),
+          e.Str(ITS_HUB_ADDRESS),
 
           e.U32(1),
           e.Str(''),
-
-          e.U32(1),
-          e.Str(OTHER_CHAIN_ADDRESS),
         ],
       })
       .assertFail({ code: 4, message: 'Zero string length' });
@@ -237,11 +227,7 @@ describe('Operatorship', () => {
     let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [
-        ...baseItsKvs(deployer),
-
-        e.kvs.Mapper('proposed_roles', deployer, user).Value(e.U32(0b00000010)),
-      ],
+      kvs: [...baseItsKvs(deployer), e.kvs.Mapper('proposed_roles', deployer, user).Value(e.U32(0b00000010))],
     });
 
     // Proposed operator can not call this function
@@ -320,11 +306,7 @@ describe('Operatorship', () => {
     let kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [
-        ...baseItsKvs(user),
-
-        e.kvs.Mapper('proposed_roles', deployer, otherUser).Value(e.U32(0b00000010)),
-      ],
+      kvs: [...baseItsKvs(user), e.kvs.Mapper('proposed_roles', deployer, otherUser).Value(e.U32(0b00000010))],
     });
 
     // otherUser can no longer accept because user doesn't have operator role anymore
@@ -370,7 +352,12 @@ describe('Pause unpause', () => {
         callee: its,
         funcName: 'registerCustomToken',
         gasLimit: 20_000_000,
-        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
+        funcArgs: [
+          e.TopBuffer(TOKEN_SALT),
+          e.Str(TOKEN_IDENTIFIER2),
+          e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
+          e.Addr(ADDRESS_ZERO),
+        ],
       })
       .assertFail({ code: 4, message: 'Contract is paused' });
 
@@ -410,21 +397,6 @@ describe('Pause unpause', () => {
       .callContract({
         callee: its,
         funcName: 'interchainTransfer',
-        gasLimit: 20_000_000,
-        funcArgs: [
-          e.TopBuffer(INTERCHAIN_TOKEN_ID),
-          e.Str(OTHER_CHAIN_NAME),
-          e.Str(OTHER_CHAIN_ADDRESS),
-          e.Buffer(''),
-          e.U(0),
-        ],
-      })
-      .assertFail({ code: 4, message: 'Contract is paused' });
-
-    await user
-      .callContract({
-        callee: its,
-        funcName: 'callContractWithInterchainToken',
         gasLimit: 20_000_000,
         funcArgs: [
           e.TopBuffer(INTERCHAIN_TOKEN_ID),
@@ -482,43 +454,41 @@ describe('Pause unpause', () => {
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_IDENTIFIER2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
     });
   });
 });
 
 describe('Address tracker', () => {
-  test('Set trusted address', async () => {
+  test('Set trusted chain', async () => {
     await deployContracts(deployer, collector);
 
     const someChainName = 'SomeChain';
-    const someChainAddress = 'SomeAddress';
 
     await user
       .callContract({
         callee: its,
-        funcName: 'setTrustedAddress',
+        funcName: 'setTrustedChain',
         gasLimit: 10_000_000,
-        funcArgs: [e.Str(someChainName), e.Str(someChainAddress)],
+        funcArgs: [e.Str(someChainName)],
       })
       .assertFail({ code: 4, message: 'Endpoint can only be called by owner' });
 
     await deployer
       .callContract({
         callee: its,
-        funcName: 'setTrustedAddress',
+        funcName: 'setTrustedChain',
         gasLimit: 10_000_000,
-        funcArgs: [e.Str(''), e.Str('')],
+        funcArgs: [e.Str('')],
       })
       .assertFail({ code: 4, message: 'Zero string length' });
 
     await deployer.callContract({
       callee: its,
-      funcName: 'setTrustedAddress',
+      funcName: 'setTrustedChain',
       gasLimit: 10_000_000,
-      funcArgs: [e.Str(someChainName), e.Str(someChainAddress)],
+      funcArgs: [e.Str(someChainName)],
     });
-    const someChainAddressHash = createKeccakHash('keccak256').update(someChainAddress).digest('hex');
 
     const kvs = await its.getAccount();
     assertAccount(kvs, {
@@ -526,18 +496,18 @@ describe('Address tracker', () => {
       kvs: [
         ...baseItsKvs(deployer),
 
-        e.kvs.Mapper('trusted_address', e.Str(someChainName)).Value(e.Str(someChainAddress)),
+        e.kvs.Mapper('trusted_chains').UnorderedSet([e.Str(OTHER_CHAIN_NAME), e.Str(someChainName)]),
       ],
     });
   });
 
-  test('Remove trusted address', async () => {
+  test('Remove trusted chain', async () => {
     await deployContracts(deployer, collector);
 
     await user
       .callContract({
         callee: its,
-        funcName: 'removeTrustedAddress',
+        funcName: 'removeTrustedChain',
         gasLimit: 10_000_000,
         funcArgs: [e.Str(OTHER_CHAIN_NAME)],
       })
@@ -546,7 +516,7 @@ describe('Address tracker', () => {
     await deployer
       .callContract({
         callee: its,
-        funcName: 'removeTrustedAddress',
+        funcName: 'removeTrustedChain',
         gasLimit: 10_000_000,
         funcArgs: [e.Str('')],
       })
@@ -554,7 +524,7 @@ describe('Address tracker', () => {
 
     await deployer.callContract({
       callee: its,
-      funcName: 'removeTrustedAddress',
+      funcName: 'removeTrustedChain',
       gasLimit: 10_000_000,
       funcArgs: [e.Str(OTHER_CHAIN_NAME)],
     });
@@ -568,7 +538,9 @@ describe('Address tracker', () => {
         e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
 
         // OTHER_CHAIN_NAME was deleted
-        e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Buffer('')),
+        e.kvs.Mapper('trusted_chains').UnorderedSet([]),
+        e.kvs.Mapper('trusted_chains.index', e.Str(OTHER_CHAIN_NAME)).Value(e.Str('')),
+        e.kvs.Mapper('trusted_chains.item', e.U32(1)).Value(e.Str('')),
       ],
     });
   });
@@ -586,11 +558,19 @@ describe('Address tracker', () => {
 
     result = await world.query({
       callee: its,
-      funcName: 'trustedAddress',
-      funcArgs: [e.Str(OTHER_CHAIN_NAME)],
+      funcName: 'trustedChains',
+      funcArgs: [],
     });
 
-    assert(result.returnData[0] === e.Str(OTHER_CHAIN_ADDRESS).toTopHex());
+    assert(result.returnData[0] === e.Str(OTHER_CHAIN_NAME).toTopHex());
+
+    result = await world.query({
+      callee: its,
+      funcName: 'itsHubAddress',
+      funcArgs: [],
+    });
+
+    assert(result.returnData[0] === e.Str(ITS_HUB_ADDRESS).toTopHex());
   });
 });
 
@@ -602,14 +582,19 @@ describe('Set flow limits', () => {
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_IDENTIFIER), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
     });
 
     await user.callContract({
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT2), e.Str(TOKEN_ID2), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT2),
+        e.Str(TOKEN_IDENTIFIER2),
+        e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
+        e.Addr(ADDRESS_ZERO),
+      ],
     });
 
     const computedTokenId = computeLinkedTokenId(user);
@@ -619,7 +604,14 @@ describe('Set flow limits', () => {
       callee: its,
       funcName: 'setFlowLimits',
       gasLimit: 20_000_000,
-      funcArgs: [e.U32(2), e.TopBuffer(computedTokenId), e.TopBuffer(computedTokenId2), e.U32(2), e.U(99), e.U(100)],
+      funcArgs: [
+        e.U32(2),
+        e.TopBuffer(computedTokenId),
+        e.TopBuffer(computedTokenId2),
+        e.U32(2),
+        e.Option(e.U(99)),
+        e.Option(e.U(100)),
+      ],
     });
 
     let tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
@@ -630,11 +622,11 @@ describe('Set flow limits', () => {
         e.kvs.Mapper('interchain_token_service').Value(its),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER)),
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit & operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
-        e.kvs.Mapper('flow_limit').Value(e.U(99)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(99))),
       ],
     });
 
@@ -646,11 +638,11 @@ describe('Set flow limits', () => {
         e.kvs.Mapper('interchain_token_service').Value(its),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId2)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID2)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER2)),
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit & operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
 
-        e.kvs.Mapper('flow_limit').Value(e.U(100)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(100))),
       ],
     });
   });
@@ -665,7 +657,7 @@ describe('Set flow limits', () => {
         callee: its,
         funcName: 'setFlowLimits',
         gasLimit: 20_000_000,
-        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.U(99)],
+        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.Option(e.U(99))],
       })
       .assertFail({ code: 4, message: 'Missing any of roles' });
 
@@ -674,7 +666,7 @@ describe('Set flow limits', () => {
         callee: its,
         funcName: 'setFlowLimits',
         gasLimit: 20_000_000,
-        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(2), e.U(99), e.U(100)],
+        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(2), e.Option(e.U(99)), e.Option(e.U(100))],
       })
       .assertFail({ code: 4, message: 'Length mismatch' });
 
@@ -683,7 +675,7 @@ describe('Set flow limits', () => {
         callee: its,
         funcName: 'setFlowLimits',
         gasLimit: 20_000_000,
-        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.U(100)],
+        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.Option(e.U(100))],
       })
       .assertFail({ code: 4, message: 'Token manager does not exist' });
 
@@ -693,7 +685,7 @@ describe('Set flow limits', () => {
       gasLimit: 20_000_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str(TOKEN_ID),
+        e.Str(TOKEN_IDENTIFIER),
         e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
         e.Buffer(user.toTopU8A()),
       ],
@@ -714,7 +706,7 @@ describe('Set flow limits', () => {
         callee: its,
         funcName: 'setFlowLimits',
         gasLimit: 20_000_000,
-        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.U(100)],
+        funcArgs: [e.U32(1), e.TopBuffer(computedTokenId), e.U32(1), e.Option(e.U(100))],
       })
       .assertFail({ code: 10, message: 'error signalled by smartcontract' });
   });

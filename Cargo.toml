@@ -13,5 +13,7 @@ members = [
     "token-manager",
     "token-manager/meta",
     "governance",
-    "governance/meta"
+    "governance/meta",
+    "interchain-token-service-proxy",
+    "interchain-token-service-proxy/meta"
 ]

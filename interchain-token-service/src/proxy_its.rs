@@ -6,10 +6,7 @@ use token_manager::ProxyTrait as _;
 
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::RegisterTokenMetadataPayload;
-use crate::constants::{
-    Hash, ManagedBufferAscii, MetadataVersion, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS,
-    ITS_HUB_CHAIN_NAME, KEEP_EXTRA_GAS, MESSAGE_TYPE_REGISTER_TOKEN_METADATA,
-};
+use crate::constants::{ManagedBufferAscii, TokenId, MESSAGE_TYPE_REGISTER_TOKEN_METADATA};
 use crate::{address_tracker, events, proxy_gmp};
 
 multiversx_sc::imports!();
@@ -59,7 +56,11 @@ pub trait ProxyItsModule:
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_set_flow_limit(&self, token_id: &TokenId<Self::Api>, flow_limit: &BigUint) {
+    fn token_manager_set_flow_limit(
+        &self,
+        token_id: &TokenId<Self::Api>,
+        flow_limit: Option<BigUint>,
+    ) {
         self.token_manager_proxy(self.deployed_token_manager(token_id))
             .set_flow_limit(flow_limit)
             .execute_on_dest_context::<()>();
@@ -84,20 +85,27 @@ pub trait ProxyItsModule:
         name: ManagedBuffer,
         symbol: ManagedBuffer,
         decimals: u8,
+        initial_caller: ManagedAddress,
     ) {
         self.token_manager_proxy(self.deployed_token_manager(token_id))
-            .deploy_interchain_token(minter, name, symbol, decimals)
+            .deploy_interchain_token(
+                minter,
+                name,
+                symbol,
+                decimals,
+                OptionalValue::Some(initial_caller),
+            )
             .with_egld_transfer(self.call_value().egld_value().clone_value())
             .with_gas_limit(100_000_000) // Need to specify gas manually here because the function does an async call. This should be plenty
             .execute_on_dest_context::<()>();
     }
 
-    fn token_manager_invalid_token_identifier(
+    fn token_manager_get_opt_token_identifier(
         &self,
         sc_address: ManagedAddress,
     ) -> Option<EgldOrEsdtTokenIdentifier> {
         self.token_manager_proxy(sc_address)
-            .invalid_token_identifier()
+            .get_opt_token_identifier()
             .execute_on_dest_context()
     }
 
@@ -162,34 +170,13 @@ pub trait ProxyItsModule:
         &self,
         destination_address: ManagedAddress,
         original_source_chain: ManagedBuffer,
-        source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        payload_hash: Hash<Self::Api>,
         original_source_address: ManagedBuffer,
         data: ManagedBuffer,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
     ) {
-        let gas_left = self.blockchain().get_gas_left();
-
-        require!(
-            gas_left > EXECUTE_WITH_TOKEN_CALLBACK_GAS + KEEP_EXTRA_GAS,
-            "Not enough gas left for async call"
-        );
-
-        let gas_limit = gas_left - EXECUTE_WITH_TOKEN_CALLBACK_GAS - KEEP_EXTRA_GAS;
-
-        require!(
-            self.transfer_with_data_lock(&source_chain, &message_id)
-                .is_empty(),
-            "Async call in progress"
-        );
-
-        self.transfer_with_data_lock(&source_chain, &message_id)
-            .set(true);
-
         self.executable_contract_proxy(destination_address)
             .execute_with_interchain_token(
                 &original_source_chain,
@@ -199,18 +186,7 @@ pub trait ProxyItsModule:
                 token_id.clone(),
             )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
-            .with_gas_limit(gas_limit)
-            .with_callback(self.callbacks().execute_with_token_callback(
-                source_chain,
-                message_id,
-                source_address,
-                payload_hash,
-                token_id,
-                token_identifier,
-                amount,
-            ))
-            .with_extra_gas_for_callback(EXECUTE_WITH_TOKEN_CALLBACK_GAS)
-            .register_promise();
+            .execute_on_dest_context::<()>();
     }
 
     fn register_token_metadata_async_call(
@@ -289,14 +265,17 @@ pub trait ProxyItsModule:
     }
 
     #[view(invalidTokenManagerAddress)]
-    fn invalid_token_manager_address(&self, token_id: &TokenId<Self::Api>) -> ManagedAddress {
+    fn get_opt_token_manager_address(
+        &self,
+        token_id: &TokenId<Self::Api>,
+    ) -> Option<ManagedAddress> {
         let token_manager_address_mapper = self.token_manager_address(token_id);
 
         if token_manager_address_mapper.is_empty() {
-            return ManagedAddress::zero();
+            return None;
         }
 
-        token_manager_address_mapper.get()
+        Some(token_manager_address_mapper.get())
     }
 
     #[view(tokenManagerAddress)]
@@ -314,52 +293,6 @@ pub trait ProxyItsModule:
         &self,
         sc_address: ManagedAddress,
     ) -> executable_contract_proxy::Proxy<Self::Api>;
-
-    #[promises_callback]
-    fn execute_with_token_callback(
-        &self,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        payload_hash: Hash<Self::Api>,
-        token_id: TokenId<Self::Api>,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
-        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
-    ) {
-        match result {
-            ManagedAsyncCallResult::Ok(_) => {
-                self.transfer_with_data_lock(&source_chain, &message_id)
-                    .clear();
-
-                // This will always be true
-                let _ = self.gateway_validate_message(
-                    &source_chain,
-                    &message_id,
-                    &source_address,
-                    &payload_hash,
-                );
-
-                self.execute_with_interchain_token_success_event(source_chain, message_id);
-            }
-            ManagedAsyncCallResult::Err(_) => {
-                self.transfer_with_data_lock(&source_chain, &message_id)
-                    .clear();
-
-                self.token_manager_take_token(&token_id, token_identifier, amount);
-
-                self.execute_with_interchain_token_failed_event(source_chain, message_id);
-            }
-        }
-    }
-
-    #[view(transferWithDataLock)]
-    #[storage_mapper("transfer_with_data_lock")]
-    fn transfer_with_data_lock(
-        &self,
-        source_chain: &ManagedBuffer,
-        message_id: &ManagedBuffer,
-    ) -> SingleValueMapper<bool>;
 
     #[callback]
     fn register_token_metadata_callback(
@@ -391,7 +324,11 @@ pub trait ProxyItsModule:
                     .unwrap();
                 let token_decimals = token_decimals_buf.ascii_to_u8();
 
-                self.register_token_metadata_raw(token_identifier, token_decimals, gas_value);
+                self.register_token_metadata_raw(
+                    EgldOrEsdtTokenIdentifier::esdt(token_identifier),
+                    token_decimals,
+                    gas_value,
+                );
             }
             ManagedAsyncCallResult::Err(_) => {
                 // Send back paid gas value to initial caller
@@ -402,7 +339,7 @@ pub trait ProxyItsModule:
 
     fn register_token_metadata_raw(
         &self,
-        token_identifier: TokenIdentifier,
+        token_identifier: EgldOrEsdtTokenIdentifier,
         decimals: u8,
         gas_value: BigUint,
     ) {
@@ -410,22 +347,12 @@ pub trait ProxyItsModule:
 
         let data = RegisterTokenMetadataPayload {
             message_type: BigUint::from(MESSAGE_TYPE_REGISTER_TOKEN_METADATA),
-            token_identifier: token_identifier.into_managed_buffer(),
+            token_identifier: token_identifier.into_name(),
             decimals,
         };
 
         let payload = data.abi_encode();
 
-        let its_hub_chain_name = ManagedBuffer::from(ITS_HUB_CHAIN_NAME);
-        let its_hub_address = self.trusted_address(&its_hub_chain_name).get();
-
-        self.call_contract(
-            its_hub_chain_name,
-            its_hub_address,
-            payload,
-            MetadataVersion::ContractCall,
-            EgldOrEsdtTokenIdentifier::egld(),
-            gas_value,
-        );
+        self.call_contract_its_hub(payload, gas_value);
     }
 }

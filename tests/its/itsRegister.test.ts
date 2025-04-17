@@ -1,39 +1,12 @@
-import { afterEach, assert, beforeEach, describe, test } from 'vitest';
-import { assertAccount, e, FSWorld, LSWallet, LSWorld } from 'xsuite';
-import {
-  ADDRESS_ZERO,
-  CHAIN_NAME,
-  INTERCHAIN_TOKEN_ID,
-  OTHER_CHAIN_ADDRESS,
-  OTHER_CHAIN_NAME,
-  OTHER_CHAIN_TOKEN_ADDRESS,
-  TOKEN_ID,
-  TOKEN_ID2,
-  TOKEN_MANAGER_ADDRESS,
-  TOKEN_MANAGER_ADDRESS_2,
-  TOKEN_SALT,
-  TOKEN_SALT2,
-} from '../helpers';
-import {
-  baseItsKvs,
-  computeInterchainTokenIdRaw,
-  deployContracts,
-  deployTokenManagerInterchainToken,
-  deployTokenManagerLockUnlock,
-  gasService,
-  its,
-  TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
-  TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
-  TOKEN_MANAGER_TYPE_MINT_BURN,
-  tokenManager,
-} from '../itsHelpers';
-import { AbiCoder } from 'ethers';
+import { afterEach, beforeEach, describe, test } from 'vitest';
+import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
+import { TOKEN_IDENTIFIER, TOKEN_IDENTIFIER2 } from '../helpers';
+import { baseItsKvs, deployContracts, gasService, its } from '../itsHelpers';
 
 let world: LSWorld;
 let deployer: LSWallet;
 let collector: LSWallet;
 let user: LSWallet;
-let otherUser: LSWallet;
 
 beforeEach(async () => {
   world = await LSWorld.start();
@@ -48,11 +21,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -63,18 +36,15 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
     ],
-  });
-  otherUser = await world.createWallet({
-    balance: BigInt('10000000000000000'),
   });
 
   await deployContracts(deployer, collector);
@@ -90,7 +60,7 @@ describe('Register token metadata', () => {
       callee: its,
       funcName: 'registerTokenMetadata',
       gasLimit: 100_000_000,
-      funcArgs: [e.Str(TOKEN_ID)],
+      funcArgs: [e.Str(TOKEN_IDENTIFIER)],
       value: 100,
     });
 
@@ -106,12 +76,33 @@ describe('Register token metadata', () => {
             e.Tuple(
               e.Str('register_token_metadata_callback'),
               e.TopBuffer('00000003'),
-              e.Buffer(e.Str(TOKEN_ID).toTopU8A()),
+              e.Buffer(e.Str(TOKEN_IDENTIFIER).toTopU8A()),
               e.U(100),
               e.Buffer(user.toTopU8A())
             )
           ),
       ],
+    });
+  });
+
+  test('Register token metadata egld', async () => {
+    await user.callContract({
+      callee: its,
+      funcName: 'registerTokenMetadata',
+      gasLimit: 100_000_000,
+      funcArgs: [e.Str('EGLD')],
+      value: 100,
+    });
+
+    let kvs = await its.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      hasKvs: [...baseItsKvs(deployer)],
+    });
+
+    // Cross chain call was done
+    assertAccount(await gasService.getAccount(), {
+      balance: 100n,
     });
   });
 

@@ -1,7 +1,7 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-use core::convert::Infallible;
+use core::convert::{Infallible, TryInto};
 use core::marker::PhantomData;
 
 use multiversx_sc::types::ManagedBuffer;
@@ -76,7 +76,7 @@ impl<M: ManagedTypeApi> Token<M> {
     fn head_append(&self, acc: &mut ManagedBuffer<M>, suffix_offset: u32) {
         match self {
             Token::Uint256(data) => acc.append_bytes(&Self::pad_biguint(data)),
-            Token::Bytes32(data) => Self::fixed_bytes_append(acc, data.as_managed_buffer()),
+            Token::Bytes32(data) => acc.append(data.as_managed_buffer()),
             Token::Bytes(_) | Token::String(_) => acc.append_bytes(&Self::pad_u32(suffix_offset)),
             Token::Uint8(data) => acc.append_bytes(&Self::pad_u32(*data as u32)),
         }
@@ -106,27 +106,10 @@ impl<M: ManagedTypeApi> Token<M> {
     }
 
     fn fixed_bytes_append(result: &mut ManagedBuffer<M>, data: &ManagedBuffer<M>) {
-        let len = (data.len() + 31) / 32;
-
-        let mut i = 0;
         data.for_each_batch::<32, _>(|bytes| {
-            let to_copy = match i == len - 1 {
-                false => 32,
-                true => match bytes.len() % 32 {
-                    0 => 32,
-                    x => x,
-                },
-            };
-
-            if to_copy == 32 {
-                result.append_bytes(bytes);
-            } else {
-                let mut padded = [0u8; 32];
-                padded[..to_copy].copy_from_slice(bytes);
-                result.append_bytes(&padded);
-            }
-
-            i += 1;
+            let mut padded = [0u8; 32];
+            padded[..bytes.len()].copy_from_slice(bytes);
+            result.append_bytes(&padded);
         });
     }
 
@@ -246,10 +229,7 @@ impl<M: ManagedTypeApi> ParamType<M> {
             panic!("Invalid data");
         }
 
-        ((slice[28] as usize) << 24)
-            + ((slice[29] as usize) << 16)
-            + ((slice[30] as usize) << 8)
-            + (slice[31] as usize)
+        u32::from_be_bytes(slice[28..32].try_into().unwrap()) as usize
     }
 
     fn take_u8(slice: &Word) -> u8 {
@@ -288,9 +268,8 @@ pub trait AbiEncodeDecode<M: ManagedTypeApi> {
         types: &[ParamType<M>],
         data: &ManagedBuffer<M>,
         result: &mut ArrayVec<Token<M>, CAP>,
-        initial_offset: usize,
     ) {
-        let mut offset = initial_offset * 32;
+        let mut offset = 0;
 
         for param in types {
             let res = param.abi_decode(data, offset);

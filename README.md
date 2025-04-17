@@ -38,6 +38,10 @@ There is also a module used by the Token Manager & Interchain Token Service cont
 
 For testing there is also the [Ping Pong Interchain](/ping-pong-interchain) contract, which is an implementation of the Ping Pong contract compatible with ITS.
 
+Aditionally, the Axelar ITS contract only allows calling contracts from the same shard!
+To aid with this, there is also a provided ITS [Proxy Contract](/interchain-token-service-proxy) contract, which is a reference implementation of a contract which needs to reside
+on the same Shard as the Axelar ITS contract, and will forward the call to a contract on a different Shard.
+
 # Axelar Amplifier
 
 These contracts work together with the [Axelar Amplifier](https://docs.axelar.dev/dev/amplifier/introduction) in order to facilitate

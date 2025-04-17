@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import createKeccakHash from 'keccak';
-import { ADDRESS_ZERO, INTERCHAIN_TOKEN_ID, TOKEN_ID, TOKEN_ID2 } from '../helpers';
+import { ADDRESS_ZERO, INTERCHAIN_TOKEN_ID, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER2 } from '../helpers';
 import {
+  deployTokenManagerInterchainToken,
   deployTokenManagerLockUnlock,
   TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN,
   TOKEN_MANAGER_TYPE_LOCK_UNLOCK,
@@ -30,11 +31,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -60,7 +61,7 @@ describe('Init', () => {
           e.Addr(ADDRESS_ZERO),
           e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
           e.TopBuffer(mockTokenId),
-          e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_ID))),
+          e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_IDENTIFIER))),
         ],
       })
       .assertFail({ code: 4, message: 'Zero address' });
@@ -92,7 +93,7 @@ describe('Init', () => {
           e.Addr(ADDRESS_ZERO),
           e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
           e.TopBuffer(mockTokenId),
-          e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_ID))),
+          e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_IDENTIFIER))),
         ],
       })
       .assertFail({ code: 4, message: 'Zero address' });
@@ -138,7 +139,7 @@ describe('Init', () => {
           e.Addr(ADDRESS_ZERO),
           e.U8(TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN),
           e.TopBuffer(mockTokenId),
-          e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_ID))),
+          e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_IDENTIFIER))),
         ],
       })
       .assertFail({ code: 4, message: 'Zero address' });
@@ -152,7 +153,7 @@ describe('Init', () => {
           deployer,
           e.U8(TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN),
           e.TopBuffer(mockTokenId),
-          e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_ID))),
+          e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_IDENTIFIER))),
         ],
       })
       .assertFail({ code: 4, message: 'Invalid token address' });
@@ -167,7 +168,7 @@ describe('Init', () => {
         otherUser,
         e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
         e.TopBuffer(INTERCHAIN_TOKEN_ID),
-        e.Tuple(e.Option(null), e.Option(e.Str(TOKEN_ID))),
+        e.Tuple(e.Option(null), e.Option(e.Str(TOKEN_IDENTIFIER))),
       ],
     });
 
@@ -180,7 +181,7 @@ describe('Init', () => {
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
         e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its & zero address
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER)),
       ],
     });
 
@@ -192,7 +193,7 @@ describe('Init', () => {
         otherUser,
         e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
         e.TopBuffer(INTERCHAIN_TOKEN_ID),
-        e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_ID))),
+        e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_IDENTIFIER))),
       ],
     });
 
@@ -205,7 +206,7 @@ describe('Init', () => {
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles for operator & its
         e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER)),
       ],
     });
   });
@@ -219,7 +220,7 @@ describe('Init', () => {
         otherUser,
         e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
         e.TopBuffer(INTERCHAIN_TOKEN_ID),
-        e.Tuple(e.Option(null), e.Option(e.Str(TOKEN_ID))),
+        e.Tuple(e.Option(null), e.Option(e.Str(TOKEN_IDENTIFIER))),
       ],
     });
 
@@ -232,7 +233,7 @@ describe('Init', () => {
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
         e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)), // flow limiter & operator roles for its & zero address
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER)),
       ],
     });
 
@@ -244,7 +245,7 @@ describe('Init', () => {
         otherUser,
         e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
         e.TopBuffer(INTERCHAIN_TOKEN_ID),
-        e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_ID))),
+        e.Tuple(e.Option(deployer), e.Option(e.Str(TOKEN_IDENTIFIER))),
       ],
     });
 
@@ -257,7 +258,7 @@ describe('Init', () => {
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(INTERCHAIN_TOKEN_ID)),
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000110)), // flow limiter & operator roles for its & zero address
         e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000110)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER)),
       ],
     });
   });
@@ -455,7 +456,7 @@ describe('Flow limit', () => {
         callee: tokenManager,
         funcName: 'setFlowLimit',
         gasLimit: 5_000_000,
-        funcArgs: [e.U(100)],
+        funcArgs: [e.Option(e.U(100))],
       })
       .assertFail({ code: 4, message: 'Missing any of roles' });
 
@@ -470,7 +471,7 @@ describe('Flow limit', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(100)],
+      funcArgs: [e.Option(e.U(100))],
     });
 
     let kvs = await tokenManager.getAccount();
@@ -481,7 +482,7 @@ describe('Flow limit', () => {
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
 
-        e.kvs.Mapper('flow_limit').Value(e.U(100)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(100))),
       ],
     });
 
@@ -489,7 +490,7 @@ describe('Flow limit', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(200)],
+      funcArgs: [e.Option(e.U(200))],
     });
 
     kvs = await tokenManager.getAccount();
@@ -500,7 +501,26 @@ describe('Flow limit', () => {
 
         e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
 
-        e.kvs.Mapper('flow_limit').Value(e.U(200)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(200))),
+      ],
+    });
+
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(null)],
+    });
+
+    kvs = await tokenManager.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseKvs,
+
+        e.kvs.Mapper('account_roles', deployer).Value(e.U32(0b00000100)), // flow limit role
+
+        e.kvs.Mapper('flow_limit').Value(e.Option(null)),
       ],
     });
   });
@@ -513,7 +533,15 @@ describe('Give token lock unlock', () => {
     // Ensure token manager has tokens
     await tokenManager.setAccount({
       ...(await tokenManager.getAccount()),
-      kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
+    });
+
+    // Set unlimited flow limit
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(null)],
     });
 
     await user.callContract({
@@ -527,12 +555,12 @@ describe('Give token lock unlock', () => {
     const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 0 }])],
+      kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 0 }])],
     });
 
     const otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
-      kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
@@ -542,15 +570,32 @@ describe('Give token lock unlock', () => {
     // Ensure token manager has tokens
     await tokenManager.setAccount({
       ...(await tokenManager.getAccount()),
-      kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
+
+    // Set flow limit to zero
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(e.U(0))],
+    });
+
+    await user
+      .callContract({
+        callee: tokenManager,
+        funcName: 'giveToken',
+        gasLimit: 20_000_000,
+        funcArgs: [otherUser, e.U(500)],
+      })
+      .assertFail({ code: 4, message: 'Flow limit exceeded' });
 
     // Set flow limit
     await deployer.callContract({
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(500)],
+      funcArgs: [e.Option(e.U(500))],
     });
 
     await user.callContract({
@@ -567,16 +612,16 @@ describe('Give token lock unlock', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 500 }]),
       ],
     });
 
     let otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
-      kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }])],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 500 }])],
     });
 
     await world.setCurrentBlockInfo({
@@ -609,17 +654,17 @@ describe('Give token lock unlock', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
         e.kvs.Mapper('flow_in_amount', e.U64(1)).Value(e.U(500)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 0 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 0 }]),
       ],
     });
 
     otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
-      kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
@@ -640,7 +685,7 @@ describe('Give token lock unlock', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(999)],
+      funcArgs: [e.Option(e.U(999))],
     });
 
     await user
@@ -668,31 +713,57 @@ describe('Take token lock unlock', () => {
   test('Normal', async () => {
     const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
 
+    // Set unlimited flow limit
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(null)],
+    });
+
     await user.callContract({
       callee: tokenManager,
       funcName: 'takeToken',
       gasLimit: 20_000_000,
       funcArgs: [],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     // Tokens remain in contract
     const kvs = await tokenManager.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
   test('With flow limit', async () => {
     const baseKvs = await deployTokenManagerLockUnlock(deployer, user);
 
+    // Set flow limit to zero
+    await deployer.callContract({
+      callee: tokenManager,
+      funcName: 'setFlowLimit',
+      gasLimit: 5_000_000,
+      funcArgs: [e.Option(e.U(0))],
+    });
+
+    await user
+      .callContract({
+        callee: tokenManager,
+        funcName: 'takeToken',
+        gasLimit: 20_000_000,
+        funcArgs: [],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 500 }],
+      })
+      .assertFail({ code: 4, message: 'Flow limit exceeded' });
+
     // Set flow limit
     await deployer.callContract({
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(500)],
+      funcArgs: [e.Option(e.U(500))],
     });
 
     await user.callContract({
@@ -700,7 +771,7 @@ describe('Take token lock unlock', () => {
       funcName: 'takeToken',
       gasLimit: 20_000_000,
       funcArgs: [],
-      esdts: [{ id: TOKEN_ID, amount: 500 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 500 }],
     });
 
     // Tokens remain in contract
@@ -710,10 +781,10 @@ describe('Take token lock unlock', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 500 }]),
       ],
     });
 
@@ -727,7 +798,7 @@ describe('Take token lock unlock', () => {
         funcName: 'takeToken',
         gasLimit: 20_000_000,
         funcArgs: [],
-        esdts: [{ id: TOKEN_ID, amount: 500 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 500 }],
       })
       .assertFail({ code: 4, message: 'Flow limit exceeded' });
 
@@ -740,7 +811,7 @@ describe('Take token lock unlock', () => {
       funcName: 'takeToken',
       gasLimit: 20_000_000,
       funcArgs: [],
-      esdts: [{ id: TOKEN_ID, amount: 500 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 500 }],
     });
 
     kvs = await tokenManager.getAccount();
@@ -749,11 +820,11 @@ describe('Take token lock unlock', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
         e.kvs.Mapper('flow_out_amount', e.U64(1)).Value(e.U(500)),
 
-        e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }]),
+        e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }]),
       ],
     });
   });
@@ -786,7 +857,7 @@ describe('Take token lock unlock', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(999)],
+      funcArgs: [e.Option(e.U(999))],
     });
 
     await user
@@ -795,7 +866,7 @@ describe('Take token lock unlock', () => {
         funcName: 'takeToken',
         gasLimit: 20_000_000,
         funcArgs: [],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Flow limit exceeded' });
   });
@@ -961,5 +1032,45 @@ describe('Operatorship', () => {
         funcArgs: [user],
       })
       .assertFail({ code: 4, message: 'Missing all roles' });
+  });
+});
+
+test('Donate tokens', async () => {
+  await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_IDENTIFIER);
+
+  await user
+    .callContract({
+      callee: tokenManager,
+      funcName: 'donateTokens',
+      gasLimit: 20_000_000,
+      funcArgs: [],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
+    })
+    .assertFail({ code: 4, message: 'Not lock/unlock token manager' });
+
+  const baseKvs = await deployTokenManagerLockUnlock(deployer);
+
+  await user
+    .callContract({
+      callee: tokenManager,
+      funcName: 'donateTokens',
+      gasLimit: 20_000_000,
+      funcArgs: [],
+      esdts: [{ id: TOKEN_IDENTIFIER2, amount: 1_000 }],
+    })
+    .assertFail({ code: 4, message: 'Wrong token sent' });
+
+  await user.callContract({
+    callee: tokenManager,
+    funcName: 'donateTokens',
+    gasLimit: 20_000_000,
+    funcArgs: [],
+    esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
+  });
+
+  // Token Manager received tokens
+  assertAccount(await tokenManager.getAccount(), {
+    balance: 0n,
+    kvs: [...baseKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
   });
 });

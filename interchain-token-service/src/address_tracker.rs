@@ -3,53 +3,48 @@ multiversx_sc::imports!();
 #[multiversx_sc::module]
 pub trait AddressTracker {
     #[only_owner]
-    #[endpoint(setTrustedAddress)]
-    fn set_trusted_address(&self, chain: &ManagedBuffer, address: &ManagedBuffer) {
-        require!(
-            !chain.is_empty() && !address.is_empty(),
-            "Zero string length"
-        );
+    #[endpoint(setTrustedChain)]
+    fn set_trusted_chain(&self, chain: ManagedBuffer) {
+        require!(!chain.is_empty(), "Zero string length");
 
-        self.trusted_address(chain).set(address.clone());
+        self.trusted_chain_added_event(&chain);
 
-        self.trusted_address_added_event(chain, address);
+        self.trusted_chains().insert(chain);
     }
 
     #[only_owner]
-    #[endpoint(removeTrustedAddress)]
-    fn remove_trusted_address(&self, source_chain: &ManagedBuffer) {
+    #[endpoint(removeTrustedChain)]
+    fn remove_trusted_chain(&self, source_chain: &ManagedBuffer) {
         require!(!source_chain.is_empty(), "Zero string length");
 
-        self.trusted_address(source_chain).clear();
+        self.trusted_chain_removed_event(source_chain);
 
-        self.trusted_address_removed_event(source_chain);
+        self.trusted_chains().swap_remove(source_chain);
     }
 
     fn set_chain_name(&self, chain_name: ManagedBuffer) {
         self.chain_name().set(chain_name);
     }
 
-    fn is_trusted_address(&self, chain: &ManagedBuffer, address: &ManagedBuffer) -> bool {
-        let trusted_address = self.trusted_address(chain);
-
-        !trusted_address.is_empty() && address == &trusted_address.get()
+    fn is_trusted_chain(&self, chain: &ManagedBuffer) -> bool {
+        self.trusted_chains().contains(chain)
     }
 
     #[view(chainName)]
     #[storage_mapper("chain_name")]
     fn chain_name(&self) -> SingleValueMapper<ManagedBuffer>;
 
-    #[view(trustedAddress)]
-    #[storage_mapper("trusted_address")]
-    fn trusted_address(&self, chain_name: &ManagedBuffer) -> SingleValueMapper<ManagedBuffer>;
+    #[view(trustedChains)]
+    #[storage_mapper("trusted_chains")]
+    fn trusted_chains(&self) -> UnorderedSetMapper<ManagedBuffer>;
 
-    #[event("trusted_address_added_event")]
-    fn trusted_address_added_event(
-        &self,
-        #[indexed] source_chain: &ManagedBuffer,
-        source_address: &ManagedBuffer,
-    );
+    #[view(itsHubAddress)]
+    #[storage_mapper("its_hub_address")]
+    fn its_hub_address(&self) -> SingleValueMapper<ManagedBuffer>;
 
-    #[event("trusted_address_removed_event")]
-    fn trusted_address_removed_event(&self, #[indexed] source_chain: &ManagedBuffer);
+    #[event("trusted_chain_added_event")]
+    fn trusted_chain_added_event(&self, #[indexed] source_chain: &ManagedBuffer);
+
+    #[event("trusted_chain_removed_event")]
+    fn trusted_chain_removed_event(&self, #[indexed] source_chain: &ManagedBuffer);
 }

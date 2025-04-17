@@ -7,11 +7,10 @@ use token_manager::constants::{DeployTokenManagerParams, TokenManagerType};
 
 use crate::abi::{AbiEncodeDecode, ParamType};
 use crate::abi_types::{
-    DeployInterchainTokenPayload, InterchainTransferPayload, LinkTokenPayload, SendToHubPayload,
+    DeployInterchainTokenPayload, InterchainTransferPayload, LinkTokenPayload,
+    ReceiveFromHubPayload,
 };
-use crate::constants::{
-    Hash, TokenId, ITS_HUB_CHAIN_NAME, ITS_HUB_ROUTING_IDENTIFIER, MESSAGE_TYPE_RECEIVE_FROM_HUB,
-};
+use crate::constants::{Hash, TokenId, MESSAGE_TYPE_RECEIVE_FROM_HUB};
 use crate::{address_tracker, events, proxy_gmp, proxy_its};
 
 multiversx_sc::imports!();
@@ -25,47 +24,32 @@ pub trait ExecutableModule:
     + address_tracker::AddressTracker
 {
     // Returns (message_type, original_source_chain, payload)
-    fn get_execute_params(
-        &self,
-        source_chain: ManagedBuffer,
-        payload: ManagedBuffer,
-    ) -> (u64, ManagedBuffer, ManagedBuffer) {
+    fn get_execute_params(&self, payload: ManagedBuffer) -> (u64, ManagedBuffer, ManagedBuffer) {
         let message_type = self.get_message_type(&payload);
 
-        // Unwrap ITS message if coming from ITS hub
-        if message_type == MESSAGE_TYPE_RECEIVE_FROM_HUB {
-            require!(source_chain == *ITS_HUB_CHAIN_NAME, "Untrusted chain");
+        require!(
+            message_type == MESSAGE_TYPE_RECEIVE_FROM_HUB,
+            "Invalid message type"
+        );
 
-            let data = SendToHubPayload::<Self::Api>::abi_decode(payload);
+        let data = ReceiveFromHubPayload::<Self::Api>::abi_decode(payload);
 
-            // Check whether the original source chain is expected to be routed via the ITS Hub
-            require!(
-                self.is_trusted_address(
-                    &data.destination_chain,
-                    &ManagedBuffer::from(ITS_HUB_ROUTING_IDENTIFIER)
-                ),
-                "Untrusted chain"
-            );
+        // Check whether the original source chain is expected to be routed via the ITS Hub
+        require!(
+            self.is_trusted_chain(&data.original_source_chain),
+            "Untrusted chain"
+        );
 
-            let message_type = self.get_message_type(&data.payload);
+        let message_type = self.get_message_type(&data.payload);
 
-            // Return original message type, source chain and payload
-            return (message_type, data.destination_chain, data.payload);
-        }
-
-        // Prevent receiving a direct message from the ITS Hub. This is not supported yet.
-        require!(source_chain != *ITS_HUB_CHAIN_NAME, "Untrusted chain");
-
-        (message_type, source_chain, payload)
+        // Return original message type, source chain and payload
+        (message_type, data.original_source_chain, data.payload)
     }
 
     fn process_interchain_transfer_payload(
         &self,
         original_source_chain: ManagedBuffer,
-        source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        payload_hash: Hash<Self::Api>,
         payload: ManagedBuffer,
     ) {
         let send_token_payload = InterchainTransferPayload::<Self::Api>::abi_decode(payload);
@@ -88,15 +72,6 @@ pub trait ExecutableModule:
         );
 
         if send_token_payload.data.is_empty() {
-            let valid = self.gateway_validate_message(
-                &source_chain,
-                &message_id,
-                &source_address,
-                &payload_hash,
-            );
-
-            require!(valid, "Not approved by gateway");
-
             let _ = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -105,16 +80,6 @@ pub trait ExecutableModule:
 
             return;
         }
-
-        // Only check that the call is valid and only mark it as executed after the async call has finished
-        let valid = self.gateway_is_message_approved(
-            &source_chain,
-            &message_id,
-            &source_address,
-            &payload_hash,
-        );
-
-        require!(valid, "Not approved by gateway");
 
         // Here we give the tokens to this contract and then call the executable contract with the tokens
         // In case of async call error, the token_manager_take_token method is called to revert this
@@ -127,10 +92,7 @@ pub trait ExecutableModule:
         self.executable_contract_execute_with_interchain_token(
             destination_address,
             original_source_chain,
-            source_chain,
             message_id,
-            source_address,
-            payload_hash,
             send_token_payload.source_address,
             send_token_payload.data,
             send_token_payload.token_id,
@@ -148,17 +110,15 @@ pub trait ExecutableModule:
         );
 
         // Support only ESDT tokens for custom linking of tokens
-        let token_identifier = TokenIdentifier::from(link_token_payload.destination_token_address);
+        let token_identifier =
+            EgldOrEsdtTokenIdentifier::parse(link_token_payload.destination_token_address);
 
-        require!(
-            token_identifier.is_valid_esdt_identifier(),
-            "Invalid token identifier"
-        );
+        require!(token_identifier.is_valid(), "Invalid token identifier");
 
         self.deploy_token_manager_raw(
             &link_token_payload.token_id,
             link_token_payload.token_manager_type,
-            Some(EgldOrEsdtTokenIdentifier::esdt(token_identifier)),
+            Some(token_identifier),
             link_token_payload.link_params,
         );
     }
@@ -227,6 +187,7 @@ pub trait ExecutableModule:
             data.name,
             data.symbol,
             data.decimals,
+            self.blockchain().get_caller(),
         );
     }
 

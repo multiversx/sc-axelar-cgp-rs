@@ -85,7 +85,22 @@ pub trait Governance: events::Events {
     ) {
         let proposal_hash = self.get_proposal_hash(&target, &call_data, &native_value);
 
-        let eta = self.finalize_time_lock(&proposal_hash);
+        require!(
+            self.time_lock_proposals_submitted(&proposal_hash).get(),
+            "Proposal is not submitted"
+        );
+        require!(
+            self.time_lock_proposals_being_executed(&proposal_hash)
+                .is_empty(),
+            "Proposal is being executed"
+        );
+
+        let eta = self.time_lock_eta(&proposal_hash).get();
+
+        require!(
+            self.blockchain().get_block_timestamp() >= eta,
+            "Time lock not ready"
+        );
 
         self.proposal_executed_event(
             &proposal_hash,
@@ -123,6 +138,9 @@ pub trait Governance: events::Events {
 
         let gas_limit = gas_left - extra_gas_for_callback - KEEP_EXTRA_GAS;
 
+        self.time_lock_proposals_being_executed(&proposal_hash)
+            .set(true);
+
         self.send()
             .contract_call::<()>(target, decoded_call_data.endpoint_name)
             .with_egld_transfer(native_value)
@@ -131,7 +149,6 @@ pub trait Governance: events::Events {
             .async_call_promise()
             .with_callback(self.callbacks().execute_proposal_callback(
                 &proposal_hash,
-                eta,
                 caller,
                 payments,
             ))
@@ -154,7 +171,16 @@ pub trait Governance: events::Events {
         let proposal_hash = self.get_proposal_hash(&target, &call_data, &native_value);
 
         require!(
-            self.operator_approvals(&proposal_hash).take(),
+            self.operator_proposals_submitted(&proposal_hash).get(),
+            "Proposal is not submitted"
+        );
+        require!(
+            self.operator_proposals_being_executed(&proposal_hash)
+                .is_empty(),
+            "Proposal is being executed"
+        );
+        require!(
+            self.operator_approvals(&proposal_hash).get(),
             "Not approved"
         );
 
@@ -189,6 +215,9 @@ pub trait Governance: events::Events {
             gas_left > extra_gas_for_callback + KEEP_EXTRA_GAS + decoded_call_data.min_gas_limit,
             "Insufficient gas for execution"
         );
+
+        self.operator_proposals_being_executed(&proposal_hash)
+            .set(true);
 
         let gas_limit = gas_left - extra_gas_for_callback - KEEP_EXTRA_GAS;
 
@@ -282,6 +311,8 @@ pub trait Governance: events::Events {
             &execute_payload.native_value,
         );
 
+        require!(!proposal_hash.is_empty(), "Invalid proposal hash");
+
         match execute_payload.command {
             ServiceGovernanceCommand::ScheduleTimeLockProposal => {
                 let eta = self.schedule_time_lock(&proposal_hash, execute_payload.eta);
@@ -297,7 +328,7 @@ pub trait Governance: events::Events {
                 );
             }
             ServiceGovernanceCommand::CancelTimeLockProposal => {
-                self.cancel_time_lock(&proposal_hash);
+                self.remove_proposal_time_lock(&proposal_hash);
 
                 self.proposal_cancelled_event(
                     &proposal_hash,
@@ -310,7 +341,7 @@ pub trait Governance: events::Events {
                 );
             }
             ServiceGovernanceCommand::ApproveOperatorProposal => {
-                self.operator_approvals(&proposal_hash).set(true);
+                self.approve_operator_proposal(&proposal_hash);
 
                 self.operator_approved_event(
                     &proposal_hash,
@@ -322,7 +353,7 @@ pub trait Governance: events::Events {
                 );
             }
             ServiceGovernanceCommand::CancelOperatorApproval => {
-                self.operator_approvals(&proposal_hash).clear();
+                self.remove_proposal_operator(&proposal_hash);
 
                 self.operator_cancelled_event(
                     &proposal_hash,
@@ -341,14 +372,16 @@ pub trait Governance: events::Events {
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
         mut eta: u64,
     ) -> u64 {
-        require!(!hash.is_empty(), "Invalid time lock hash");
+        require!(
+            self.time_lock_proposals_submitted(hash).is_empty(),
+            "Proposal was already submitted"
+        );
+        require!(
+            self.time_lock_proposals_being_executed(hash).is_empty(),
+            "Proposal is being executed"
+        );
 
         let time_lock_eta_mapper = self.time_lock_eta(hash);
-
-        require!(
-            time_lock_eta_mapper.is_empty(),
-            "Time lock already scheduled"
-        );
 
         let minimum_eta =
             self.blockchain().get_block_timestamp() + self.minimum_time_lock_delay().get();
@@ -358,26 +391,33 @@ pub trait Governance: events::Events {
         }
 
         time_lock_eta_mapper.set(eta);
+        self.time_lock_proposals_submitted(hash).set(true);
 
         eta
     }
 
-    fn cancel_time_lock(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) {
-        require!(!hash.is_empty(), "Invalid time lock hash");
-
-        self.time_lock_eta(hash).clear();
-    }
-
-    fn finalize_time_lock(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) -> u64 {
-        let eta = self.time_lock_eta(hash).take();
-
-        require!(!hash.is_empty() && eta != 0, "Invalid time lock hash");
+    fn approve_operator_proposal(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) {
         require!(
-            self.blockchain().get_block_timestamp() >= eta,
-            "Time lock not ready"
+            self.operator_proposals_submitted(hash).is_empty(),
+            "Proposal was already submitted"
+        );
+        require!(
+            self.operator_proposals_being_executed(hash).is_empty(),
+            "Proposal is being executed"
         );
 
-        eta
+        self.operator_approvals(hash).set(true);
+        self.operator_proposals_submitted(hash).set(true);
+    }
+
+    fn remove_proposal_time_lock(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) {
+        self.time_lock_eta(hash).clear();
+        self.time_lock_proposals_submitted(hash).clear();
+    }
+
+    fn remove_proposal_operator(&self, hash: &ManagedByteArray<KECCAK256_RESULT_LEN>) {
+        self.operator_approvals(hash).clear();
+        self.operator_proposals_submitted(hash).clear();
     }
 
     fn get_proposal_hash(
@@ -405,21 +445,20 @@ pub trait Governance: events::Events {
     fn execute_proposal_callback(
         &self,
         hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
-        eta: u64,
         caller: ManagedAddress,
         payments: EgldOrMultiEsdtPayment<Self::Api>,
         #[call_result] call_result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
     ) {
+        self.time_lock_proposals_being_executed(hash).clear();
+
         match call_result {
             ManagedAsyncCallResult::Ok(results) => {
+                self.remove_proposal_time_lock(hash);
+
                 self.execute_proposal_success_event(hash, results);
             }
             ManagedAsyncCallResult::Err(err) => {
                 self.handle_callback_failure(caller, payments);
-
-                // Let call be retried in case of failure, mostly because async call
-                // can fail with out of gas since it can be triggered by anyone
-                self.time_lock_eta(hash).set(eta);
 
                 self.execute_proposal_error_event(hash, err.err_code, err.err_msg);
             }
@@ -434,16 +473,16 @@ pub trait Governance: events::Events {
         payments: EgldOrMultiEsdtPayment<Self::Api>,
         #[call_result] call_result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
     ) {
+        self.operator_proposals_being_executed(hash).clear();
+
         match call_result {
             ManagedAsyncCallResult::Ok(results) => {
+                self.remove_proposal_operator(hash);
+
                 self.operator_execute_proposal_success_event(hash, results);
             }
             ManagedAsyncCallResult::Err(err) => {
                 self.handle_callback_failure(operator, payments);
-
-                // Let call be retried in case of failure, mostly because async call
-                // can fail with out of gas
-                self.operator_approvals(hash).set(true);
 
                 self.operator_execute_proposal_error_event(hash, err.err_code, err.err_msg);
             }
@@ -546,6 +585,34 @@ pub trait Governance: events::Events {
         user: &ManagedAddress,
         token: EgldOrEsdtToken<Self::Api>,
     ) -> SingleValueMapper<BigUint>;
+
+    #[view(getTimelockProposalsSubmitted)]
+    #[storage_mapper("time_lock_proposals_submitted")]
+    fn time_lock_proposals_submitted(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> SingleValueMapper<bool>;
+
+    #[view(getOperatorProposalsSubmitted)]
+    #[storage_mapper("operator_proposals_submitted")]
+    fn operator_proposals_submitted(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> SingleValueMapper<bool>;
+
+    #[view(getTimelockProposalsBeingExecuted)]
+    #[storage_mapper("time_lock_proposals_being_executed")]
+    fn time_lock_proposals_being_executed(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> SingleValueMapper<bool>;
+
+    #[view(getOperatorProposalsBeingExecuted)]
+    #[storage_mapper("operator_proposals_being_executed")]
+    fn operator_proposals_being_executed(
+        &self,
+        hash: &ManagedByteArray<KECCAK256_RESULT_LEN>,
+    ) -> SingleValueMapper<bool>;
 
     #[proxy]
     fn gateway_proxy(&self, sc_address: ManagedAddress) -> gateway::Proxy<Self::Api>;

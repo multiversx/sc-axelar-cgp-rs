@@ -1,0 +1,10 @@
+[package]
+name = "interchain-token-service-proxy-meta"
+version = "0.0.0"
+edition = "2021"
+publish = false
+[dependencies.interchain-token-service-proxy]
+path = ".."
+
+[dependencies.multiversx-sc-meta]
+version = "0.50.3"

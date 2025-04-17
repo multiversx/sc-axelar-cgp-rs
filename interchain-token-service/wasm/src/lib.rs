@@ -8,8 +8,7 @@
 // Upgrade:                              1
 // Endpoints:                           46
 // Async Callback:                       1
-// Promise callbacks:                    1
-// Total number of exported functions:  50
+// Total number of exported functions:  49
 
 #![no_std]
 
@@ -25,17 +24,17 @@ multiversx_sc_wasm_adapter::endpoints! {
         execute => execute
         registerTokenMetadata => register_token_metadata
         interchainTransfer => interchain_transfer
-        callContractWithInterchainToken => call_contract_with_interchain_token
         transferOperatorship => transfer_operatorship
         proposeOperatorship => propose_operatorship
         acceptOperatorship => accept_operatorship
         isOperator => is_operator
         getAccountRoles => account_roles
         getProposedRoles => proposed_roles
-        setTrustedAddress => set_trusted_address
-        removeTrustedAddress => remove_trusted_address
+        setTrustedChain => set_trusted_chain
+        removeTrustedChain => remove_trusted_chain
         chainName => chain_name
-        trustedAddress => trusted_address
+        trustedChains => trusted_chains
+        itsHubAddress => its_hub_address
         gateway => gateway
         gasService => gas_service
         flowLimit => flow_limit
@@ -43,9 +42,8 @@ multiversx_sc_wasm_adapter::endpoints! {
         flowInAmount => flow_in_amount
         deployedTokenManager => deployed_token_manager
         registeredTokenIdentifier => registered_token_identifier
-        invalidTokenManagerAddress => invalid_token_manager_address
+        invalidTokenManagerAddress => get_opt_token_manager_address
         tokenManagerAddress => token_manager_address
-        transferWithDataLock => transfer_with_data_lock
         tokenManagerImplementation => token_manager
         deployInterchainToken => deploy_interchain_token
         approveDeployRemoteInterchainToken => approve_deploy_remote_interchain_token
@@ -64,10 +62,10 @@ multiversx_sc_wasm_adapter::endpoints! {
         linkedTokenId => linked_token_id
         chainNameHash => chain_name_hash
         approvedDestinationMinters => approved_destination_minters
+        interchainTokenStatus => interchain_token_status
         pause => pause_endpoint
         unpause => unpause_endpoint
         isPaused => paused_status
-        execute_with_token_callback => execute_with_token_callback
     )
 }
 

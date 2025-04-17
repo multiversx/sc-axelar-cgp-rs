@@ -3,10 +3,9 @@ import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
 import {
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
-  OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
-  TOKEN_ID,
-  TOKEN_ID2,
+  TOKEN_IDENTIFIER,
+  TOKEN_IDENTIFIER2,
   TOKEN_MANAGER_ADDRESS,
 } from '../helpers';
 import { Buffer } from 'buffer';
@@ -17,9 +16,12 @@ import {
   deployTokenManagerInterchainToken,
   gateway,
   its,
+  ITS_HUB_ADDRESS,
+  ITS_HUB_CHAIN,
   MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
   mockGatewayMessageApproved,
   tokenManager,
+  wrapFromItsHubPayload,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -42,11 +44,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -57,11 +59,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -76,19 +78,19 @@ afterEach(async () => {
 });
 
 const mockGatewayCall = async (tokenId = INTERCHAIN_TOKEN_ID) => {
-  const payload = AbiCoder.defaultAbiCoder()
-    .encode(
-      ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
-      [
-        MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-        Buffer.from(tokenId, 'hex'),
-        'TokenName',
-        'SYMBOL',
-        18,
-        Buffer.from(user.toTopU8A()), // minter
-      ]
-    )
-    .substring(2);
+  const originalPayload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
+    [
+      MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+      Buffer.from(tokenId, 'hex'),
+      'TokenName',
+      'SYMBOL',
+      18,
+      Buffer.from(user.toTopU8A()), // minter
+    ]
+  );
+
+  const payload = wrapFromItsHubPayload(originalPayload);
 
   const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
@@ -102,7 +104,7 @@ test('Only deploy token manager', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 100_000_000,
-    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+    funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
   });
 
   const kvs = await its.getAccount();
@@ -149,7 +151,7 @@ test('Only issue esdt', async () => {
     funcName: 'execute',
     gasLimit: 600_000_000,
     value: BigInt('50000000000000000'),
-    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+    funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
   });
 
   // Nothing was changed for its
@@ -172,7 +174,7 @@ test('Only issue esdt', async () => {
       // Async call tested in itsCrossChainCalls.test.ts file
       e.kvs
         .Mapper('CB_CLOSURE................................')
-        .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+        .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
     ],
   });
   assertAccount(await user.getAccount(), {
@@ -194,23 +196,22 @@ test('Errors', async () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str('SomeOtherAddress'), payload],
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
-    .assertFail({ code: 4, message: 'Not remote service' });
+    .assertFail({ code: 4, message: 'Not its hub' });
 
-  payload = AbiCoder.defaultAbiCoder()
-    .encode(
-      ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
-      [
-        MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
-        Buffer.from(INTERCHAIN_TOKEN_ID, 'hex'),
-        'TokenName',
-        'SYMBOL',
-        18,
-        Buffer.from(user.toTopU8A()),
-      ]
-    )
-    .substring(2);
+  payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'string', 'string', 'uint8', 'bytes'],
+    [
+      MESSAGE_TYPE_DEPLOY_INTERCHAIN_TOKEN,
+      Buffer.from(INTERCHAIN_TOKEN_ID, 'hex'),
+      'TokenName',
+      'SYMBOL',
+      18,
+      Buffer.from(user.toTopU8A()),
+    ]
+  );
+  payload = wrapFromItsHubPayload(payload);
 
   await user
     .callContract({
@@ -218,7 +219,7 @@ test('Errors', async () => {
       funcName: 'execute',
       gasLimit: 100_000_000,
       value: BigInt('50000000000000000'),
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
     .assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
 
@@ -227,7 +228,7 @@ test('Errors', async () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
     .assertFail({ code: 4, message: 'Not approved by gateway' });
 
@@ -247,7 +248,7 @@ test('Errors', async () => {
       funcName: 'execute',
       gasLimit: 20_000_000,
       value: BigInt('50000000000000000'),
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
     .assertFail({ code: 4, message: 'Not approved by gateway' });
 });

@@ -9,6 +9,9 @@ a new token, as well as register a token remotely for another chain.
 This contract is based on version v2.1.0 of the [Interchain Token Service implementation in Solidity](https://github.com/axelarnetwork/interchain-token-service/blob/v/contracts/InterchainTokenService.sol).
 It also includes merges the **Interchain Token Factory** contract from Solidity into this same contract for easier management. 
 
+Keep in mind that when executing cross-chain transfers through the MultiversX Axelar ITS contract from another chain, only contracts **on the same Shard** as the Axelar ITS contract are supported.
+See the [Interchain Token Service Proxy](../interchain-token-service-proxy) for more details.
+
 ## User callable endpoints
 - **registerTokenMetadata** (token_identifier) - registers metadata (decimals) for a token identifier with the ITS Hub
   - should be used in case of custom tokens when wanting to link an existing token on MultiversX with an existing token on another blockchain
@@ -49,9 +52,9 @@ It also includes merges the **Interchain Token Factory** contract from Solidity 
 The owner of the ITS contract can set flow limits for all token manager contracts that have the operator the ITS contract:
 - **setFlowLimits** (token_ids, flow_limits) - set flow limits for multiple token ids at a time
 
-The owner can also add or remove other ITS addresses for other chains as trusted:
-- **setTrustedAddress** (chain, address)
-- **removeTrustedAddress** (source_chain)
+The owner can also add or remove other ITS chains as trusted:
+- **setTrustedChain** (chain)
+- **removeTrustedChain** (chain)
 
 ## Execute endpoint
 
