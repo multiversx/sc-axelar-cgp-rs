@@ -18,9 +18,6 @@ pub const MESSAGE_TYPE_REGISTER_TOKEN_METADATA: u64 = 6;
  */
 pub const ITS_HUB_CHAIN_NAME: &[u8] = b"axelar";
 
-pub const EXECUTE_WITH_TOKEN_CALLBACK_GAS: u64 = 20_000_000; // This is overkill, but the callback should be prevented from failing at all costs
-pub const KEEP_EXTRA_GAS: u64 = 15_000_000; // Extra gas to keep in contract before registering async promise. This needs to be a somewhat larger value
-
 pub type Hash<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 pub type TokenId<M> = ManagedByteArray<M, KECCAK256_RESULT_LEN>;
 

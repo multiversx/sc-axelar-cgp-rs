@@ -123,12 +123,19 @@ pub trait InterchainTokenServiceContract:
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
+                let valid = self.gateway_validate_message(
+                    &source_chain,
+                    &message_id,
+                    &source_address,
+                    &payload_hash,
+                );
+
+                require!(valid, "Not approved by gateway");
+
                 self.process_interchain_transfer_payload(
                     original_source_chain,
                     source_chain,
                     message_id,
-                    source_address,
-                    payload_hash,
                     payload,
                 );
             }

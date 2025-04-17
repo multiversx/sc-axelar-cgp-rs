@@ -6,10 +6,7 @@ use token_manager::ProxyTrait as _;
 
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::RegisterTokenMetadataPayload;
-use crate::constants::{
-    Hash, ManagedBufferAscii, TokenId, EXECUTE_WITH_TOKEN_CALLBACK_GAS,
-    KEEP_EXTRA_GAS, MESSAGE_TYPE_REGISTER_TOKEN_METADATA,
-};
+use crate::constants::{ManagedBufferAscii, TokenId, MESSAGE_TYPE_REGISTER_TOKEN_METADATA};
 use crate::{address_tracker, events, proxy_gmp};
 
 multiversx_sc::imports!();
@@ -175,32 +172,12 @@ pub trait ProxyItsModule:
         original_source_chain: ManagedBuffer,
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        payload_hash: Hash<Self::Api>,
         original_source_address: ManagedBuffer,
         data: ManagedBuffer,
         token_id: TokenId<Self::Api>,
         token_identifier: EgldOrEsdtTokenIdentifier,
         amount: BigUint,
     ) {
-        let gas_left = self.blockchain().get_gas_left();
-
-        require!(
-            gas_left > EXECUTE_WITH_TOKEN_CALLBACK_GAS + KEEP_EXTRA_GAS,
-            "Not enough gas left for async call"
-        );
-
-        let gas_limit = gas_left - EXECUTE_WITH_TOKEN_CALLBACK_GAS - KEEP_EXTRA_GAS;
-
-        require!(
-            self.transfer_with_data_lock(&source_chain, &message_id)
-                .is_empty(),
-            "Async call in progress"
-        );
-
-        self.transfer_with_data_lock(&source_chain, &message_id)
-            .set(true);
-
         self.executable_contract_proxy(destination_address)
             .execute_with_interchain_token(
                 &original_source_chain,
@@ -210,18 +187,9 @@ pub trait ProxyItsModule:
                 token_id.clone(),
             )
             .with_egld_or_single_esdt_transfer((token_identifier.clone(), 0, amount.clone()))
-            .with_gas_limit(gas_limit)
-            .with_callback(self.callbacks().execute_with_token_callback(
-                source_chain,
-                message_id,
-                source_address,
-                payload_hash,
-                token_id,
-                token_identifier,
-                amount,
-            ))
-            .with_extra_gas_for_callback(EXECUTE_WITH_TOKEN_CALLBACK_GAS)
-            .register_promise();
+            .execute_on_dest_context::<()>();
+
+        self.execute_with_interchain_token_success_event(source_chain, message_id);
     }
 
     fn register_token_metadata_async_call(
@@ -328,52 +296,6 @@ pub trait ProxyItsModule:
         &self,
         sc_address: ManagedAddress,
     ) -> executable_contract_proxy::Proxy<Self::Api>;
-
-    #[promises_callback]
-    fn execute_with_token_callback(
-        &self,
-        source_chain: ManagedBuffer,
-        message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        payload_hash: Hash<Self::Api>,
-        token_id: TokenId<Self::Api>,
-        token_identifier: EgldOrEsdtTokenIdentifier,
-        amount: BigUint,
-        #[call_result] result: ManagedAsyncCallResult<MultiValueEncoded<ManagedBuffer>>,
-    ) {
-        match result {
-            ManagedAsyncCallResult::Ok(_) => {
-                self.transfer_with_data_lock(&source_chain, &message_id)
-                    .clear();
-
-                // This will always be true
-                let _ = self.gateway_validate_message(
-                    &source_chain,
-                    &message_id,
-                    &source_address,
-                    &payload_hash,
-                );
-
-                self.execute_with_interchain_token_success_event(source_chain, message_id);
-            }
-            ManagedAsyncCallResult::Err(_) => {
-                self.transfer_with_data_lock(&source_chain, &message_id)
-                    .clear();
-
-                self.token_manager_take_token(&token_id, token_identifier, amount);
-
-                self.execute_with_interchain_token_failed_event(source_chain, message_id);
-            }
-        }
-    }
-
-    #[view(transferWithDataLock)]
-    #[storage_mapper("transfer_with_data_lock")]
-    fn transfer_with_data_lock(
-        &self,
-        source_chain: &ManagedBuffer,
-        message_id: &ManagedBuffer,
-    ) -> SingleValueMapper<bool>;
 
     #[callback]
     fn register_token_metadata_callback(

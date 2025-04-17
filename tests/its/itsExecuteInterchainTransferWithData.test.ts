@@ -180,9 +180,9 @@ test('Transfer with data contract error', async () => {
     funcName: 'execute',
     gasLimit: 300_000_000,
     funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
-  });
+  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
-  // Assert its doesn't have balance & lock removed
+  // Assert its doesn't have balance
   assertAccount(await its.getAccount(), {
     balance: 0n,
     kvs: [...baseItsKvs(deployer, computedTokenId)],

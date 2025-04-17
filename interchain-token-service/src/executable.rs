@@ -51,8 +51,6 @@ pub trait ExecutableModule:
         original_source_chain: ManagedBuffer,
         source_chain: ManagedBuffer,
         message_id: ManagedBuffer,
-        source_address: ManagedBuffer,
-        payload_hash: Hash<Self::Api>,
         payload: ManagedBuffer,
     ) {
         let send_token_payload = InterchainTransferPayload::<Self::Api>::abi_decode(payload);
@@ -75,15 +73,6 @@ pub trait ExecutableModule:
         );
 
         if send_token_payload.data.is_empty() {
-            let valid = self.gateway_validate_message(
-                &source_chain,
-                &message_id,
-                &source_address,
-                &payload_hash,
-            );
-
-            require!(valid, "Not approved by gateway");
-
             let _ = self.token_manager_give_token(
                 &send_token_payload.token_id,
                 &destination_address,
@@ -92,16 +81,6 @@ pub trait ExecutableModule:
 
             return;
         }
-
-        // Only check that the call is valid and only mark it as executed after the async call has finished
-        let valid = self.gateway_is_message_approved(
-            &source_chain,
-            &message_id,
-            &source_address,
-            &payload_hash,
-        );
-
-        require!(valid, "Not approved by gateway");
 
         // Here we give the tokens to this contract and then call the executable contract with the tokens
         // In case of async call error, the token_manager_take_token method is called to revert this
@@ -116,8 +95,6 @@ pub trait ExecutableModule:
             original_source_chain,
             source_chain,
             message_id,
-            source_address,
-            payload_hash,
             send_token_payload.source_address,
             send_token_payload.data,
             send_token_payload.token_id,

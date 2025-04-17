@@ -6,10 +6,9 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           47
+// Endpoints:                           46
 // Async Callback:                       1
-// Promise callbacks:                    1
-// Total number of exported functions:  51
+// Total number of exported functions:  49
 
 #![no_std]
 
@@ -45,7 +44,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         registeredTokenIdentifier => registered_token_identifier
         invalidTokenManagerAddress => get_opt_token_manager_address
         tokenManagerAddress => token_manager_address
-        transferWithDataLock => transfer_with_data_lock
         tokenManagerImplementation => token_manager
         deployInterchainToken => deploy_interchain_token
         approveDeployRemoteInterchainToken => approve_deploy_remote_interchain_token
@@ -68,7 +66,6 @@ multiversx_sc_wasm_adapter::endpoints! {
         pause => pause_endpoint
         unpause => unpause_endpoint
         isPaused => paused_status
-        execute_with_token_callback => execute_with_token_callback
     )
 }
 
