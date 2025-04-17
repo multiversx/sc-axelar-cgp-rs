@@ -41,7 +41,6 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for InterchainTransferPayload<M> {
             ],
             &payload,
             &mut result,
-            0,
         );
 
         let data = result.pop().unwrap().into_managed_buffer();
@@ -84,7 +83,7 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
     }
 
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
-        let mut result = ArrayVec::<Token<M>, 9>::new();
+        let mut result = ArrayVec::<Token<M>, 6>::new();
 
         Self::raw_abi_decode(
             &[
@@ -97,7 +96,6 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for DeployInterchainTokenPayload<M> {
             ],
             &payload,
             &mut result,
-            0,
         );
 
         let minter = result.pop().unwrap().into_managed_buffer();
@@ -134,13 +132,12 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for SendToHubPayload<M> {
     }
 
     fn abi_decode(payload: ManagedBuffer<M>) -> Self {
-        let mut result = ArrayVec::<Token<M>, 4>::new();
+        let mut result = ArrayVec::<Token<M>, 3>::new();
 
         Self::raw_abi_decode(
             &[ParamType::Uint256, ParamType::String, ParamType::Bytes],
             &payload,
             &mut result,
-            0,
         );
 
         let payload = result.pop().unwrap().into_managed_buffer();
@@ -177,7 +174,6 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for RegisterTokenMetadataPayload<M> {
             &[ParamType::Uint256, ParamType::Bytes, ParamType::Uint8],
             &payload,
             &mut result,
-            0,
         );
 
         let decimals = result.pop().unwrap().into_u8();
@@ -227,7 +223,6 @@ impl<M: ManagedTypeApi> AbiEncodeDecode<M> for LinkTokenPayload<M> {
             ],
             &payload,
             &mut result,
-            0,
         );
 
         let link_params = result.pop().unwrap().into_managed_buffer();
