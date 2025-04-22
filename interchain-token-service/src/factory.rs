@@ -607,6 +607,12 @@ pub trait FactoryModule:
     ) {
         match result {
             ManagedAsyncCallResult::Ok(values) => {
+                // Send back paid gas value to initial caller in case chain is no longer trusted
+                if !self.is_trusted_chain(&destination_chain) {
+                    self.send().direct_non_zero_egld(&caller, &gas_value);
+                    return;
+                }
+
                 let vec: ManagedVec<ManagedBuffer> = values.into_vec_of_buffers();
 
                 let token_name = vec.get(ESDT_PROPERTIES_TOKEN_NAME_INDEX).clone_value();

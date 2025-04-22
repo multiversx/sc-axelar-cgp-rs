@@ -303,7 +303,6 @@ pub trait UserFunctionsModule:
         let mut encoded = ManagedBuffer::new();
 
         encoded.append(prefix_interchain_token_id.as_managed_buffer());
-        encoded.append(ManagedAddress::zero().as_managed_buffer());
         encoded.append(salt.as_managed_buffer());
 
         self.crypto().keccak256(encoded)

@@ -472,7 +472,6 @@ export const computeInterchainTokenIdRaw = (deploySalt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_ID).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
-    Buffer.from(e.Addr(ADDRESS_ZERO).toTopHex(), 'hex'),
     Buffer.from(deploySalt, 'hex'),
   ]);
 
