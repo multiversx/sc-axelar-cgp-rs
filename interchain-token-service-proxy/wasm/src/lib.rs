@@ -6,10 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                            4
+// Endpoints:                            5
 // Async Callback (empty):               1
 // Promise callbacks:                    1
-// Total number of exported functions:   8
+// Total number of exported functions:   9
 
 #![no_std]
 
@@ -24,6 +24,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         executeWithInterchainToken => execute_with_interchain_token
         interchainTokenService => interchain_token_service
         contractAddress => contract_address
+        minGasForExecution => min_gas_for_execution
         failedCalls => failed_calls
         execute_callback => execute_callback
     )

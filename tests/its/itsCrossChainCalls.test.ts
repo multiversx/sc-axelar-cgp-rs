@@ -224,6 +224,8 @@ const mockExecuteInterchainTransferWithDataGatewayCall = async (
   contract: FSContract,
   fnc = 'ping'
 ) => {
+  const contractPayload = Buffer.from(e.Tuple(e.Str(fnc), collector).toTopU8A());
+
   const originalPayload = AbiCoder.defaultAbiCoder().encode(
     ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
     [
@@ -232,7 +234,7 @@ const mockExecuteInterchainTransferWithDataGatewayCall = async (
       Buffer.from(OTHER_CHAIN_ADDRESS),
       Buffer.from(contract.toTopU8A()),
       1_000,
-      Buffer.from(e.Tuple(e.Str(fnc), collector).toTopU8A()), // data passed to contract
+      contractPayload, // data passed to contract
     ]
   );
 
@@ -240,7 +242,7 @@ const mockExecuteInterchainTransferWithDataGatewayCall = async (
 
   const { crossChainId, messageHash } = await mockFSGatewayMessageApproved(payload, deployer);
 
-  return { payload, crossChainId, messageHash };
+  return { payload, crossChainId, messageHash, contractPayload };
 };
 
 test(
@@ -689,7 +691,7 @@ describe('Execute interchain transfer with data', () => {
   );
 
   test(
-    'Different shard async call proxy',
+    'Different shard async call proxy all cases',
     async () => {
       await deployContracts();
 
@@ -709,7 +711,7 @@ describe('Execute interchain transfer with data', () => {
         code: 'file:interchain-token-service-proxy/output/interchain-token-service-proxy.wasm',
         codeMetadata: ['upgradeable'],
         gasLimit: 100_000_000,
-        codeArgs: [fsIts, fsPingPong],
+        codeArgs: [fsIts, fsPingPong, e.U64(20_000_000)],
       });
 
       // Make sure its and proxy is no same shard, and ping pong is on another shard
@@ -727,13 +729,40 @@ describe('Execute interchain transfer with data', () => {
       const computedTokenId = await registerEgldCanonical();
 
       // Need to call proxy contract from other chain instead
-      const { payload } = await mockExecuteInterchainTransferWithDataGatewayCall(computedTokenId, fsProxyContract);
+      const { payload, contractPayload } = await mockExecuteInterchainTransferWithDataGatewayCall(
+        computedTokenId,
+        fsProxyContract
+      );
+
+      // User can not execute through Proxy directly if call is not failed
+      await user
+        .callContract({
+          callee: fsProxyContract,
+          funcName: 'executeWithInterchainToken',
+          gasLimit: 100_000_000,
+          funcArgs: [
+            e.Str(OTHER_CHAIN_NAME),
+            e.Str(MESSAGE_ID),
+            e.Str(OTHER_CHAIN_ADDRESS),
+            e.Buffer(contractPayload),
+            e.TopBuffer(computedTokenId),
+          ],
+        })
+        .assertFail({ code: 'signalError', message: 'Call is not allowed' });
+
+      // Too little gas provided, Proxy prevents gas attacks in a sync way
+      await user.callContract({
+        callee: fsIts,
+        funcName: 'execute',
+        gasLimit: 50_000_000,
+        funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
+      }).assertFail({ code: 'signalError', message: 'error signalled by smartcontract' });
 
       // ITS will sync call -> Proxy Contract async call -> Ping Pong contract
       await user.callContract({
         callee: fsIts,
         funcName: 'execute',
-        gasLimit: 100_000_000,
+        gasLimit: 60_000_000,
         funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
       });
 
@@ -763,20 +792,24 @@ describe('Execute interchain transfer with data', () => {
 
       // Proxy async call will fail
       // ITS will sync call -> Proxy Contract async call -> Ping Pong contract
-      await user.callContract({
-        callee: fsIts,
-        funcName: 'execute',
-        gasLimit: 100_000_000,
-        funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payloadAgain],
-      }).assertFail({ code: 'returnMessage', message: 'can only ping once' });
+      await user
+        .callContract({
+          callee: fsIts,
+          funcName: 'execute',
+          gasLimit: 100_000_000,
+          funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payloadAgain],
+        })
+        .assertFail({ code: 'returnMessage', message: 'can only ping once' });
 
       // Even if proxy async call failed, gateway message was still validated
-      await user.callContract({
-        callee: fsIts,
-        funcName: 'execute',
-        gasLimit: 100_000_000,
-        funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payloadAgain],
-      }).assertFail({ code: 'signalError', message: 'Not approved by gateway' });
+      await user
+        .callContract({
+          callee: fsIts,
+          funcName: 'execute',
+          gasLimit: 100_000_000,
+          funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payloadAgain],
+        })
+        .assertFail({ code: 'signalError', message: 'Not approved by gateway' });
 
       // Assert ping pong kvs remain unchanged
       pingPongKvs = await fsPingPong.getAccount();
@@ -804,9 +837,107 @@ describe('Execute interchain transfer with data', () => {
           e.kvs.Mapper('interchain_token_service').Value(fsIts),
           e.kvs.Mapper('contract_address').Value(fsPingPong),
 
+          // Failed calls holds all the information required to retry a call
           e.kvs
-            .Mapper('failed_calls', e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID))
+            .Mapper(
+              'failed_calls',
+              e.Str(OTHER_CHAIN_NAME),
+              e.Str(MESSAGE_ID),
+              e.Str(OTHER_CHAIN_ADDRESS),
+              e.Buffer(contractPayload),
+              e.TopBuffer(computedTokenId)
+            )
             .Value(e.Tuple(e.Str('EGLD'), e.U(1_000))),
+        ],
+      });
+
+      // User can now execute failed call through Proxy directly, although asyn call still fails in this case
+      await user
+        .callContract({
+          callee: fsProxyContract,
+          funcName: 'executeWithInterchainToken',
+          gasLimit: 100_000_000,
+          funcArgs: [
+            e.Str(OTHER_CHAIN_NAME),
+            e.Str(MESSAGE_ID),
+            e.Str(OTHER_CHAIN_ADDRESS),
+            e.Buffer(contractPayload),
+            e.TopBuffer(computedTokenId),
+          ],
+        }).assertFail({ code: 'returnMessage', message: 'can only ping once' });
+
+      // Assert proxy contract still has tokens because async call failed
+      assertAccount(await fsProxyContract.getAccount(), {
+        balance: 1_000,
+        hasKvs: [
+          e.kvs.Mapper('interchain_token_service').Value(fsIts),
+          e.kvs.Mapper('contract_address').Value(fsPingPong),
+
+          // Failed calls still holds all the information required to retry a call
+          e.kvs
+            .Mapper(
+              'failed_calls',
+              e.Str(OTHER_CHAIN_NAME),
+              e.Str(MESSAGE_ID),
+              e.Str(OTHER_CHAIN_ADDRESS),
+              e.Buffer(contractPayload),
+              e.TopBuffer(computedTokenId)
+            )
+            .Value(e.Tuple(e.Str('EGLD'), e.U(1_000))),
+        ],
+      });
+
+      // Remove keys from Ping Pong contract so retrying call succeeds
+      await fsPingPong.setAccount({
+        ...(await fsPingPong.getAccount()),
+        balance: 0,
+        codeMetadata: ['payable'],
+        kvs: [
+          e.kvs.Mapper('interchain_token_service').Value(fsProxyContract),
+          e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
+          e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+        ],
+      });
+
+      // User can now execute failed call through Proxy directly, which will now work
+      await user
+        .callContract({
+          callee: fsProxyContract,
+          funcName: 'executeWithInterchainToken',
+          gasLimit: 100_000_000,
+          funcArgs: [
+            e.Str(OTHER_CHAIN_NAME),
+            e.Str(MESSAGE_ID),
+            e.Str(OTHER_CHAIN_ADDRESS),
+            e.Buffer(contractPayload),
+            e.TopBuffer(computedTokenId),
+          ],
+        });
+
+      // Assert proxy no longer has tokens and no failed calls
+      assertAccount(await fsProxyContract.getAccount(), {
+        balance: 0,
+        hasKvs: [
+          e.kvs.Mapper('interchain_token_service').Value(fsIts),
+          e.kvs.Mapper('contract_address').Value(fsPingPong),
+        ],
+      });
+
+      // Assert ping pong was executed correctly
+      pingPongKvs = await fsPingPong.getAccount();
+      assertAccount(pingPongKvs, {
+        balance: 1_000,
+        hasKvs: [
+          e.kvs.Mapper('interchain_token_service').Value(fsProxyContract),
+          e.kvs.Mapper('pingAmount').Value(e.U(1_000)),
+          e.kvs.Mapper('maxFunds').Value(e.Option(null)),
+
+          // User mapper
+          e.kvs.Mapper('user_address_to_id', collector).Value(e.U32(1)),
+          e.kvs.Mapper('user_id_to_address', e.U32(1)).Value(collector),
+          e.kvs.Mapper('user_count').Value(e.U32(1)),
+
+          e.kvs.Mapper('userStatus', e.U32(1)).Value(e.U8(1)),
         ],
       });
     },
