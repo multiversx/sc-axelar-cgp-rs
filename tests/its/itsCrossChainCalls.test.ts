@@ -169,7 +169,16 @@ const deployNewEsdt = async () => {
     ],
   });
 
-  return computedTokenId;
+  const tokenIdentifier = d.Str().fromTop(
+    (
+      await fsIts.query({
+        funcName: 'registeredTokenIdentifier',
+        funcArgs: [e.TopBuffer(computedTokenId)],
+      })
+    ).returnData[0]
+  );
+
+  return { computedTokenId, tokenIdentifier };
 };
 
 async function mockFSGatewayMessageApproved(
@@ -250,16 +259,7 @@ test(
   async () => {
     await deployContracts();
 
-    const computedTokenId = await deployNewEsdt();
-
-    const tokenIdentifier = d.Str().fromTop(
-      (
-        await fsIts.query({
-          funcName: 'registeredTokenIdentifier',
-          funcArgs: [e.TopBuffer(computedTokenId)],
-        })
-      ).returnData[0]
-    );
+    const { computedTokenId, tokenIdentifier } = await deployNewEsdt();
 
     const { hash } = await user.callContract({
       callee: fsIts,
@@ -325,7 +325,7 @@ test(
   async () => {
     await deployContracts();
 
-    const computedTokenId = await deployNewEsdt();
+    const { computedTokenId } = await deployNewEsdt();
 
     const { hash } = await user.callContract({
       callee: fsIts,
@@ -362,7 +362,7 @@ test(
   async () => {
     await deployContracts();
 
-    const computedTokenId = await deployNewEsdt();
+    const { computedTokenId } = await deployNewEsdt();
 
     const { hash } = await user.callContract({
       callee: fsIts,
@@ -613,6 +613,42 @@ describe('Execute interchain transfer with data', () => {
     return computedTokenId;
   };
 
+  const checkItsProxyTokens = async (fsProxyContract: FSContract, contractPayload: Buffer, computedTokenId: string) => {
+    const { tokenIdentifier } = await deployNewEsdt();
+
+    await user
+      .callContract({
+        callee: fsProxyContract,
+        funcName: 'executeWithInterchainToken',
+        gasLimit: 100_000_000,
+        funcArgs: [
+          e.Str(OTHER_CHAIN_NAME),
+          e.Str(MESSAGE_ID),
+          e.Str(OTHER_CHAIN_ADDRESS),
+          e.Buffer(contractPayload),
+          e.TopBuffer(computedTokenId),
+        ],
+        esdts: [{ id: tokenIdentifier, amount: 1_000 }],
+      })
+      .assertFail({ code: 'returnMessage', message: 'Can not send any payment' });
+
+    await user
+      .callContract({
+        callee: fsProxyContract,
+        funcName: 'executeWithInterchainToken',
+        gasLimit: 100_000_000,
+        value: 1_000,
+        funcArgs: [
+          e.Str(OTHER_CHAIN_NAME),
+          e.Str(MESSAGE_ID),
+          e.Str(OTHER_CHAIN_ADDRESS),
+          e.Buffer(contractPayload),
+          e.TopBuffer(computedTokenId),
+        ],
+      })
+      .assertFail({ code: 'signalError', message: 'Can not send any payment' });
+  };
+
   test(
     'Same shard',
     async () => {
@@ -751,12 +787,14 @@ describe('Execute interchain transfer with data', () => {
         .assertFail({ code: 'signalError', message: 'Call is not allowed' });
 
       // Too little gas provided, Proxy prevents gas attacks in a sync way
-      await user.callContract({
-        callee: fsIts,
-        funcName: 'execute',
-        gasLimit: 50_000_000,
-        funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
-      }).assertFail({ code: 'signalError', message: 'error signalled by smartcontract' });
+      await user
+        .callContract({
+          callee: fsIts,
+          funcName: 'execute',
+          gasLimit: 50_000_000,
+          funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
+        })
+        .assertFail({ code: 'signalError', message: 'error signalled by smartcontract' });
 
       // ITS will sync call -> Proxy Contract async call -> Ping Pong contract
       await user.callContract({
@@ -833,9 +871,10 @@ describe('Execute interchain transfer with data', () => {
       const proxyKvs = await fsProxyContract.getAccount();
       assertAccount(proxyKvs, {
         balance: 1_000,
-        hasKvs: [
+        kvs: [
           e.kvs.Mapper('interchain_token_service').Value(fsIts),
           e.kvs.Mapper('contract_address').Value(fsPingPong),
+          e.kvs.Mapper('min_gas_for_execution').Value(e.U64(20_000_000)),
 
           // Failed calls holds all the information required to retry a call
           e.kvs
@@ -851,7 +890,10 @@ describe('Execute interchain transfer with data', () => {
         ],
       });
 
-      // User can now execute failed call through Proxy directly, although asyn call still fails in this case
+      // User can now execute failed call through Proxy directly, but can not send any tokens
+      await checkItsProxyTokens(fsProxyContract, contractPayload, computedTokenId);
+
+      // User can now execute failed call through Proxy directly, although async call still fails in this case
       await user
         .callContract({
           callee: fsProxyContract,
@@ -864,14 +906,16 @@ describe('Execute interchain transfer with data', () => {
             e.Buffer(contractPayload),
             e.TopBuffer(computedTokenId),
           ],
-        }).assertFail({ code: 'returnMessage', message: 'can only ping once' });
+        })
+        .assertFail({ code: 'returnMessage', message: 'can only ping once' });
 
       // Assert proxy contract still has tokens because async call failed
       assertAccount(await fsProxyContract.getAccount(), {
         balance: 1_000,
-        hasKvs: [
+        kvs: [
           e.kvs.Mapper('interchain_token_service').Value(fsIts),
           e.kvs.Mapper('contract_address').Value(fsPingPong),
+          e.kvs.Mapper('min_gas_for_execution').Value(e.U64(20_000_000)),
 
           // Failed calls still holds all the information required to retry a call
           e.kvs
@@ -900,26 +944,26 @@ describe('Execute interchain transfer with data', () => {
       });
 
       // User can now execute failed call through Proxy directly, which will now work
-      await user
-        .callContract({
-          callee: fsProxyContract,
-          funcName: 'executeWithInterchainToken',
-          gasLimit: 100_000_000,
-          funcArgs: [
-            e.Str(OTHER_CHAIN_NAME),
-            e.Str(MESSAGE_ID),
-            e.Str(OTHER_CHAIN_ADDRESS),
-            e.Buffer(contractPayload),
-            e.TopBuffer(computedTokenId),
-          ],
-        });
+      await user.callContract({
+        callee: fsProxyContract,
+        funcName: 'executeWithInterchainToken',
+        gasLimit: 100_000_000,
+        funcArgs: [
+          e.Str(OTHER_CHAIN_NAME),
+          e.Str(MESSAGE_ID),
+          e.Str(OTHER_CHAIN_ADDRESS),
+          e.Buffer(contractPayload),
+          e.TopBuffer(computedTokenId),
+        ],
+      });
 
       // Assert proxy no longer has tokens and no failed calls
       assertAccount(await fsProxyContract.getAccount(), {
         balance: 0,
-        hasKvs: [
+        kvs: [
           e.kvs.Mapper('interchain_token_service').Value(fsIts),
           e.kvs.Mapper('contract_address').Value(fsPingPong),
+          e.kvs.Mapper('min_gas_for_execution').Value(e.U64(20_000_000)),
         ],
       });
 
@@ -943,4 +987,40 @@ describe('Execute interchain transfer with data', () => {
     },
     { timeout: 60_000 }
   );
+
+  test('Proxy contract management', async () => {
+    await deployContracts();
+
+    const { contract: fsProxyContract } = await deployer.deployContract({
+      code: 'file:interchain-token-service-proxy/output/interchain-token-service-proxy.wasm',
+      codeMetadata: ['upgradeable'],
+      gasLimit: 100_000_000,
+      codeArgs: [fsIts, fsIts, e.U64(20_000_000)],
+    });
+
+    await user
+      .callContract({
+        callee: fsProxyContract,
+        funcName: 'setMinGasForExecution',
+        gasLimit: 10_000_000,
+        funcArgs: [e.U64(10_000_000)],
+      })
+      .assertFail({ code: 'signalError', message: 'Endpoint can only be called by owner' });
+
+    await deployer
+      .callContract({
+        callee: fsProxyContract,
+        funcName: 'setMinGasForExecution',
+        gasLimit: 10_000_000,
+        funcArgs: [e.U64(10_000_000)],
+      });
+
+    assertAccount(await fsProxyContract.getAccount(), {
+      kvs: [
+        e.kvs.Mapper('interchain_token_service').Value(fsIts),
+        e.kvs.Mapper('contract_address').Value(fsIts),
+        e.kvs.Mapper('min_gas_for_execution').Value(e.U64(10_000_000)),
+      ],
+    });
+  });
 });

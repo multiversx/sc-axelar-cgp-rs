@@ -47,7 +47,9 @@ pub trait InterchainTokenServiceProxy {
     }
 
     #[upgrade]
-    fn upgrade(&self) {}
+    fn upgrade(&self, min_gas_for_execution: u64) {
+        self.min_gas_for_execution().set(min_gas_for_execution);
+    }
 
     // This function will be called by the Interchain Token Service, it has to have this exact signature!
     #[payable("*")]
@@ -77,6 +79,10 @@ pub trait InterchainTokenServiceProxy {
                 );
 
                 require!(!failed_calls_mapper.is_empty(), "Call is not allowed");
+                require!(
+                    self.call_value().any_payment().is_empty(),
+                    "Can not send any payment"
+                );
 
                 failed_calls_mapper.take()
             };
@@ -116,6 +122,12 @@ pub trait InterchainTokenServiceProxy {
             ))
             .with_extra_gas_for_callback(CALLBACK_GAS)
             .register_promise();
+    }
+
+    #[only_owner]
+    #[endpoint(setMinGasForExecution)]
+    fn set_min_gas_for_execution(&self, min_gas_for_execution: u64) {
+        self.min_gas_for_execution().set(min_gas_for_execution);
     }
 
     #[view(interchainTokenService)]
