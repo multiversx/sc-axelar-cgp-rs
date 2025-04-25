@@ -5,8 +5,8 @@ import {
   MESSAGE_ID,
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
-  TOKEN_ID,
-  TOKEN_ID2,
+  TOKEN_IDENTIFIER,
+  TOKEN_IDENTIFIER2,
 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
@@ -14,10 +14,13 @@ import {
   deployContracts,
   gateway,
   its,
+  ITS_HUB_ADDRESS,
+  ITS_HUB_CHAIN,
   itsRegisterCustomTokenLockUnlock,
   itsRegisterCustomTokenMintBurn,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   mockGatewayMessageApproved,
+  wrapFromItsHubPayload,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -41,11 +44,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -56,11 +59,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -77,22 +80,22 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const mockGatewayCall = async (interchainTokenId: string, payload: string | null = null) => {
-  if (!payload) {
-    payload = AbiCoder.defaultAbiCoder()
-      .encode(
-        ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
-        [
-          MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-          Buffer.from(interchainTokenId, 'hex'),
-          Buffer.from(OTHER_CHAIN_ADDRESS),
-          Buffer.from(otherUser.toTopU8A()),
-          1_000,
-          Buffer.from(''),
-        ]
-      )
-      .substring(2);
+const mockGatewayCall = async (interchainTokenId: string, originalPayload: string | null = null) => {
+  if (!originalPayload) {
+    originalPayload = AbiCoder.defaultAbiCoder().encode(
+      ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
+      [
+        MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+        Buffer.from(interchainTokenId, 'hex'),
+        Buffer.from(OTHER_CHAIN_ADDRESS),
+        Buffer.from(otherUser.toTopU8A()),
+        1_000,
+        Buffer.from(''),
+      ]
+    );
   }
+
+  const payload = wrapFromItsHubPayload(originalPayload);
 
   const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
@@ -108,7 +111,7 @@ test('Transfer mint burn', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 20_000_000,
-    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+    funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
   });
 
   await user
@@ -116,7 +119,7 @@ test('Transfer mint burn', async () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
     .assertFail({ code: 4, message: 'Not approved by gateway' });
 
@@ -124,7 +127,7 @@ test('Transfer mint burn', async () => {
   const otherUserKvs = await otherUser.getAccount();
   assertAccount(otherUserKvs, {
     balance: BigInt('10000000000000000'),
-    kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+    kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
   });
 
   // Nothing changed for token manager
@@ -153,21 +156,21 @@ test('Transfer lock unlock', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 20_000_000,
-    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+    funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
   });
 
   // Tokens should be transfered to otherUser
   const otherUserKvs = await otherUser.getAccount();
   assertAccount(otherUserKvs, {
     balance: BigInt('10000000000000000'),
-    kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+    kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
   });
 
   // Token manager transfered tokens
   const tokenManagerKvs = await tokenManager.getAccount();
   assertAccount(tokenManagerKvs, {
     balance: 0,
-    kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_ID, amount: 99_000 }])],
+    kvs: [...baseTokenManagerKvs, e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 99_000 }])],
   });
 
   // Gateway message was marked as executed
@@ -189,7 +192,7 @@ test('Flow limit', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 20_000_000,
-    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+    funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
   });
 
   let tokenManagerKvs = await tokenManager.getAccount();
@@ -210,7 +213,7 @@ test('Flow limit', async () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
     .assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
@@ -225,7 +228,7 @@ test('Flow limit', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 20_000_000,
-    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+    funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
   });
 
   tokenManagerKvs = await tokenManager.getAccount();
@@ -241,7 +244,8 @@ test('Flow limit', async () => {
 });
 
 test('Errors', async () => {
-  let payload = AbiCoder.defaultAbiCoder().encode(['uint256'], [MESSAGE_TYPE_INTERCHAIN_TRANSFER]).substring(2);
+  let payload = AbiCoder.defaultAbiCoder().encode(['uint256'], [MESSAGE_TYPE_INTERCHAIN_TRANSFER]);
+  payload = wrapFromItsHubPayload(payload);
 
   // Invalid other address from other chain
   await user
@@ -249,18 +253,16 @@ test('Errors', async () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str('SomeOtherAddress'), payload],
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
-    .assertFail({ code: 4, message: 'Not remote service' });
+    .assertFail({ code: 4, message: 'Not its hub' });
 
-  payload = AbiCoder.defaultAbiCoder()
-    .encode(
-      ['uint256'],
-      [
-        999, // message type unknown
-      ]
-    )
-    .substring(2);
+  payload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256'],
+    [
+      999, // message type unknown
+    ]
+  );
 
   const { payload: newPayload } = await mockGatewayCall(INTERCHAIN_TOKEN_ID, payload);
 
@@ -269,7 +271,34 @@ test('Errors', async () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), newPayload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), newPayload],
     })
     .assertFail({ code: 4, message: 'Invalid message type' });
+
+  // Can not receive from hub from other chain than ITS Hub chain
+  await user
+    .callContract({
+      callee: its,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), newPayload],
+    })
+    .assertFail({ code: 4, message: 'Not its hub' });
+
+  await deployer.callContract({
+    callee: its,
+    funcName: 'removeTrustedChain',
+    gasLimit: 10_000_000,
+    funcArgs: [e.Str(OTHER_CHAIN_NAME)],
+  });
+
+  // Original source chain is not trusted
+  await user
+    .callContract({
+      callee: its,
+      funcName: 'execute',
+      gasLimit: 20_000_000,
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), newPayload],
+    })
+    .assertFail({ code: 4, message: 'Untrusted chain' });
 });

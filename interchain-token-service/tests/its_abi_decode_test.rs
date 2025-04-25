@@ -6,10 +6,11 @@ use multiversx_sc_scenario::api::StaticApi;
 use interchain_token_service::abi::AbiEncodeDecode;
 use interchain_token_service::abi::ParamType;
 use interchain_token_service::abi::Token;
-use interchain_token_service::abi_types::{DeployInterchainTokenPayload, InterchainTransferPayload, LinkTokenPayload, RegisterTokenMetadataPayload, SendToHubPayload};
-use interchain_token_service::constants::{
-    ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB,
+use interchain_token_service::abi_types::{
+    DeployInterchainTokenPayload, InterchainTransferPayload, LinkTokenPayload,
+    ReceiveFromHubPayload, RegisterTokenMetadataPayload, SendToHubPayload,
 };
+use interchain_token_service::constants::{ITS_HUB_CHAIN_NAME, MESSAGE_TYPE_SEND_TO_HUB};
 use token_manager::constants::TokenManagerType;
 
 #[test]
@@ -21,7 +22,6 @@ fn decode_from_empty_bytes32() {
         &[ParamType::Bytes32],
         &ManagedBuffer::new(),
         &mut result,
-        0,
     );
 }
 
@@ -34,7 +34,6 @@ fn decode_from_empty_bytes() {
         &[ParamType::Bytes],
         &ManagedBuffer::new(),
         &mut result,
-        0,
     );
 }
 
@@ -47,7 +46,6 @@ fn decode_from_empty_string() {
         &[ParamType::String],
         &ManagedBuffer::new(),
         &mut result,
-        0,
     );
 }
 
@@ -61,7 +59,6 @@ fn decode_uint256() {
             "000000000000000000000000000000005ce0e9a53831e3936420d9774000000c"
         )),
         &mut result,
-        0,
     );
 
     let expected = BigUint::from(123456789000000000000000000000000000012u128);
@@ -79,7 +76,6 @@ fn decode_bytes32() {
             "1234567890000000000000000000000000000000000000000000000000001122"
         )),
         &mut result,
-        0,
     );
 
     let expected = ManagedByteArray::from(&[
@@ -105,7 +101,6 @@ fn decode_bytes() {
 		"
         )),
         &mut result,
-        0,
     );
 
     let expected = ManagedBuffer::from(&[0x12, 0x34]);
@@ -127,7 +122,6 @@ fn decode_string() {
 		"
         )),
         &mut result,
-        0,
     );
 
     let expected = ManagedBuffer::from("gavofyork");
@@ -145,7 +139,6 @@ fn decode_uint8() {
             "00000000000000000000000000000000000000000000000000000000000000ff"
         )),
         &mut result,
-        0,
     );
 
     let expected = 255u8;
@@ -164,7 +157,6 @@ fn decode_uint8_error() {
             "0000000000000000000000000000000000000000000000000000000000000fff"
         )),
         &mut result,
-        0,
     );
 }
 
@@ -185,7 +177,6 @@ fn decode_two_bytes() {
 		"
         )),
         &mut result,
-        0,
     );
 
     let token1 = ManagedBuffer::from(&hex!(
@@ -366,6 +357,55 @@ fn decode_send_to_hub_payload() {
 }
 
 #[test]
+fn decode_receive_from_hub_payload() {
+    let result = ReceiveFromHubPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
+        "
+			0000000000000000000000000000000000000000000000000000000000000003
+            0000000000000000000000000000000000000000000000000000000000000060
+            00000000000000000000000000000000000000000000000000000000000000a0
+            0000000000000000000000000000000000000000000000000000000000000006
+            6178656c61720000000000000000000000000000000000000000000000000000
+            0000000000000000000000000000000000000000000000000000000000000160
+            000000000000000000000000000000000000000000000000000000000000000b
+            131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
+            00000000000000000000000000000000000000000000000000000000000000c0
+            0000000000000000000000000000000000000000000000000000000000000100
+            000000000000000000000000000000000000000000000000000000000165ec15
+            0000000000000000000000000000000000000000000000000000000000000140
+            0000000000000000000000000000000000000000000000000000000000000014
+            f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
+            0000000000000000000000000000000000000000000000000000000000000020
+            000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf
+            0000000000000000000000000000000000000000000000000000000000000000
+		"
+    )));
+
+    let expected = ReceiveFromHubPayload::<StaticApi> {
+        message_type: BigUint::from(MESSAGE_TYPE_SEND_TO_HUB),
+        original_source_chain: ManagedBuffer::from(ITS_HUB_CHAIN_NAME),
+        payload: ManagedBuffer::from(&hex!(
+            "
+			000000000000000000000000000000000000000000000000000000000000000b
+            131a3afc00d1b1e3461b955e53fc866dcf303b3eb9f4c16f89e388930f48134b
+            00000000000000000000000000000000000000000000000000000000000000c0
+            0000000000000000000000000000000000000000000000000000000000000100
+            000000000000000000000000000000000000000000000000000000000165ec15
+            0000000000000000000000000000000000000000000000000000000000000140
+            0000000000000000000000000000000000000000000000000000000000000014
+            f786e21509a9d50a9afd033b5940a2b7d872c208000000000000000000000000
+            0000000000000000000000000000000000000000000000000000000000000020
+            000000000000000005001019ba11c00268aae52e1dc6f89572828ae783ebb5bf
+            0000000000000000000000000000000000000000000000000000000000000000
+		"
+        )),
+    };
+
+    assert_eq!(result.message_type, expected.message_type);
+    assert_eq!(result.original_source_chain, expected.original_source_chain);
+    assert_eq!(result.payload, expected.payload);
+}
+
+#[test]
 fn decode_register_token_metadata_payload() {
     let result = RegisterTokenMetadataPayload::<StaticApi>::abi_decode(ManagedBuffer::from(&hex!(
         "
@@ -414,7 +454,9 @@ fn decode_link_token_payload() {
         )),
         token_manager_type: TokenManagerType::MintBurnFrom,
         source_token_address: ManagedBuffer::from(&hex!("4d45582d313233343536")),
-        destination_token_address: ManagedBuffer::from(&hex!("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")),
+        destination_token_address: ManagedBuffer::from(&hex!(
+            "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        )),
         link_params: ManagedBuffer::from(&hex!("f786e21509a9d50a9afd033b5940a2b7d872c208")),
     };
 
@@ -422,6 +464,9 @@ fn decode_link_token_payload() {
     assert_eq!(result.token_id, expected.token_id);
     assert_eq!(result.token_manager_type, expected.token_manager_type);
     assert_eq!(result.source_token_address, expected.source_token_address);
-    assert_eq!(result.destination_token_address, expected.destination_token_address);
+    assert_eq!(
+        result.destination_token_address,
+        expected.destination_token_address
+    );
     assert_eq!(result.link_params, expected.link_params);
 }

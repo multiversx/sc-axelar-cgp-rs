@@ -15,11 +15,11 @@ pub mod address_tracker;
 pub mod constants;
 pub mod events;
 pub mod executable;
+pub mod factory;
 pub mod proxy_gmp;
 pub mod proxy_its;
 pub mod remote;
 pub mod user_functions;
-pub mod factory;
 
 #[multiversx_sc::contract]
 pub trait InterchainTokenServiceContract:
@@ -42,11 +42,10 @@ pub trait InterchainTokenServiceContract:
         gateway: ManagedAddress,
         gas_service: ManagedAddress,
         token_manager_implementation: ManagedAddress,
-        // from _setup function below
         operator: ManagedAddress,
         chain_name: ManagedBuffer,
+        its_hub_address: ManagedBuffer,
         trusted_chain_names: MultiValueManagedVecCounted<ManagedBuffer>,
-        trusted_addresses: MultiValueManagedVecCounted<ManagedBuffer>,
     ) {
         require!(
             !gateway.is_zero() && !gas_service.is_zero() && !token_manager_implementation.is_zero(),
@@ -58,23 +57,16 @@ pub trait InterchainTokenServiceContract:
         self.token_manager()
             .set_if_empty(token_manager_implementation);
 
-        // from _setup function below
         require!(!operator.is_zero(), "Zero address");
         require!(!chain_name.is_empty(), "Invalid chain name");
-        require!(
-            trusted_chain_names.len() == trusted_addresses.len(),
-            "Length mismatch"
-        );
+        require!(!its_hub_address.is_empty(), "Invalid its hub address");
 
         self.add_operator(operator);
         self.set_chain_name(chain_name.clone());
+        self.its_hub_address().set(its_hub_address);
 
-        for (name, address) in trusted_chain_names
-            .into_vec()
-            .iter()
-            .zip(trusted_addresses.into_vec().iter())
-        {
-            self.set_trusted_address(name.deref(), address.deref());
+        for name in trusted_chain_names.into_vec().iter() {
+            self.set_trusted_chain(name.clone_value());
         }
 
         self.chain_name_hash()
@@ -90,7 +82,7 @@ pub trait InterchainTokenServiceContract:
     fn set_flow_limits(
         &self,
         token_ids: MultiValueManagedVecCounted<TokenId<Self::Api>>,
-        flow_limits: MultiValueManagedVecCounted<BigUint>,
+        flow_limits: MultiValueManagedVecCounted<Option<BigUint>>,
     ) {
         self.only_operator();
 
@@ -101,7 +93,7 @@ pub trait InterchainTokenServiceContract:
             .iter()
             .zip(flow_limits.into_vec().iter())
         {
-            self.token_manager_set_flow_limit(token_id.deref(), flow_limit.deref());
+            self.token_manager_set_flow_limit(token_id.deref(), flow_limit);
         }
     }
 
@@ -118,12 +110,11 @@ pub trait InterchainTokenServiceContract:
         payload: ManagedBuffer,
     ) {
         self.require_not_paused();
-        self.only_remote_service(&source_chain, &source_address);
+        self.only_its_hub(&source_chain, &source_address);
 
         let payload_hash = self.crypto().keccak256(&payload);
 
-        let (message_type, original_source_chain, payload) =
-            self.get_execute_params(source_chain.clone(), payload);
+        let (message_type, original_source_chain, payload) = self.get_execute_params(payload);
 
         match message_type {
             MESSAGE_TYPE_INTERCHAIN_TRANSFER => {
@@ -132,12 +123,18 @@ pub trait InterchainTokenServiceContract:
                     "Can not send EGLD payment if not issuing ESDT"
                 );
 
+                let valid = self.gateway_validate_message(
+                    &source_chain,
+                    &message_id,
+                    &source_address,
+                    &payload_hash,
+                );
+
+                require!(valid, "Not approved by gateway");
+
                 self.process_interchain_transfer_payload(
                     original_source_chain,
-                    source_chain,
                     message_id,
-                    source_address,
-                    payload_hash,
                     payload,
                 );
             }

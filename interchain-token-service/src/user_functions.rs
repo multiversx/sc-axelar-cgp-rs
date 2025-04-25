@@ -7,7 +7,7 @@ use token_manager::constants::TokenManagerType;
 use crate::abi::AbiEncodeDecode;
 use crate::abi_types::LinkTokenPayload;
 use crate::constants::{
-    Hash, MetadataVersion, TokenId, TransferAndGasTokens, ESDT_EGLD_IDENTIFIER,
+    Hash, TokenId, TransferAndGasTokens, EGLD_DECIMALS, ESDT_EGLD_IDENTIFIER,
     MESSAGE_TYPE_LINK_TOKEN, PREFIX_INTERCHAIN_TOKEN_ID,
 };
 use crate::{address_tracker, events, executable, proxy_gmp, proxy_its, remote};
@@ -24,15 +24,18 @@ pub trait UserFunctionsModule:
 {
     #[payable("EGLD")]
     #[endpoint(registerTokenMetadata)]
-    fn register_token_metadata(&self, token_identifier: TokenIdentifier) {
-        require!(
-            token_identifier.is_valid_esdt_identifier(),
-            "Invalid token identifier"
-        );
+    fn register_token_metadata(&self, token_identifier: EgldOrEsdtTokenIdentifier) {
+        require!(token_identifier.is_valid(), "Invalid token identifier");
 
         let gas_value = self.call_value().egld_value().clone_value();
 
-        self.register_token_metadata_async_call(token_identifier, gas_value);
+        if token_identifier.is_egld() {
+            self.register_token_metadata_raw(token_identifier, EGLD_DECIMALS, gas_value);
+
+            return;
+        }
+
+        self.register_token_metadata_async_call(token_identifier.unwrap_esdt(), gas_value);
     }
 
     fn register_custom_token_raw(
@@ -117,11 +120,9 @@ pub trait UserFunctionsModule:
         };
         let payload = data.abi_encode();
 
-        self.route_message(
+        self.route_message_through_its_hub(
             destination_chain,
             payload,
-            MetadataVersion::ContractCall,
-            EgldOrEsdtTokenIdentifier::egld(),
             gas_value,
         );
 
@@ -137,9 +138,8 @@ pub trait UserFunctionsModule:
         decimals: u8,
         minter: ManagedBuffer,
         egld_value: BigUint,
+        initial_caller: ManagedAddress,
     ) -> TokenId<Self::Api> {
-        self.require_not_paused();
-
         let token_id = self.interchain_token_id_raw(&deploy_salt);
 
         self.interchain_token_id_claimed_event(&token_id, &deploy_salt);
@@ -173,7 +173,14 @@ pub trait UserFunctionsModule:
                 )
             };
 
-            self.token_manager_deploy_interchain_token(&token_id, minter, name, symbol, decimals);
+            self.token_manager_deploy_interchain_token(
+                &token_id,
+                minter,
+                name,
+                symbol,
+                decimals,
+                initial_caller,
+            );
         } else {
             let gas_value = egld_value;
 
@@ -189,7 +196,6 @@ pub trait UserFunctionsModule:
                 decimals,
                 minter,
                 destination_chain,
-                EgldOrEsdtTokenIdentifier::egld(),
                 gas_value,
             );
         }
@@ -204,46 +210,11 @@ pub trait UserFunctionsModule:
         token_id: TokenId<Self::Api>,
         destination_chain: ManagedBuffer,
         destination_address: ManagedBuffer,
-        metadata: ManagedBuffer,
-        gas_value: BigUint,
-    ) {
-        self.require_not_paused();
-
-        let transfer_and_gas_tokens = self.get_transfer_and_gas_tokens(gas_value);
-
-        self.token_manager_take_token(
-            &token_id,
-            transfer_and_gas_tokens.transfer_token.clone(),
-            transfer_and_gas_tokens.transfer_amount.clone(),
-        );
-
-        let (metadata_version, data) = self.decode_metadata(metadata);
-
-        self.transmit_interchain_transfer_raw(
-            token_id,
-            self.blockchain().get_caller(),
-            destination_chain,
-            destination_address,
-            transfer_and_gas_tokens,
-            metadata_version,
-            data,
-        );
-    }
-
-    #[payable("*")]
-    #[endpoint(callContractWithInterchainToken)]
-    fn call_contract_with_interchain_token(
-        &self,
-        token_id: TokenId<Self::Api>,
-        destination_chain: ManagedBuffer,
-        destination_address: ManagedBuffer,
         data: ManagedBuffer,
         gas_value: BigUint,
     ) {
         self.require_not_paused();
 
-        require!(!data.is_empty(), "Empty data");
-
         let transfer_and_gas_tokens = self.get_transfer_and_gas_tokens(gas_value);
 
         self.token_manager_take_token(
@@ -258,7 +229,6 @@ pub trait UserFunctionsModule:
             destination_chain,
             destination_address,
             transfer_and_gas_tokens,
-            MetadataVersion::ContractCall,
             data,
         );
     }
@@ -272,12 +242,11 @@ pub trait UserFunctionsModule:
             EgldOrMultiEsdtPayment::Egld(value) => {
                 require!(value > gas_amount, "Invalid gas value");
 
-                return TransferAndGasTokens {
+                TransferAndGasTokens {
                     transfer_token: EgldOrEsdtTokenIdentifier::egld(),
                     transfer_amount: &value - &gas_amount,
-                    gas_token: EgldOrEsdtTokenIdentifier::egld(),
                     gas_amount,
-                };
+                }
             }
             EgldOrMultiEsdtPayment::MultiEsdt(esdts) => {
                 require!(
@@ -298,41 +267,30 @@ pub trait UserFunctionsModule:
 
                 let second_payment = esdts.try_get(1);
 
-                // If only one ESDT is set, substract gas amount from amount sent
                 if second_payment.is_none() {
-                    require!(amount > gas_amount, "Invalid gas value");
+                    // If only one ESDT is set, make sure gas_amount is set to zero
+                    require!(gas_amount == 0, "Gas amount should be zero");
+                } else {
+                    // If two ESDTs are sent, 2nd one should always be egld
+                    let second_payment = second_payment.unwrap();
 
-                    return TransferAndGasTokens {
-                        transfer_token: token_identifier.clone(),
-                        transfer_amount: &amount - &gas_amount,
-                        gas_token: token_identifier,
-                        gas_amount,
-                    };
+                    require!(
+                        second_payment.token_nonce == 0,
+                        "Only fungible esdts are supported"
+                    );
+                    require!(second_payment.amount == gas_amount, "Invalid gas value");
+                    require!(
+                        second_payment.token_identifier.as_managed_buffer()
+                            == &ManagedBuffer::from(ESDT_EGLD_IDENTIFIER),
+                        "Only egld is supported for paying gas"
+                    );
                 }
 
-                let second_payment = second_payment.unwrap();
-
-                require!(
-                    second_payment.token_nonce == 0,
-                    "Only fungible esdts are supported"
-                );
-                require!(second_payment.amount == gas_amount, "Invalid gas value");
-
-                // If two ESDTs were sent, check if EGLD was sent in MultiESDT and convert to EGLD identifier
-                let gas_token = if second_payment.token_identifier.as_managed_buffer()
-                    == &ManagedBuffer::from(ESDT_EGLD_IDENTIFIER)
-                {
-                    EgldOrEsdtTokenIdentifier::egld()
-                } else {
-                    EgldOrEsdtTokenIdentifier::esdt(second_payment.token_identifier)
-                };
-
-                return TransferAndGasTokens {
+                TransferAndGasTokens {
                     transfer_token: token_identifier,
                     transfer_amount: amount,
-                    gas_token,
                     gas_amount,
-                };
+                }
             }
         }
     }
@@ -345,7 +303,6 @@ pub trait UserFunctionsModule:
         let mut encoded = ManagedBuffer::new();
 
         encoded.append(prefix_interchain_token_id.as_managed_buffer());
-        encoded.append(ManagedAddress::zero().as_managed_buffer());
         encoded.append(salt.as_managed_buffer());
 
         self.crypto().keccak256(encoded)

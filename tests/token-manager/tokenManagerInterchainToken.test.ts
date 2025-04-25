@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, test } from 'vitest';
 import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
-import { TOKEN_ID, TOKEN_ID2 } from '../helpers';
-import {
-  deployTokenManagerInterchainToken,
-  deployTokenManagerLockUnlock,
-  deployTokenManagerMintBurn,
-  tokenManager,
-} from '../itsHelpers';
+import { TOKEN_IDENTIFIER, TOKEN_IDENTIFIER2 } from '../helpers';
+import { deployTokenManagerInterchainToken, deployTokenManagerMintBurn, tokenManager } from '../itsHelpers';
 
 let world: LSWorld;
 let deployer: LSWallet;
@@ -28,11 +23,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -47,7 +42,7 @@ afterEach(async () => {
 
 describe('Give token mint burn', () => {
   test('Normal', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID);
+    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_IDENTIFIER);
 
     await user.callContract({
       callee: tokenManager,
@@ -65,19 +60,19 @@ describe('Give token mint burn', () => {
 
     const otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
-      kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
   test('With flow limit', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID);
+    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_IDENTIFIER);
 
     // Set flow limit
     await deployer.callContract({
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(500)],
+      funcArgs: [e.Option(e.U(500))],
     });
 
     await user.callContract({
@@ -94,14 +89,14 @@ describe('Give token mint burn', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
       ],
     });
 
     let otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
-      kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 500 }])],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 500 }])],
     });
 
     await world.setCurrentBlockInfo({
@@ -134,7 +129,7 @@ describe('Give token mint burn', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_in_amount', e.U64(0)).Value(e.U(500)),
         e.kvs.Mapper('flow_in_amount', e.U64(1)).Value(e.U(500)),
       ],
@@ -142,12 +137,12 @@ describe('Give token mint burn', () => {
 
     otherUserKvs = await otherUser.getAccount();
     assertAccount(otherUserKvs, {
-      kvs: [e.kvs.Esdts([{ id: TOKEN_ID, amount: 1_000 }])],
+      kvs: [e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, amount: 1_000 }])],
     });
   });
 
   test('Errors', async () => {
-    await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID, false);
+    await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_IDENTIFIER, false);
 
     await otherUser
       .callContract({
@@ -163,7 +158,7 @@ describe('Give token mint burn', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(999)],
+      funcArgs: [e.Option(e.U(999))],
     });
 
     await user
@@ -189,14 +184,14 @@ describe('Give token mint burn', () => {
 
 describe('Take token mint burn', () => {
   test('Take token', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID);
+    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_IDENTIFIER);
 
     await user.callContract({
       callee: tokenManager,
       funcName: 'takeToken',
       gasLimit: 20_000_000,
       funcArgs: [],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     // Tokens were burned by contract
@@ -212,11 +207,11 @@ describe('Take token mint burn', () => {
       kvs: [
         e.kvs.Esdts([
           {
-            id: TOKEN_ID,
+            id: TOKEN_IDENTIFIER,
             amount: 99_000,
           },
           {
-            id: TOKEN_ID2,
+            id: TOKEN_IDENTIFIER2,
             amount: 10_000,
           },
         ]),
@@ -225,14 +220,14 @@ describe('Take token mint burn', () => {
   });
 
   test('Take token flow limit', async () => {
-    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID);
+    const baseKvs = await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_IDENTIFIER);
 
     // Set flow limit
     await deployer.callContract({
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(500)],
+      funcArgs: [e.Option(e.U(500))],
     });
 
     await user.callContract({
@@ -240,7 +235,7 @@ describe('Take token mint burn', () => {
       funcName: 'takeToken',
       gasLimit: 20_000_000,
       funcArgs: [],
-      esdts: [{ id: TOKEN_ID, amount: 500 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 500 }],
     });
 
     // Tokens were burned by contract
@@ -250,7 +245,7 @@ describe('Take token mint burn', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
       ],
     });
@@ -265,7 +260,7 @@ describe('Take token mint burn', () => {
         funcName: 'takeToken',
         gasLimit: 20_000_000,
         funcArgs: [],
-        esdts: [{ id: TOKEN_ID, amount: 500 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 500 }],
       })
       .assertFail({ code: 4, message: 'Flow limit exceeded' });
 
@@ -278,7 +273,7 @@ describe('Take token mint burn', () => {
       funcName: 'takeToken',
       gasLimit: 20_000_000,
       funcArgs: [],
-      esdts: [{ id: TOKEN_ID, amount: 500 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 500 }],
     });
 
     kvs = await tokenManager.getAccount();
@@ -287,7 +282,7 @@ describe('Take token mint burn', () => {
       kvs: [
         ...baseKvs,
 
-        e.kvs.Mapper('flow_limit').Value(e.U(500)),
+        e.kvs.Mapper('flow_limit').Value(e.Option(e.U(500))),
         e.kvs.Mapper('flow_out_amount', e.U64(0)).Value(e.U(500)),
         e.kvs.Mapper('flow_out_amount', e.U64(1)).Value(e.U(500)),
       ],
@@ -299,11 +294,11 @@ describe('Take token mint burn', () => {
       kvs: [
         e.kvs.Esdts([
           {
-            id: TOKEN_ID,
+            id: TOKEN_IDENTIFIER,
             amount: 99_000,
           },
           {
-            id: TOKEN_ID2,
+            id: TOKEN_IDENTIFIER2,
             amount: 10_000,
           },
         ]),
@@ -312,7 +307,7 @@ describe('Take token mint burn', () => {
   });
 
   test('Take token errors', async () => {
-    await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_ID, false);
+    await deployTokenManagerMintBurn(deployer, deployer, user, TOKEN_IDENTIFIER, false);
 
     await deployer
       .callContract({
@@ -339,7 +334,7 @@ describe('Take token mint burn', () => {
       callee: tokenManager,
       funcName: 'setFlowLimit',
       gasLimit: 5_000_000,
-      funcArgs: [e.U(999)],
+      funcArgs: [e.Option(e.U(999))],
     });
 
     await user
@@ -348,7 +343,7 @@ describe('Take token mint burn', () => {
         funcName: 'takeToken',
         gasLimit: 20_000_000,
         funcArgs: [],
-        esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
       })
       .assertFail({ code: 4, message: 'Flow limit exceeded' });
 
@@ -359,7 +354,7 @@ describe('Take token mint burn', () => {
         funcName: 'takeToken',
         gasLimit: 20_000_000,
         funcArgs: [],
-        esdts: [{ id: TOKEN_ID, amount: 999 }],
+        esdts: [{ id: TOKEN_IDENTIFIER, amount: 999 }],
       })
       .assertFail({ code: 10, message: 'action is not allowed' });
   });
@@ -378,7 +373,7 @@ describe('Deploy interchain token', () => {
       funcName: 'deployInterchainToken',
       gasLimit: 200_000_000,
       value: BigInt('50000000000000000'),
-      funcArgs: [e.Option(user), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18)],
+      funcArgs: [e.Option(user), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), user],
     });
 
     const kvs = await tokenManager.getAccount();
@@ -388,11 +383,12 @@ describe('Deploy interchain token', () => {
         ...baseKvs,
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // minter role was added to user (ITS)
+        e.kvs.Mapper('minter_address').Value(user),
 
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
-          .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+          .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
       ],
     });
   });
@@ -400,7 +396,6 @@ describe('Deploy interchain token', () => {
   test('Errors', async () => {
     const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, user);
 
-    // Not sent enough EGLD funds for ESDT issue
     await user
       .callContract({
         callee: tokenManager,
@@ -409,7 +404,7 @@ describe('Deploy interchain token', () => {
         value: BigInt('1'),
         funcArgs: [e.Option(user), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18)],
       })
-      .assertFail({ code: 7, message: 'failed transfer (insufficient funds)' });
+      .assertFail({ code: 4, message: 'Invalid esdt issue cost' });
 
     await deployer
       .callContract({
@@ -441,7 +436,7 @@ describe('Deploy interchain token', () => {
     // Manually set token identifier
     await tokenManager.setAccount({
       ...(await tokenManager.getAccount()),
-      kvs: [...baseKvs, e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID))],
+      kvs: [...baseKvs, e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER))],
     });
 
     await user
@@ -470,7 +465,7 @@ describe('Deploy interchain token', () => {
 
 describe('Mint burn', () => {
   test('Mint', async () => {
-    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_ID, true, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_IDENTIFIER, true, user);
 
     // Only minter can call this
     await otherUser
@@ -501,7 +496,7 @@ describe('Mint burn', () => {
       kvs: [
         e.kvs.Esdts([
           {
-            id: TOKEN_ID,
+            id: TOKEN_IDENTIFIER,
             amount: 1_000,
           },
         ]),
@@ -510,7 +505,7 @@ describe('Mint burn', () => {
   });
 
   test('Burn', async () => {
-    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_ID, true, user);
+    const baseKvs = await deployTokenManagerInterchainToken(deployer, deployer, deployer, TOKEN_IDENTIFIER, true, user);
 
     // Only minter can call this
     await otherUser
@@ -537,7 +532,7 @@ describe('Mint burn', () => {
       funcName: 'burn',
       gasLimit: 20_000_000,
       funcArgs: [],
-      esdts: [{ id: TOKEN_ID, amount: 1_000 }],
+      esdts: [{ id: TOKEN_IDENTIFIER, amount: 1_000 }],
     });
 
     const kvs = await tokenManager.getAccount();
@@ -553,11 +548,11 @@ describe('Mint burn', () => {
       kvs: [
         e.kvs.Esdts([
           {
-            id: TOKEN_ID,
+            id: TOKEN_IDENTIFIER,
             amount: 99_000,
           },
           {
-            id: TOKEN_ID2,
+            id: TOKEN_IDENTIFIER2,
             amount: 10_000,
           },
         ]),
@@ -638,6 +633,7 @@ describe('Mintership', () => {
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
         e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000111)), // flow limit & operator & minter role
+        e.kvs.Mapper('minter_address').Value(otherUser),
       ],
     });
 
@@ -756,6 +752,7 @@ describe('Mintership', () => {
 
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000000)), // minter role was removed
         e.kvs.Mapper('account_roles', otherUser).Value(e.U32(0b00000111)), // flow limit & operator & minter role
+        e.kvs.Mapper('minter_address').Value(otherUser),
 
         e.kvs.Mapper('proposed_roles', user, deployer).Value(e.U32(0b00000001)),
       ],

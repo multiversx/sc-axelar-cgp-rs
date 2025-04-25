@@ -12,17 +12,16 @@ import {
   getSignersHash,
   INTERCHAIN_TOKEN_ID,
   MESSAGE_ID,
-  OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
-  TOKEN_ID,
-  TOKEN_MANAGER_ADDRESS, TOKEN_MANAGER_ADDRESS_3,
+  TOKEN_IDENTIFIER,
+  TOKEN_MANAGER_ADDRESS,
   TOKEN_SALT,
 } from './helpers';
 import createKeccakHash from 'keccak';
 import { Buffer } from 'buffer';
 import { Kvs } from 'xsuite/dist/data/kvs';
-import { EncodableKvs } from 'xsuite/dist/data/encoding';
 import { assert } from 'vitest';
+import { AbiCoder } from 'ethers';
 
 export const PREFIX_INTERCHAIN_TOKEN_ID = 'its-interchain-token-id';
 
@@ -37,11 +36,8 @@ export const MESSAGE_TYPE_RECEIVE_FROM_HUB = 4;
 export const MESSAGE_TYPE_LINK_TOKEN = 5;
 export const MESSAGE_TYPE_REGISTER_TOKEN_METADATA = 6;
 
-export const ITS_HUB_CHAIN_NAME = 'axelar';
-export const ITS_HUB_ROUTING_IDENTIFIER = 'hub';
-export const ITS_HUB_CHAIN_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
-
-export const LATEST_METADATA_VERSION = 0;
+export const ITS_HUB_CHAIN = 'axelar';
+export const ITS_HUB_ADDRESS = 'axelar10jzzmv5m7da7dn2xsfac0yqe7zamy34uedx3e28laq0p6f3f8dzqp649fp';
 
 export const TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN = 0;
 export const TOKEN_MANAGER_TYPE_LOCK_UNLOCK = 2;
@@ -192,7 +188,7 @@ export const deployTokenManagerMintBurn = async (
   deployer: LSWallet,
   operator: LSWallet | LSContract = deployer,
   its: LSWallet | LSContract = operator,
-  tokenIdentifier: string = TOKEN_ID,
+  tokenIdentifier: string = TOKEN_IDENTIFIER,
   burnRole: boolean = true
 ): Promise<Kvs[]> => {
   ({ contract: tokenManager, address } = await deployer.deployContract({
@@ -241,9 +237,9 @@ export const deployTokenManagerLockUnlock = async (
   deployer: LSWallet,
   its: LSWallet | LSContract = deployer,
   operator: LSWallet = deployer,
-  tokenId: string = TOKEN_ID,
+  tokenId: string = TOKEN_IDENTIFIER,
   interchainTokenId: string = INTERCHAIN_TOKEN_ID
-): Promise<EncodableKvs> => {
+): Promise<Kvs[]> => {
   ({ contract: tokenManager, address } = await deployer.deployContract({
     code: 'file:token-manager/output/token-manager.wasm',
     codeMetadata: ['upgradeable'],
@@ -287,12 +283,10 @@ export const deployIts = async (deployer: LSWallet) => {
 
       deployer,
       e.Str(CHAIN_NAME),
+      e.Str(ITS_HUB_ADDRESS),
 
       e.U32(1),
       e.Str(OTHER_CHAIN_NAME),
-
-      e.U32(1),
-      e.Str(OTHER_CHAIN_ADDRESS),
     ],
   }));
 
@@ -326,10 +320,10 @@ export const itsRegisterCanonicalToken = async (
   world: LSWorld,
   user: LSWallet,
   addTokens: boolean = false,
-  tokenIdentifier: string = TOKEN_ID
+  tokenIdentifier: string = TOKEN_IDENTIFIER
 ) => {
   const deploySalt = computeCanonicalInterchainTokenDeploySalt(tokenIdentifier);
-  const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
+  const computedTokenId = computeInterchainTokenIdRaw(deploySalt);
 
   const result = await user.callContract({
     callee: its,
@@ -379,7 +373,7 @@ export const itsRegisterCustomTokenLockUnlock = async (
   world: LSWorld,
   user: LSWallet,
   addTokens: boolean = false,
-  tokenIdentifier: string = TOKEN_ID
+  tokenIdentifier: string = TOKEN_IDENTIFIER
 ) => {
   const computedTokenId = computeLinkedTokenId(user);
 
@@ -437,20 +431,25 @@ export const itsRegisterCustomTokenMintBurn = async (world: LSWorld, user: LSWal
     callee: its,
     funcName: 'registerCustomToken',
     gasLimit: 20_000_000,
-    funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID), e.U8(TOKEN_MANAGER_TYPE_MINT_BURN), e.Buffer(user.toTopU8A())],
+    funcArgs: [
+      e.TopBuffer(TOKEN_SALT),
+      e.Str(TOKEN_IDENTIFIER),
+      e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
+      e.Buffer(user.toTopU8A()),
+    ],
   });
 
   const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
   const baseTokenManagerKvs = [
     e.kvs.Mapper('interchain_token_service').Value(its),
     e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
-    e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+    e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER)),
     e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limit and operator roles
     e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000100)), // flow limit role
 
-    e.kvs.Esdts([{ id: TOKEN_ID, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
+    e.kvs.Esdts([{ id: TOKEN_IDENTIFIER, roles: ['ESDTRoleLocalMint', 'ESDTRoleLocalBurn'] }]),
 
-    ...(flowLimit ? [e.kvs.Mapper('flow_limit').Value(e.U(flowLimit))] : []),
+    ...(flowLimit ? [e.kvs.Mapper('flow_limit').Value(e.Option(e.U(flowLimit)))] : []),
   ];
 
   // Set mint/burn role for token
@@ -469,12 +468,10 @@ export const itsRegisterCustomTokenMintBurn = async (world: LSWorld, user: LSWal
   return { computedTokenId, tokenManager, baseTokenManagerKvs };
 };
 
-// TODO: Remove address zero as first argument since it is always that address
-export const computeInterchainTokenIdRaw = (user: Encodable = e.Addr(ADDRESS_ZERO), deploySalt = TOKEN_SALT) => {
+export const computeInterchainTokenIdRaw = (deploySalt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_INTERCHAIN_TOKEN_ID).digest('hex');
   const buffer = Buffer.concat([
     Buffer.from(prefix, 'hex'),
-    Buffer.from(user.toTopHex(), 'hex'),
     Buffer.from(deploySalt, 'hex'),
   ]);
 
@@ -494,7 +491,7 @@ export const computeInterchainTokenDeploySalt = (user: Encodable, salt = TOKEN_S
   return createKeccakHash('keccak256').update(buffer).digest('hex');
 };
 
-export const computeCanonicalInterchainTokenDeploySalt = (tokenIdentifier: string = TOKEN_ID) => {
+export const computeCanonicalInterchainTokenDeploySalt = (tokenIdentifier: string = TOKEN_IDENTIFIER) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_CANONICAL_TOKEN_SALT).digest('hex');
   const chain_name_hash = createKeccakHash('keccak256').update(CHAIN_NAME).digest('hex');
   const buffer = Buffer.concat([
@@ -509,8 +506,8 @@ export const computeCanonicalInterchainTokenDeploySalt = (tokenIdentifier: strin
 export const computeLinkedTokenId = (user: Encodable, salt = TOKEN_SALT) => {
   const deploySaltLink = computeLinkedTokenDeploySalt(user, salt);
 
-  return computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySaltLink);
-}
+  return computeInterchainTokenIdRaw(deploySaltLink);
+};
 
 export const computeLinkedTokenDeploySalt = (user: Encodable, salt = TOKEN_SALT) => {
   const prefix = createKeccakHash('keccak256').update(PREFIX_CUSTOM_TOKEN_SALT).digest('hex');
@@ -538,8 +535,9 @@ export const baseItsKvs = (
 
     e.kvs.Mapper('chain_name').Value(e.Str(CHAIN_NAME)),
     e.kvs.Mapper('chain_name_hash').Value(e.TopBuffer(CHAIN_NAME_HASH)),
+    e.kvs.Mapper('its_hub_address').Value(e.Str(ITS_HUB_ADDRESS)),
 
-    e.kvs.Mapper('trusted_address', e.Str(OTHER_CHAIN_NAME)).Value(e.Str(OTHER_CHAIN_ADDRESS)),
+    e.kvs.Mapper('trusted_chains').UnorderedSet([e.Str(OTHER_CHAIN_NAME)]),
 
     ...(computedTokenId
       ? [e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(tokenManagerAddress))]
@@ -550,8 +548,8 @@ export const baseItsKvs = (
 export async function mockGatewayMessageApproved(
   payload: string,
   operator: LSWallet,
-  sourceChain: string = OTHER_CHAIN_NAME,
-  sourceAddress: string = OTHER_CHAIN_ADDRESS
+  sourceChain: string = ITS_HUB_CHAIN,
+  sourceAddress: string = ITS_HUB_ADDRESS
 ) {
   const payloadHash = getKeccak256Hash(Buffer.from(payload, 'hex'));
 
@@ -573,3 +571,15 @@ export async function mockGatewayMessageApproved(
 
   return { crossChainId, messageHash };
 }
+
+export const wrapFromItsHubPayload = (payload: string, sourceChain: string = OTHER_CHAIN_NAME) => {
+  return AbiCoder.defaultAbiCoder()
+    .encode(['uint256', 'string', 'bytes'], [MESSAGE_TYPE_RECEIVE_FROM_HUB, sourceChain, payload])
+    .substring(2);
+};
+
+export const wrapToItsHubPayload = (payload: string, sourceChain: string = OTHER_CHAIN_NAME) => {
+  return AbiCoder.defaultAbiCoder()
+    .encode(['uint256', 'string', 'bytes'], [MESSAGE_TYPE_SEND_TO_HUB, sourceChain, payload])
+    .substring(2);
+};
