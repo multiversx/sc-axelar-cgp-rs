@@ -8,7 +8,7 @@ const EPOCH_TIME: u64 = 6 * 3600; // 6 hours;
 pub trait FlowLimit {
     fn set_flow_limit_raw(
         &self,
-        flow_limit: BigUint,
+        flow_limit: Option<BigUint>,
         token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
     ) {
         self.flow_limit_set_event(token_id, self.blockchain().get_caller(), &flow_limit);
@@ -19,7 +19,7 @@ pub trait FlowLimit {
     fn add_flow_out_raw(&self, flow_out_amount: &BigUint) {
         let flow_limit = self.flow_limit().get();
 
-        if flow_limit == 0 {
+        if flow_limit.is_none() {
             return;
         }
 
@@ -27,13 +27,13 @@ pub trait FlowLimit {
         let slot_to_add = self.flow_out_amount(epoch);
         let slot_to_compare = self.flow_in_amount(epoch);
 
-        self.add_flow(flow_limit, slot_to_add, slot_to_compare, flow_out_amount);
+        self.add_flow(flow_limit.unwrap(), slot_to_add, slot_to_compare, flow_out_amount);
     }
 
     fn add_flow_in_raw(&self, flow_in_amount: &BigUint) {
         let flow_limit = self.flow_limit().get();
 
-        if flow_limit == 0 {
+        if flow_limit.is_none() {
             return;
         }
 
@@ -41,7 +41,7 @@ pub trait FlowLimit {
         let slot_to_add = self.flow_in_amount(epoch);
         let slot_to_compare = self.flow_out_amount(epoch);
 
-        self.add_flow(flow_limit, slot_to_add, slot_to_compare, flow_in_amount);
+        self.add_flow(flow_limit.unwrap(), slot_to_add, slot_to_compare, flow_in_amount);
     }
 
     fn add_flow(
@@ -79,7 +79,7 @@ pub trait FlowLimit {
 
     #[view(getFlowLimit)]
     #[storage_mapper("flow_limit")]
-    fn flow_limit(&self) -> SingleValueMapper<BigUint>;
+    fn flow_limit(&self) -> SingleValueMapper<Option<BigUint>>;
 
     #[storage_mapper("flow_out_amount")]
     fn flow_out_amount(&self, epoch: u64) -> SingleValueMapper<BigUint>;
@@ -92,6 +92,6 @@ pub trait FlowLimit {
         &self,
         #[indexed] token_id: ManagedByteArray<KECCAK256_RESULT_LEN>,
         #[indexed] operator: ManagedAddress,
-        flow_limit: &BigUint,
+        flow_limit: &Option<BigUint>,
     );
 }

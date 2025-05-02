@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, LSWallet, LSWorld } from 'xsuite';
-import { MESSAGE_ID, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_ID, TOKEN_ID2 } from '../helpers';
+import { MESSAGE_ID, OTHER_CHAIN_ADDRESS, OTHER_CHAIN_NAME, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER2 } from '../helpers';
 import { Buffer } from 'buffer';
 import {
   baseGatewayKvs,
@@ -8,11 +8,14 @@ import {
   deployContracts,
   deployPingPongInterchain,
   gateway,
-  its, itsRegisterCanonicalToken,
-  itsRegisterCustomTokenLockUnlock,
+  its,
+  ITS_HUB_ADDRESS,
+  ITS_HUB_CHAIN,
+  itsRegisterCanonicalToken,
   MESSAGE_TYPE_INTERCHAIN_TRANSFER,
   mockGatewayMessageApproved,
   pingPong,
+  wrapFromItsHubPayload,
 } from '../itsHelpers';
 import { AbiCoder } from 'ethers';
 
@@ -36,11 +39,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -51,11 +54,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -73,19 +76,19 @@ afterEach(async () => {
 });
 
 const mockGatewayCall = async (tokenId: string, fnc = 'ping') => {
-  const payload = AbiCoder.defaultAbiCoder()
-    .encode(
-      ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
-      [
-        MESSAGE_TYPE_INTERCHAIN_TRANSFER,
-        Buffer.from(tokenId, 'hex'),
-        Buffer.from(OTHER_CHAIN_ADDRESS),
-        Buffer.from(pingPong.toTopU8A()),
-        1_000,
-        Buffer.from(e.Tuple(e.Str(fnc), otherUser).toTopU8A()), // data passed to contract
-      ]
-    )
-    .substring(2);
+  const originalPayload = AbiCoder.defaultAbiCoder().encode(
+    ['uint256', 'bytes32', 'bytes', 'bytes', 'uint256', 'bytes'],
+    [
+      MESSAGE_TYPE_INTERCHAIN_TRANSFER,
+      Buffer.from(tokenId, 'hex'),
+      Buffer.from(OTHER_CHAIN_ADDRESS),
+      Buffer.from(pingPong.toTopU8A()),
+      1_000,
+      Buffer.from(e.Tuple(e.Str(fnc), otherUser).toTopU8A()), // data passed to contract
+    ]
+  );
+
+  const payload = wrapFromItsHubPayload(originalPayload);
 
   const { crossChainId, messageHash } = await mockGatewayMessageApproved(payload, deployer);
 
@@ -108,7 +111,7 @@ test('Transfer with data', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 100_000_000,
-    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+    funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
   });
 
   await user
@@ -116,7 +119,7 @@ test('Transfer with data', async () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 100_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
+      funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
     .assertFail({ code: 4, message: 'Not approved by gateway' });
 
@@ -176,10 +179,10 @@ test('Transfer with data contract error', async () => {
     callee: its,
     funcName: 'execute',
     gasLimit: 300_000_000,
-    funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(OTHER_CHAIN_ADDRESS), payload],
-  });
+    funcArgs: [e.Str(ITS_HUB_CHAIN), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
+  }).assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
-  // Assert its doesn't have balance & lock removed
+  // Assert its doesn't have balance
   assertAccount(await its.getAccount(), {
     balance: 0n,
     kvs: [...baseItsKvs(deployer, computedTokenId)],
@@ -216,7 +219,7 @@ test('Errors', async () => {
       callee: its,
       funcName: 'execute',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str('SomeOtherAddress'), payload],
+      funcArgs: [e.Str(OTHER_CHAIN_NAME), e.Str(MESSAGE_ID), e.Str(ITS_HUB_ADDRESS), payload],
     })
-    .assertFail({ code: 4, message: 'Not remote service' });
+    .assertFail({ code: 4, message: 'Not its hub' });
 });

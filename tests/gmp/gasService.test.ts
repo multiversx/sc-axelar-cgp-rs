@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, test } from 'vitest';
 import { assertAccount, e, LSContract, LSWallet, LSWorld } from 'xsuite';
-import { TOKEN_ID } from '../helpers';
+import { TOKEN_IDENTIFIER } from '../helpers';
 
 let world: LSWorld;
 let deployer: LSWallet;
@@ -20,7 +20,7 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
       ]),
@@ -93,7 +93,7 @@ test('Pay gas for contract call', async () => {
       e.Addr(deployer.toString()),
     ],
     esdts: [
-      { id: TOKEN_ID, amount: 1_000 },
+      { id: TOKEN_IDENTIFIER, amount: 1_000 },
     ],
   });
 
@@ -105,7 +105,7 @@ test('Pay gas for contract call', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 1_000,
         },
       ]),
@@ -204,7 +204,7 @@ test('Pay gas for express contract call', async () => {
       e.Addr(deployer.toString()),
     ],
     esdts: [
-      { id: TOKEN_ID, amount: 1_000 },
+      { id: TOKEN_IDENTIFIER, amount: 1_000 },
     ],
   });
 
@@ -216,7 +216,7 @@ test('Pay gas for express contract call', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 1_000,
         },
       ]),
@@ -311,7 +311,7 @@ test('Add gas', async () => {
       e.Addr(deployer.toString()),
     ],
     esdts: [
-      { id: TOKEN_ID, amount: 1_000 },
+      { id: TOKEN_IDENTIFIER, amount: 1_000 },
     ],
   });
 
@@ -323,7 +323,7 @@ test('Add gas', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 1_000,
         },
       ]),
@@ -414,7 +414,7 @@ test('Add express gas', async () => {
       e.Addr(deployer.toString()),
     ],
     esdts: [
-      { id: TOKEN_ID, amount: 1_000 },
+      { id: TOKEN_IDENTIFIER, amount: 1_000 },
     ],
   });
 
@@ -426,7 +426,7 @@ test('Add express gas', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 1_000,
         },
       ]),
@@ -492,7 +492,7 @@ test('Collect fees not collector', async () => {
       e.Addr(deployer.toString()),
 
       e.U32(1),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
 
       e.U32(1),
       e.U(1_000),
@@ -511,7 +511,7 @@ test('Collect fees invalid address', async () => {
       e.TopBuffer('0000000000000000000000000000000000000000000000000000000000000000'),
 
       e.U32(1),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
 
       e.U32(1),
       e.U(1_000),
@@ -530,7 +530,7 @@ test('Collect fees invalid amounts wrong length', async () => {
       e.Addr(deployer.toString()),
 
       e.U32(1),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
 
       e.U32(2),
       e.U(1_000),
@@ -550,7 +550,7 @@ test('Collect fees invalid amounts zero', async () => {
       e.Addr(deployer.toString()),
 
       e.U32(1),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
 
       e.U32(1),
       e.U(0),
@@ -569,7 +569,7 @@ test('Collect fees', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 1_000,
         },
       ]),
@@ -584,7 +584,7 @@ test('Collect fees', async () => {
       e.Addr(deployer.toString()),
 
       e.U32(2),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
       e.Str('EGLD'),
 
       e.U32(2),
@@ -607,7 +607,7 @@ test('Collect fees', async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 101_000,
         },
       ]),
@@ -626,7 +626,7 @@ test('Collect fees too much asked', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 1_000,
         },
       ]),
@@ -641,8 +641,8 @@ test('Collect fees too much asked', async () => {
       e.Addr(deployer.toString()),
 
       e.U32(3),
-      e.Str(TOKEN_ID),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
+      e.Str(TOKEN_IDENTIFIER),
       e.Str('EGLD'),
 
       e.U32(3),
@@ -660,7 +660,7 @@ test('Collect fees too much asked', async () => {
       e.Addr(deployer.toString()),
 
       e.U32(2),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
       e.Str('EGLD'),
 
       e.U32(2),
@@ -677,7 +677,7 @@ test('Collect fees too much asked', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 250,
         },
       ]),
@@ -696,7 +696,7 @@ test('Refund not collector', async () => {
       e.Str('txHash'),
       e.U(1),
       e.Addr(deployer.toString()),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
       e.U(1_000),
     ],
   }).assertFail({ code: 4, message: 'Not collector' });
@@ -713,7 +713,7 @@ test('Refund invalid address', async () => {
       e.Str('txHash'),
       e.U(1),
       e.TopBuffer('0000000000000000000000000000000000000000000000000000000000000000'),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
       e.U(1_000),
     ],
   }).assertFail({ code: 4, message: 'Invalid address' });
@@ -767,7 +767,7 @@ test('Refund esdt', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 2_000,
         },
       ]),
@@ -782,7 +782,7 @@ test('Refund esdt', async () => {
       e.Str('txHash'),
       e.U(1),
       e.Addr(deployer.toString()),
-      e.Str(TOKEN_ID),
+      e.Str(TOKEN_IDENTIFIER),
       e.U(500),
     ],
   });
@@ -794,7 +794,7 @@ test('Refund esdt', async () => {
 
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 1_500,
         },
       ]),
@@ -807,7 +807,7 @@ test('Refund esdt', async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_500,
         },
       ]),

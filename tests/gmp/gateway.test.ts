@@ -15,8 +15,8 @@ import {
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   PAYLOAD_HASH,
-  TOKEN_ID,
-  TOKEN_ID2,
+  TOKEN_IDENTIFIER,
+  TOKEN_IDENTIFIER2,
 } from '../helpers';
 import { deployPingPongInterchain, pingPong } from '../itsHelpers';
 
@@ -28,7 +28,7 @@ let address: string;
 
 beforeEach(async () => {
   world = await LSWorld.start();
-  world.setCurrentBlockInfo({
+  await world.setCurrentBlockInfo({
     nonce: 0,
     epoch: 0,
   });
@@ -38,11 +38,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -370,7 +370,7 @@ describe('Approve messages', () => {
         ...baseKvs(),
 
         // Manually approve message
-        e.kvs.Mapper('messages', crossChainId).Value(messageHash),
+        e.kvs.Mapper('messages', crossChainId).Value(e.TopBuffer(messageHash)),
       ],
     });
 

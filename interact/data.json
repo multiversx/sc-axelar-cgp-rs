@@ -62,16 +62,19 @@
     },
     "mainnet": {}
   },
-  "itsTrustedAddresses": {
-    "devnet": {
-      "axelar": "axelar157hl7gpuknjmhtac2qnphuazv2yerfagva7lsu9vuj2pgn32z22qa26dk4",
-      "avalanche-fuji": "hub",
-      "eth-sepolia": "hub",
-      "optimism-sepolia": "hub",
-      "sui-2": "hub",
-      "stacks": "hub"
-    },
+  "itsTrustedChains": {
+    "devnet": [
+      "avalanche-fuji",
+      "eth-sepolia",
+      "optimism-sepolia",
+      "sui-2",
+      "stacks"
+    ],
     "mainnet": {}
+  },
+  "itsHubAddress": {
+    "devnet": "axelar157hl7gpuknjmhtac2qnphuazv2yerfagva7lsu9vuj2pgn32z22qa26dk4",
+    "mainnet": ""
   },
   "itsKnownTokens": {
     "devnet": {

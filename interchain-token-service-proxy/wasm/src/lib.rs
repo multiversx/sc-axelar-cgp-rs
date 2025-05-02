@@ -6,9 +6,10 @@
 
 // Init:                                 1
 // Upgrade:                              1
-// Endpoints:                           14
+// Endpoints:                            6
 // Async Callback (empty):               1
-// Total number of exported functions:  17
+// Promise callbacks:                    1
+// Total number of exported functions:  10
 
 #![no_std]
 
@@ -16,24 +17,17 @@ multiversx_sc_wasm_adapter::allocator!();
 multiversx_sc_wasm_adapter::panic_handler!();
 
 multiversx_sc_wasm_adapter::endpoints! {
-    ping_ping_interchain
+    interchain_token_service_proxy
     (
         init => init
         upgrade => upgrade
-        execute => execute
         executeWithInterchainToken => execute_with_interchain_token
-        ping => ping
-        pong => pong
-        pongAll => pong_all
-        setInterchainTokenService => set_interchain_token_service
-        getUserAddresses => get_user_addresses
-        getInterchainTokenService => interchain_token_service
-        getPingAmount => ping_amount
-        getDeadline => deadline
-        getActivationTimestamp => activation_timestamp
-        getMaxFunds => max_funds
-        getUserStatus => user_status
-        pongAllLastUser => pong_all_last_user
+        setMinGasForExecution => set_min_gas_for_execution
+        interchainTokenService => interchain_token_service
+        contractAddress => contract_address
+        minGasForExecution => min_gas_for_execution
+        failedCalls => failed_calls
+        execute_callback => execute_callback
     )
 }
 

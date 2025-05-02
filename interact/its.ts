@@ -33,9 +33,7 @@ const deployBaseTokenManager = async (deployer: Wallet) => {
 const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
   console.log('Deploying ITS...');
 
-  const itsTrustedAddresses: object = envChain.select(data.itsTrustedAddresses);
-  const trustedChainNames = Object.keys(itsTrustedAddresses).map((name) => e.Str(name));
-  const trustedChainAddresses = Object.values(itsTrustedAddresses).map((address) => e.Str(address));
+  const itsTrustedChains: string[] = envChain.select(data.itsTrustedChains).map((name: string) => e.Str(name));
 
   const result = await deployer.deployContract({
     code: data.codeIts,
@@ -48,12 +46,10 @@ const deployIts = async (deployer: Wallet, baseTokenManager: string) => {
 
       deployer,
       e.Str(envChain.select(data.axelar).chainName),
+      e.Str(envChain.select(data.itsHubAddress)),
 
-      e.U32(trustedChainNames.length),
-      ...trustedChainNames,
-
-      e.U32(trustedChainAddresses.length),
-      ...trustedChainAddresses,
+      e.U32(itsTrustedChains.length),
+      ...itsTrustedChains,
     ],
   });
   console.log('Result Interchain Token Service:', result);

@@ -54,13 +54,6 @@ pub trait AccountRoles {
         require!(caller_roles.intersects(roles), "Missing any of roles");
     }
 
-    fn with_every_role(&self, roles: Roles) {
-        let caller = self.blockchain().get_caller();
-        let caller_roles = self.account_roles(&caller).get();
-
-        require!(caller_roles.contains(roles), "Missing all roles");
-    }
-
     fn has_role(&self, address: &ManagedAddress, roles: Roles) -> bool {
         let account_roles_mapper = self.account_roles(address);
 

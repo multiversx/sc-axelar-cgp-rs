@@ -9,8 +9,8 @@ import {
   OTHER_CHAIN_ADDRESS,
   OTHER_CHAIN_NAME,
   OTHER_CHAIN_TOKEN_ADDRESS,
-  TOKEN_ID,
-  TOKEN_ID2,
+  TOKEN_IDENTIFIER,
+  TOKEN_IDENTIFIER2,
   TOKEN_MANAGER_ADDRESS,
   TOKEN_MANAGER_ADDRESS_2,
   TOKEN_MANAGER_ADDRESS_3,
@@ -20,9 +20,9 @@ import {
 import {
   baseItsKvs,
   computeCanonicalInterchainTokenDeploySalt,
-  computeLinkedTokenId,
   computeInterchainTokenDeploySalt,
   computeInterchainTokenIdRaw,
+  computeLinkedTokenId,
   deployContracts,
   deployTokenManagerInterchainToken,
   deployTokenManagerLockUnlock,
@@ -54,11 +54,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -69,11 +69,11 @@ beforeEach(async () => {
     kvs: [
       e.kvs.Esdts([
         {
-          id: TOKEN_ID,
+          id: TOKEN_IDENTIFIER,
           amount: 100_000,
         },
         {
-          id: TOKEN_ID2,
+          id: TOKEN_IDENTIFIER2,
           amount: 10_000,
         },
       ]),
@@ -88,18 +88,18 @@ afterEach(async () => {
   await world.terminate();
 });
 
-const deployAndMockTokenManagerInterchainToken = async (burnRole: boolean = false, minter: LSWallet = null) => {
+const deployAndMockTokenManagerInterchainToken = async (burnRole: boolean = false, minter: LSWallet | null = null) => {
   await deployContracts(deployer, collector);
 
   let baseTokenManagerKvs;
   if (!burnRole) {
     baseTokenManagerKvs = await deployTokenManagerInterchainToken(deployer, its);
   } else {
-    baseTokenManagerKvs = await deployTokenManagerInterchainToken(deployer, its, its, TOKEN_ID, true, minter || its);
+    baseTokenManagerKvs = await deployTokenManagerInterchainToken(deployer, its, its, TOKEN_IDENTIFIER, true, minter || its);
   }
 
   const deploySalt = computeInterchainTokenDeploySalt(user);
-  const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
+  const computedTokenId = computeInterchainTokenIdRaw(deploySalt);
 
   // Mock token manager already deployed as not being canonical so contract deployment is not tried again
   await its.setAccount({
@@ -115,7 +115,7 @@ const deployAndMockTokenManagerInterchainToken = async (burnRole: boolean = fals
 };
 
 const deployAndMockTokenManagerLockUnlock = async (
-  tokenId: string = TOKEN_ID,
+  tokenId: string = TOKEN_IDENTIFIER,
   interchainTokenId: string = INTERCHAIN_TOKEN_ID
 ) => {
   await deployContracts(deployer, collector);
@@ -129,7 +129,7 @@ const deployAndMockTokenManagerLockUnlock = async (
     deploySalt = computeCanonicalInterchainTokenDeploySalt(tokenId);
   }
 
-  const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
+  const computedTokenId = computeInterchainTokenIdRaw(deploySalt);
 
   // Mock token manager already deployed as not being canonical so contract deployment is not tried again
   await its.setAccount({
@@ -155,8 +155,8 @@ describe('Deploy interchain token', () => {
         value: BigInt('50000000000000000'),
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          e.Str('Token Name'),
-          e.Str('TOKEN-SYMBOL'),
+          e.Str('TokenName'),
+          e.Str('SYMBOL'),
           e.U8(18),
           e.U(1_000),
           user, // minter
@@ -169,16 +169,20 @@ describe('Deploy interchain token', () => {
       funcName: 'deployInterchainToken',
       gasLimit: 100_000_000,
       value: 0,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.U(1_000), user],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(1_000), user],
     });
 
     const salt = computeInterchainTokenDeploySalt(user);
-    const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), salt);
+    const computedTokenId = computeInterchainTokenIdRaw(salt);
 
     const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [...baseItsKvs(deployer, computedTokenId)],
+      kvs: [
+        ...baseItsKvs(deployer, computedTokenId),
+
+        e.kvs.Mapper('interchain_token_status', e.TopBuffer(computedTokenId)).Value(e.U8(2)),
+      ],
     });
 
     // ITS gets roles over token manager
@@ -206,7 +210,7 @@ describe('Deploy interchain token', () => {
         funcName: 'deployInterchainToken',
         gasLimit: 100_000_000,
         value: 0,
-        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.U(0), its],
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(0), its],
       })
       .assertFail({ code: 4, message: 'Invalid minter' });
 
@@ -215,16 +219,20 @@ describe('Deploy interchain token', () => {
       funcName: 'deployInterchainToken',
       gasLimit: 100_000_000,
       value: 0,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.U(0), user],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(0), user],
     });
 
     const salt = computeInterchainTokenDeploySalt(user);
-    const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), salt);
+    const computedTokenId = computeInterchainTokenIdRaw(salt);
 
     const kvs = await its.getAccount();
     assertAccount(kvs, {
       balance: 0n,
-      kvs: [...baseItsKvs(deployer, computedTokenId)],
+      kvs: [
+        ...baseItsKvs(deployer, computedTokenId),
+
+        e.kvs.Mapper('interchain_token_status', e.TopBuffer(computedTokenId)).Value(e.U8(1)),
+      ],
     });
 
     // Minter gets roles over token manager
@@ -251,14 +259,7 @@ describe('Deploy interchain token', () => {
         funcName: 'deployInterchainToken',
         gasLimit: 100_000_000,
         value: 0,
-        funcArgs: [
-          e.TopBuffer(TOKEN_SALT),
-          e.Str('Token Name'),
-          e.Str('TOKEN-SYMBOL'),
-          e.U8(18),
-          e.U(0),
-          e.Addr(ADDRESS_ZERO),
-        ],
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(0)],
       })
       .assertFail({ code: 4, message: 'Zero supply token' });
   });
@@ -273,9 +274,9 @@ describe('Deploy interchain token', () => {
         funcName: 'deployInterchainToken',
         gasLimit: 200_000_000,
         value: 0,
-        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.U(1_000), user],
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(1_000), user],
       })
-      .assertFail({ code: 10, message: 'failed transfer (insufficient funds)' });
+      .assertFail({ code: 10, message: 'error signalled by smartcontract' });
 
     // Insufficient funds for issuing ESDT
     await user.callContract({
@@ -283,7 +284,7 @@ describe('Deploy interchain token', () => {
       funcName: 'deployInterchainToken',
       gasLimit: 200_000_000,
       value: BigInt('50000000000000000'),
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.U(1_000), user],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(1_000), user],
     });
 
     assertAccount(await its.getAccount(), {
@@ -304,7 +305,7 @@ describe('Deploy interchain token', () => {
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
-          .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+          .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
       ],
     });
     assertAccount(await user.getAccount(), {
@@ -322,8 +323,8 @@ describe('Deploy interchain token', () => {
       value: BigInt('50000000000000000'),
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
+        e.Str('TokenName'),
+        e.Str('SYMBOL'),
         e.U8(18),
         e.U(0),
         user, // minter
@@ -350,12 +351,29 @@ describe('Deploy interchain token', () => {
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
-          .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+          .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
       ],
     });
     assertAccount(await user.getAccount(), {
       balance: BigInt('50000000000000000'), // balance was changed
     });
+
+    // Can not call again with initial supply
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'deployInterchainToken',
+        gasLimit: 200_000_000,
+        funcArgs: [
+          e.TopBuffer(TOKEN_SALT),
+          e.Str('TokenName'),
+          e.Str('SYMBOL'),
+          e.U8(18),
+          e.U(1_000), // initial supply not zero
+          user, // minter
+        ],
+      })
+      .assertFail({ code: 4, message: 'Token already initialized' });
   });
 
   test('Only issue esdt no minter', async () => {
@@ -368,8 +386,8 @@ describe('Deploy interchain token', () => {
       value: BigInt('50000000000000000'),
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
+        e.Str('TokenName'),
+        e.Str('SYMBOL'),
         e.U8(18),
         e.U(1_000),
         e.Addr(ADDRESS_ZERO), // minter
@@ -396,7 +414,7 @@ describe('Deploy interchain token', () => {
         // Async call tested in itsCrossChainCalls.test.ts file
         e.kvs
           .Mapper('CB_CLOSURE................................')
-          .Value(e.Tuple(e.Str('deploy_token_callback'), e.TopBuffer('00000000'))),
+          .Value(e.Tuple(e.Str('deploy_token_callback'), e.U32(1), e.Buffer(user.toTopU8A()))),
       ],
     });
     assertAccount(await user.getAccount(), {
@@ -413,7 +431,7 @@ describe('Deploy interchain token', () => {
         funcName: 'deployInterchainToken',
         gasLimit: 200_000_000,
         value: BigInt('50000000000000000'),
-        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.U(1_000), user],
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(1_000), user],
       })
       .assertFail({ code: 4, message: 'Can not send EGLD payment if not issuing ESDT' });
 
@@ -421,7 +439,7 @@ describe('Deploy interchain token', () => {
       callee: its,
       funcName: 'deployInterchainToken',
       gasLimit: 200_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Token Name'), e.Str('TOKEN-SYMBOL'), e.U8(18), e.U(1_000), user],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(1_000), user],
     });
 
     // Assert user got all roles
@@ -433,6 +451,7 @@ describe('Deploy interchain token', () => {
 
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000000)), // roles removed
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000111)), // all roles
+        e.kvs.Mapper('minter_address').Value(user),
       ],
     });
 
@@ -443,16 +462,40 @@ describe('Deploy interchain token', () => {
       kvs: [
         e.kvs.Esdts([
           {
-            id: TOKEN_ID,
+            id: TOKEN_IDENTIFIER,
             amount: 101_000,
           },
           {
-            id: TOKEN_ID2,
+            id: TOKEN_IDENTIFIER2,
             amount: 10_000,
           },
         ]),
       ],
     });
+
+    const salt = computeInterchainTokenDeploySalt(user);
+    const computedTokenId = computeInterchainTokenIdRaw(salt);
+
+    assertAccount(await its.getAccount(), {
+      balance: 0n,
+      hasKvs: [
+        ...baseItsKvs(deployer),
+
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(tokenManager),
+
+        e.kvs.Mapper('interchain_token_status', e.TopBuffer(computedTokenId)).Value(e.U8(3)), // Minting completed
+      ],
+    });
+
+    // Can not mint again
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'deployInterchainToken',
+        gasLimit: 200_000_000,
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('TokenName'), e.Str('SYMBOL'), e.U8(18), e.U(1_000), user],
+      })
+      .assertFail({ code: 4, message: 'Token already initialized' });
   });
 
   test('Only mint no minter', async () => {
@@ -464,8 +507,8 @@ describe('Deploy interchain token', () => {
       gasLimit: 200_000_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str('Token Name'),
-        e.Str('TOKEN-SYMBOL'),
+        e.Str('TokenName'),
+        e.Str('SYMBOL'),
         e.U8(18),
         e.U(1_000),
         e.Addr(ADDRESS_ZERO),
@@ -481,6 +524,7 @@ describe('Deploy interchain token', () => {
 
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000000)), // roles removed
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000111)), // operator & flow limiter & minter role
+        e.kvs.Mapper('minter_address').Value(e.Addr(ADDRESS_ZERO)),
       ],
     });
 
@@ -491,16 +535,54 @@ describe('Deploy interchain token', () => {
       kvs: [
         e.kvs.Esdts([
           {
-            id: TOKEN_ID,
+            id: TOKEN_IDENTIFIER,
             amount: 101_000,
           },
           {
-            id: TOKEN_ID2,
+            id: TOKEN_IDENTIFIER2,
             amount: 10_000,
           },
         ]),
       ],
     });
+  });
+
+  test('Errors', async () => {
+    await deployContracts(deployer, collector);
+
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'deployInterchainToken',
+        gasLimit: 100_000_000,
+        value: BigInt('50000000000000000'),
+        funcArgs: [
+          e.TopBuffer(TOKEN_SALT),
+          e.Str('Token Name'),
+          e.Str('SYMBOL'),
+          e.U8(18),
+          e.U(1_000),
+          user, // minter
+        ],
+      })
+      .assertFail({ code: 4, message: 'Invalid token name' });
+
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'deployInterchainToken',
+        gasLimit: 100_000_000,
+        value: BigInt('50000000000000000'),
+        funcArgs: [
+          e.TopBuffer(TOKEN_SALT),
+          e.Str('TokenName'),
+          e.Str('TOKEN-SYMBOL'),
+          e.U8(18),
+          e.U(1_000),
+          user, // minter
+        ],
+      })
+      .assertFail({ code: 4, message: 'Invalid token symbol' });
   });
 });
 
@@ -550,7 +632,7 @@ describe('Approvals deploy remote interchain token', () => {
     });
 
     const deploySalt = computeInterchainTokenDeploySalt(user);
-    const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
+    const computedTokenId = computeInterchainTokenIdRaw(deploySalt);
 
     const approvalKey = getKeccak256Hash(
       Buffer.concat([
@@ -576,7 +658,7 @@ describe('Approvals deploy remote interchain token', () => {
 
     const deploySalt = computeInterchainTokenDeploySalt(user);
 
-    const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), deploySalt);
+    const computedTokenId = computeInterchainTokenIdRaw(deploySalt);
 
     const approvalKey = getKeccak256Hash(
       Buffer.concat([
@@ -644,7 +726,7 @@ describe('Deploy remote interchain token', () => {
             e.U32(6),
             e.Buffer(computeInterchainTokenDeploySalt(user)),
             e.Str(OTHER_CHAIN_NAME),
-            e.Str(TOKEN_ID.split('-')[0]),
+            e.Str(TOKEN_IDENTIFIER.split('-')[0]),
             e.Buffer(''), // minter
             e.U(100_000_000n),
             e.Buffer(user.toTopU8A())
@@ -712,12 +794,27 @@ describe('Deploy remote interchain token', () => {
         value: 100_000_000n,
         funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(OTHER_CHAIN_NAME)],
       })
-      .assertFail({ code: 4, message: 'panic occurred' });
+      .assertFail({ code: 4, message: 'Invalid token identifier' });
+
+    await tokenManager.setAccount({
+      ...(await tokenManager.getAccount()),
+      kvs: [...baseTokenManagerKvs, e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER))],
+    });
+
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'deployRemoteInterchainToken',
+        gasLimit: 20_000_000,
+        value: 100_000,
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str('Unknown')],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
   });
 });
 
 describe('Deploy remote interchain token with minter', () => {
-  test('With destination minter same as minter', async () => {
+  test('With no destination minter but with minter', async () => {
     const { computedTokenId } = await deployAndMockTokenManagerInterchainToken(true, user);
 
     await user.callContract({
@@ -725,7 +822,7 @@ describe('Deploy remote interchain token with minter', () => {
       funcName: 'deployRemoteInterchainTokenWithMinter',
       gasLimit: 150_000_000,
       value: 100_000_000n,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), user, e.Str(OTHER_CHAIN_NAME)],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Option(user), e.Str(OTHER_CHAIN_NAME)],
     });
 
     assertAccount(await its.getAccount(), {
@@ -740,8 +837,8 @@ describe('Deploy remote interchain token with minter', () => {
             e.U32(6),
             e.Buffer(computeInterchainTokenDeploySalt(user)),
             e.Str(OTHER_CHAIN_NAME),
-            e.Str(TOKEN_ID.split('-')[0]),
-            e.Buffer(user.toTopU8A()), // destination minter
+            e.Str(TOKEN_IDENTIFIER.split('-')[0]),
+            e.Buffer(''), // destination minter
             e.U(100_000_000n),
             e.Buffer(user.toTopU8A())
           )
@@ -762,7 +859,7 @@ describe('Deploy remote interchain token with minter', () => {
         value: 100_000_000n,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          deployer, // minter
+          e.Option(deployer), // minter
           e.Str(OTHER_CHAIN_NAME),
           e.TopBuffer(OTHER_CHAIN_ADDRESS.slice(2)),
         ],
@@ -786,7 +883,7 @@ describe('Deploy remote interchain token with minter', () => {
         value: 100_000_000n,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          deployer, // minter
+          e.Option(deployer), // minter
           e.Str(OTHER_CHAIN_NAME),
           e.TopBuffer('AABB'),
         ],
@@ -800,7 +897,7 @@ describe('Deploy remote interchain token with minter', () => {
       value: 100_000_000n,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        deployer, // minter
+        e.Option(deployer), // minter
         e.Str(OTHER_CHAIN_NAME),
         e.TopBuffer(OTHER_CHAIN_ADDRESS.slice(2)),
       ],
@@ -818,7 +915,7 @@ describe('Deploy remote interchain token with minter', () => {
             e.U32(6),
             e.Buffer(computeInterchainTokenDeploySalt(user)),
             e.Str(OTHER_CHAIN_NAME),
-            e.Str(TOKEN_ID.split('-')[0]),
+            e.Str(TOKEN_IDENTIFIER.split('-')[0]),
             e.Buffer(OTHER_CHAIN_ADDRESS.slice(2)), // destination minter
             e.U(100_000_000n),
             e.Buffer(user.toTopU8A())
@@ -840,7 +937,7 @@ describe('Deploy remote interchain token with minter', () => {
         value: 100_000_000n,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          e.Addr(ADDRESS_ZERO), // minter
+          e.Option(null), // minter
           e.Str(OTHER_CHAIN_NAME),
         ],
       })
@@ -857,7 +954,7 @@ describe('Deploy remote interchain token with minter', () => {
         value: 100_000_000n,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          user, // minter
+          e.Option(user), // minter
           e.Str(OTHER_CHAIN_NAME),
         ],
       })
@@ -874,7 +971,7 @@ describe('Deploy remote interchain token with minter', () => {
         value: 100_000_000n,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          user, // minter
+          e.Option(user), // minter
           e.Str(OTHER_CHAIN_NAME),
         ],
       })
@@ -889,7 +986,7 @@ describe('Deploy remote interchain token with minter', () => {
         value: 100_000_000n,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          its, // minter
+          e.Option(its), // minter
           e.Str(OTHER_CHAIN_NAME),
         ],
       })
@@ -902,7 +999,7 @@ describe('Deploy remote interchain token with minter', () => {
         funcName: 'deployRemoteInterchainTokenWithMinter',
         gasLimit: 150_000_000,
         value: 100_000_000n,
-        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Addr(ADDRESS_ZERO), e.Str(OTHER_CHAIN_NAME), e.TopBuffer('AABB')],
+        funcArgs: [e.TopBuffer(TOKEN_SALT), e.Option(null), e.Str(OTHER_CHAIN_NAME), e.TopBuffer('AABB')],
       })
       .assertFail({ code: 4, message: 'Invalid minter' });
 
@@ -920,11 +1017,11 @@ describe('Deploy remote interchain token with minter', () => {
         value: 100_000_000n,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          e.Addr(ADDRESS_ZERO), // minter
+          e.Option(null), // minter
           e.Str(OTHER_CHAIN_NAME),
         ],
       })
-      .assertFail({ code: 4, message: 'panic occurred' });
+      .assertFail({ code: 4, message: 'Invalid token identifier' });
   });
 });
 
@@ -936,11 +1033,11 @@ describe('Register canonical interchain token', () => {
       callee: its,
       funcName: 'registerCanonicalInterchainToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(TOKEN_ID)],
+      funcArgs: [e.Str(TOKEN_IDENTIFIER)],
     });
 
     const salt = computeCanonicalInterchainTokenDeploySalt();
-    const computedTokenId = computeInterchainTokenIdRaw(e.Addr(ADDRESS_ZERO), salt);
+    const computedTokenId = computeInterchainTokenIdRaw(salt);
 
     assert(result.returnData[0] === computedTokenId);
 
@@ -958,7 +1055,7 @@ describe('Register canonical interchain token', () => {
         e.kvs.Mapper('interchain_token_service').Value(its),
         e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER)),
         e.kvs.Mapper('account_roles', e.Addr(ADDRESS_ZERO)).Value(e.U32(0b00000110)), // flow limit and operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)), // flow limit and operator roles
       ],
@@ -990,7 +1087,7 @@ describe('Register canonical interchain token', () => {
       callee: its,
       funcName: 'registerCanonicalInterchainToken',
       gasLimit: 20_000_000,
-      funcArgs: [e.Str(TOKEN_ID)],
+      funcArgs: [e.Str(TOKEN_IDENTIFIER)],
     });
 
     // Can not register same canonical token twice
@@ -999,7 +1096,7 @@ describe('Register canonical interchain token', () => {
         callee: its,
         funcName: 'registerCanonicalInterchainToken',
         gasLimit: 20_000_000,
-        funcArgs: [e.Str(TOKEN_ID)],
+        funcArgs: [e.Str(TOKEN_IDENTIFIER)],
       })
       .assertFail({ code: 4, message: 'Token manager already exists' });
   });
@@ -1007,14 +1104,14 @@ describe('Register canonical interchain token', () => {
 
 describe('Deploy remote canonical interchain token', () => {
   test('ESDT token', async () => {
-    await deployAndMockTokenManagerLockUnlock(TOKEN_ID, CANONICAL_INTERCHAIN_TOKEN_ID);
+    await deployAndMockTokenManagerLockUnlock(TOKEN_IDENTIFIER, CANONICAL_INTERCHAIN_TOKEN_ID);
 
     await user.callContract({
       callee: its,
       funcName: 'deployRemoteCanonicalInterchainToken',
       gasLimit: 150_000_000,
       value: 100_000_000n,
-      funcArgs: [e.Str(TOKEN_ID), e.Str(OTHER_CHAIN_NAME)],
+      funcArgs: [e.Str(TOKEN_IDENTIFIER), e.Str(OTHER_CHAIN_NAME)],
     });
 
     assertAccount(await its.getAccount(), {
@@ -1029,7 +1126,7 @@ describe('Deploy remote canonical interchain token', () => {
             e.U32(6),
             e.Buffer(computeCanonicalInterchainTokenDeploySalt()),
             e.Str(OTHER_CHAIN_NAME),
-            e.Str(TOKEN_ID.split('-')[0]),
+            e.Str(TOKEN_IDENTIFIER.split('-')[0]),
             e.Buffer(''), // empty minter
             e.U(100_000_000n),
             e.Buffer(user.toTopU8A())
@@ -1082,15 +1179,15 @@ describe('Deploy remote canonical interchain token', () => {
         funcName: 'deployRemoteCanonicalInterchainToken',
         gasLimit: 150_000_000,
         value: 100_000_000n,
-        funcArgs: [e.Str(TOKEN_ID), e.Str(OTHER_CHAIN_NAME)],
+        funcArgs: [e.Str(TOKEN_IDENTIFIER), e.Str(OTHER_CHAIN_NAME)],
       })
       .assertFail({ code: 4, message: 'Token manager does not exist' });
 
-    const { baseTokenManagerKvs } = await deployAndMockTokenManagerLockUnlock(TOKEN_ID, CANONICAL_INTERCHAIN_TOKEN_ID);
+    const { baseTokenManagerKvs } = await deployAndMockTokenManagerLockUnlock(TOKEN_IDENTIFIER, CANONICAL_INTERCHAIN_TOKEN_ID);
 
     await tokenManager.setAccount({
       ...(await tokenManager.getAccount()),
-      kvs: [...baseTokenManagerKvs, e.kvs.Mapper('token_identifier').Value('')],
+      kvs: [...baseTokenManagerKvs, e.kvs.Mapper('token_identifier').Value(e.Str(''))],
     });
 
     // No token identifier
@@ -1100,9 +1197,24 @@ describe('Deploy remote canonical interchain token', () => {
         funcName: 'deployRemoteCanonicalInterchainToken',
         gasLimit: 150_000_000,
         value: 100_000_000n,
-        funcArgs: [e.Str(TOKEN_ID), e.Str(OTHER_CHAIN_NAME)],
+        funcArgs: [e.Str(TOKEN_IDENTIFIER), e.Str(OTHER_CHAIN_NAME)],
       })
-      .assertFail({ code: 4, message: 'panic occurred' });
+      .assertFail({ code: 4, message: 'Invalid token identifier' });
+
+    await tokenManager.setAccount({
+      ...(await tokenManager.getAccount()),
+      kvs: [...baseTokenManagerKvs, e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER))],
+    });
+
+    await user
+      .callContract({
+        callee: its,
+        funcName: 'deployRemoteCanonicalInterchainToken',
+        gasLimit: 150_000_000,
+        value: 100_000_000n,
+        funcArgs: [e.Str(TOKEN_IDENTIFIER), e.Str('Unknown')],
+      })
+      .assertFail({ code: 4, message: 'Untrusted chain' });
   });
 });
 
@@ -1116,7 +1228,7 @@ describe('Register custom token', () => {
       gasLimit: 100_000_000,
       funcArgs: [
         e.TopBuffer(TOKEN_SALT),
-        e.Str(TOKEN_ID),
+        e.Str(TOKEN_IDENTIFIER),
         e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), // Lock/unlock
         user,
       ],
@@ -1146,7 +1258,7 @@ describe('Register custom token', () => {
         e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
         e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limiter & operator roles
         e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
-        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_ID)),
+        e.kvs.Mapper('token_identifier').Value(e.Str(TOKEN_IDENTIFIER)),
       ],
     });
 
@@ -1164,7 +1276,7 @@ describe('Register custom token', () => {
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 100_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT2), e.Str(TOKEN_ID), e.U8(TOKEN_MANAGER_TYPE_MINT_BURN), user],
+      funcArgs: [e.TopBuffer(TOKEN_SALT2), e.Str(TOKEN_IDENTIFIER), e.U8(TOKEN_MANAGER_TYPE_MINT_BURN), user],
     });
 
     kvs = await its.getAccount();
@@ -1177,6 +1289,59 @@ describe('Register custom token', () => {
         e.kvs.Mapper('token_manager_address', e.TopBuffer(result.returnData[0])).Value(e.Addr(TOKEN_MANAGER_ADDRESS_2)),
       ],
     });
+  });
+
+  test('Register custom token egld', async () => {
+    await deployContracts(deployer, collector);
+
+    let result = await user.callContract({
+      callee: its,
+      funcName: 'registerCustomToken',
+      gasLimit: 100_000_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str('EGLD'),
+        e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), // Lock/unlock
+        user,
+      ],
+    });
+
+    const computedTokenId = computeLinkedTokenId(user);
+
+    assert(result.returnData[0] === computedTokenId);
+
+    let kvs = await its.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseItsKvs(deployer),
+
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(computedTokenId)).Value(e.Addr(TOKEN_MANAGER_ADDRESS)),
+      ],
+    });
+
+    const tokenManager = await world.newContract(TOKEN_MANAGER_ADDRESS);
+    const tokenManagerKvs = await tokenManager.getAccount();
+    assertAccount(tokenManagerKvs, {
+      balance: 0n,
+      kvs: [
+        e.kvs.Mapper('interchain_token_service').Value(its),
+        e.kvs.Mapper('implementation_type').Value(e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK)),
+        e.kvs.Mapper('interchain_token_id').Value(e.TopBuffer(computedTokenId)),
+        e.kvs.Mapper('account_roles', user).Value(e.U32(0b00000110)), // flow limiter & operator roles
+        e.kvs.Mapper('account_roles', its).Value(e.U32(0b00000110)),
+        e.kvs.Mapper('token_identifier').Value(e.Str('EGLD')),
+      ],
+    });
+
+    // Assert correct token manager type
+    const query = await world.query({
+      callee: tokenManager,
+      funcName: 'implementationType',
+      funcArgs: [],
+    });
+
+    assert(query.returnData[0] == '02'); // lock/unlock type
   });
 
   test('Errors', async () => {
@@ -1204,7 +1369,7 @@ describe('Register custom token', () => {
         gasLimit: 20_000_000,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          e.Str(TOKEN_ID),
+          e.Str(TOKEN_IDENTIFIER),
           e.U8(TOKEN_MANAGER_TYPE_INTERCHAIN_TOKEN),
           e.Addr(ADDRESS_ZERO),
         ],
@@ -1215,7 +1380,7 @@ describe('Register custom token', () => {
       callee: its,
       funcName: 'registerCustomToken',
       gasLimit: 100_000_000,
-      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_ID), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
+      funcArgs: [e.TopBuffer(TOKEN_SALT), e.Str(TOKEN_IDENTIFIER), e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK), e.Addr(ADDRESS_ZERO)],
     });
 
     // Can not deploy same token with same salt
@@ -1226,7 +1391,7 @@ describe('Register custom token', () => {
         gasLimit: 100_000_000,
         funcArgs: [
           e.TopBuffer(TOKEN_SALT),
-          e.Str(TOKEN_ID),
+          e.Str(TOKEN_IDENTIFIER),
           e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
           e.Addr(ADDRESS_ZERO),
         ],
@@ -1323,6 +1488,59 @@ describe('Link token', () => {
       balance: 150_000,
       kvs: [e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString()))],
     });
+  });
+
+  test('Link egld', async () => {
+    await deployContracts(deployer, collector);
+
+    const userTokenId = computeLinkedTokenId(user);
+
+    // Mock token manager exists on source chain
+    await deployTokenManagerLockUnlock(deployer, its, deployer, 'EGLD');
+    await its.setAccount({
+      ...(await its.getAccount()),
+      kvs: [
+        ...baseItsKvs(deployer),
+
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(userTokenId)).Value(tokenManager),
+      ],
+    });
+
+    let result = await user.callContract({
+      callee: its,
+      funcName: 'linkToken',
+      gasLimit: 50_000_000,
+      value: 100_000,
+      funcArgs: [
+        e.TopBuffer(TOKEN_SALT),
+        e.Str(OTHER_CHAIN_NAME),
+        e.Str(OTHER_CHAIN_TOKEN_ADDRESS),
+        e.U8(TOKEN_MANAGER_TYPE_MINT_BURN),
+        e.Buffer(AbiCoder.defaultAbiCoder().encode(['bytes'], [OTHER_CHAIN_ADDRESS]).substring(2)),
+      ],
+    });
+
+    assert(result.returnData[0] === userTokenId);
+
+    // Nothing changes for its keys
+    let kvs = await its.getAccount();
+    assertAccount(kvs, {
+      balance: 0n,
+      kvs: [
+        ...baseItsKvs(deployer),
+
+        e.kvs.Mapper('token_manager_address', e.TopBuffer(userTokenId)).Value(tokenManager),
+      ],
+    });
+
+    // Assert gas was paid for cross chain call
+    kvs = await gasService.getAccount();
+    assertAccount(kvs, {
+      balance: 100_000,
+      kvs: [e.kvs.Mapper('gas_collector').Value(e.Addr(collector.toString()))],
+    });
+
+    // There are events emitted for the Gateway contract, but there is no way to test those currently...
   });
 
   test('Errors', async () => {

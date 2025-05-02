@@ -2,23 +2,16 @@ import fs from 'fs';
 import { UserSecretKey } from '@multiversx/sdk-wallet/out';
 import createKeccakHash from 'keccak';
 import { e, Encodable } from 'xsuite';
-import { AbiCoder } from 'ethers';
-
-export const MOCK_CONTRACT_ADDRESS_1: string = 'erd1qqqqqqqqqqqqqpgqd77fnev2sthnczp2lnfx0y5jdycynjfhzzgq6p3rax';
-export const MOCK_CONTRACT_ADDRESS_2: string = 'erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh';
 
 export const ALICE_PUB_KEY = '0139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e1';
 export const BOB_PUB_KEY = '8049d639e5a6980d1cd2392abcce41029cda74a1563523a202f09641cc2618f8';
 export const CAROL_PUB_KEY = 'b2a11555ce521e4944e09ab17549d85b487dcd26c84b5017a39e31a3670889ba';
 
-export const MULTISIG_PROVER_PUB_KEY_1 = 'ca5b4abdf9eec1f8e2d12c187d41ddd054c81979cae9e8ee9f4ecab901cac5b6';
-export const MULTISIG_PROVER_PUB_KEY_2 = 'ef637606f3144ee46343ba4a25c261b5c400ade88528e876f3deababa22a4449';
-
 export const TOKEN_SALT: string = '91b44915de5f5bb438be952d4cda1bcc08829495e8704e40751dcee97aa83886';
 export const TOKEN_SALT2: string = '8be14915de5f5bb438be952d4cda1bcc08829495e8704e40751dcee97aa89854';
-export const TOKEN_ID: string = 'WEGLD-123456';
-export const TOKEN_ID2: string = 'OTHER-654321';
-export const TOKEN_ID_EGLD: string = 'EGLD-000000';
+export const TOKEN_IDENTIFIER: string = 'WEGLD-123456';
+export const TOKEN_IDENTIFIER2: string = 'OTHER-654321';
+export const TOKEN_IDENTIFIER_EGLD: string = 'EGLD-000000';
 
 export const INTERCHAIN_TOKEN_ID: string = '01b3d64c8c6530a3aad5909ae7e0985d4438ce8eafd90e51ce48fbc809bced39';
 export const CANONICAL_INTERCHAIN_TOKEN_ID: string = 'ab13e48029a0672cd3a669e258a97696dc33b4f72f4d758f92ee4afc8a026dc1';
@@ -55,10 +48,12 @@ export const getAuthMessageHash = (signersHash: Buffer, dataHash: Buffer): strin
 };
 
 export const generateMessageSignature = (signersHash: Buffer, data: Encodable, signerPem = './alice.pem'): Buffer => {
-  const dataHash = getKeccak256Hash(Buffer.concat([
-    Buffer.from('00', 'hex'), // ApproveMessages command type,
-    data.toTopU8A(),
-  ]));
+  const dataHash = getKeccak256Hash(
+    Buffer.concat([
+      Buffer.from('00', 'hex'), // ApproveMessages command type,
+      data.toTopU8A(),
+    ])
+  );
 
   const messageHashToSign = getAuthMessageHash(signersHash, Buffer.from(dataHash, 'hex'));
 
@@ -68,11 +63,17 @@ export const generateMessageSignature = (signersHash: Buffer, data: Encodable, s
   return privateKey.sign(Buffer.from(messageHashToSign, 'hex'));
 };
 
-export const generateRotateSignersSignature = (signersHash: Buffer, data: Encodable, signerPem = './alice.pem'): Buffer => {
-  const dataHash = getKeccak256Hash(Buffer.concat([
-    Buffer.from('01', 'hex'), // RotateSigners command type,
-    data.toTopU8A(),
-  ]));
+export const generateRotateSignersSignature = (
+  signersHash: Buffer,
+  data: Encodable,
+  signerPem = './alice.pem'
+): Buffer => {
+  const dataHash = getKeccak256Hash(
+    Buffer.concat([
+      Buffer.from('01', 'hex'), // RotateSigners command type,
+      data.toTopU8A(),
+    ])
+  );
 
   const messageHashToSign = getAuthMessageHash(signersHash, Buffer.from(dataHash, 'hex'));
 
@@ -99,14 +100,14 @@ export const getMessageHash = (
   return e.TopBuffer(getKeccak256Hash(messageData));
 };
 
-export const getSignersHash = (signers: { signer: string, weight: number } [], threshold: number, nonce: string) => {
+export const getSignersHash = (signers: { signer: string; weight: number }[], threshold: number, nonce: string) => {
   let signersLengthHex = numberToHex(signers.length, 4);
 
   let thresholdHex = numberToHex(threshold);
 
   let data = Buffer.concat([
     Buffer.from(signersLengthHex, 'hex'),
-    ...signers.map(signer => {
+    ...signers.map((signer) => {
       let weightHex = numberToHex(signer.weight);
       let weightHexLengthHex = numberToHex(weightHex.length / 2, 4);
 
@@ -137,29 +138,15 @@ const numberToHex = (nb: number, size: number = 0): string => {
   return nbHex;
 };
 
-export const getSignersHashAndEncodable = (signers: {
-  signer: string,
-  weight: number
-} [], threshold: number, createdAt: number) => {
-  const nonce = AbiCoder.defaultAbiCoder().encode(['uint256'], [createdAt]).substring(2);
-
-  const signerHash = getSignersHash(signers, threshold, nonce);
-
-  const encodable = e.Tuple(
-    e.List(
-      ...signers.map(signer => e.Tuple(e.TopBuffer(signer.signer), e.U(signer.weight))),
-    ),
-    e.U(threshold),
-    e.TopBuffer(nonce),
-  );
-
-  return [encodable, signerHash];
-};
-
 export const generateProof = (weightedSigners: Encodable, signatures: (Buffer | null)[]): Encodable => {
-  return e.Tuple(weightedSigners, e.List(...signatures.map(signature => {
-    return e.Option(signature === null ? null : e.TopBuffer(signature));
-  })));
+  return e.Tuple(
+    weightedSigners,
+    e.List(
+      ...signatures.map((signature) => {
+        return e.Option(signature === null ? null : e.TopBuffer(signature));
+      })
+    )
+  );
 };
 
 export const getKeccak256Hash = (payload: string | Buffer) => {
