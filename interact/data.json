@@ -79,25 +79,12 @@
   "itsKnownTokens": {
     "devnet": {
       "EGLD": {
-        "tokenId": "2c2a94e0c1200b3432349f28ac617a7c9242bbc9d2c9cb46d7fe9ac555104710",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqlmu50mwf6a8j9ys7txr7u0f6g730th4wkklswp02pc"
-      },
-      "ITSTT-066438": {
-        "tokenId": "81748eb162a0c2c245b3fb7f29e125edf1a95cf01712d21e20a7594add9d82cd",
-        "tokenManager": "erd1s96gavtz5rpvy3dnldljncf9ahc6jh8szufdy83q5av54hvastxs9ren2p"
+        "tokenId": "764324ca564aa350b7f055cb5fdc566a29e546f6df0db1fb2f916830b7c26135",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgq3555zasfufg5gajwfnwe9htup2e9al59kklszz7uq9"
       },
       "MEX-a659d0": {
-        "tokenId": "5f2a70ee6ef62578e6c13283c84b20edaa76d20ff6744b703b613aa4ec376522",
-        "tokenManager": "erd1qqqqqqqqqqqqqpgqyud9dhd7d4al34l5xvaz4g6hm6nypqawkklszy7e88"
-      },
-      "UTK-14d57d": {
-        "tokenId": "7c704442671c54e50c08599a9751d1987d635281f8ab2dd4d0a6f5c534b23133"
-      },
-      "NIT-3844dc": {
-        "tokenId": "d34f765596bb68d26ba144dda1e78f35ad8d07e45765811a55a044f9ff09fd9f"
-      },
-      "TFM-5c6a4a": {
-        "tokenId": "641dbb07afbd73875ef0740c239a5cd29e278f9ca6ac4453d80301005ade7dc3"
+        "tokenId": "17e23413701c5ca7b815bd71f962ee0945c3458af9f2c9cab4b53cf80ef57ae1",
+        "tokenManager": "erd1qqqqqqqqqqqqqpgqmq3ughd53gptc2764zmugxvec9up8m8tkklsl30cf9"
       }
     },
     "mainnet": {}

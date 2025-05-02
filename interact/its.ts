@@ -137,12 +137,7 @@ export const setupITSCommands = (program: Command) => {
       code: data.codeBaseTokenManager,
       codeMetadata: ['upgradeable'],
       gasLimit: 100_000_000,
-      codeArgs: [
-        wallet,
-        e.U8(TOKEN_MANAGER_TYPE_LOCK_UNLOCK),
-        e.TopBuffer(INTERCHAIN_TOKEN_ID),
-        e.Tuple(e.Option(wallet), e.Option(e.Str('EGLD'))),
-      ],
+      codeArgs: [],
     });
     console.log('Result:', result);
   });

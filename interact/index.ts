@@ -114,4 +114,32 @@ program.command('deployGovernance').action(async () => {
   console.log('Deployed Governance Contract:', resultGovernance.address);
 });
 
+program.command('upgradeGasService').action(async () => {
+  const wallet = await loadWallet();
+
+  const result = await wallet.upgradeContract({
+    callee: envChain.select(data.addressGasService),
+    code: data.codeGasService,
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [],
+  });
+  console.log('Result:', result);
+});
+
+program.command('upgradeGateway').action(async () => {
+  const wallet = await loadWallet();
+
+  const result = await wallet.upgradeContract({
+    callee: envChain.select(data.addressGateway),
+    code: data.codeGateway,
+    codeMetadata: ['upgradeable'],
+    gasLimit: 100_000_000,
+    codeArgs: [
+      e.Addr(envChain.select(data.operator)),
+    ],
+  });
+  console.log('Result:', result);
+});
+
 program.parse(process.argv);
